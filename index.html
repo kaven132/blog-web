@@ -1,0 +1,537 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Kaven的个人博客</title>
+    <link rel="icon" type="image/png" href="./image/pen.png">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Noto+Sans+SC:wght@300;400;500;700&family=Noto+Serif+SC:wght@400;600;700;900&family=Playfair+Display:ital,wght@0,500;0,700;0,900;1,500&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+    <!-- ========== Header ========== -->
+    <header class="header">
+        <div class="header-inner">
+            <a href="#" class="logo" id="home-link">
+                <i class="fa-solid fa-feather-pointed"></i>
+                <span id="site-title">Kaven的博客</span>
+            </a>
+            <div class="header-info" id="header-info">
+                <span class="header-date" id="header-date"></span>
+                <span class="header-weather" id="header-weather" title="点击刷新天气">
+                    <i class="fa-solid fa-cloud-sun"></i>
+                    <span class="weather-text">获取天气中...</span>
+                </span>
+            </div>
+            <nav class="header-nav">
+                <span class="login-indicator" id="login-indicator" style="display:none" title="已登录">
+                    <i class="fa-solid fa-user-shield"></i> 已登录
+                </span>
+                <button class="btn btn-sm btn-logout" id="btn-logout" style="display:none" title="退出登录">
+                    <i class="fa-solid fa-right-from-bracket"></i> 退出
+                </button>
+                <button class="btn btn-primary btn-sm" id="btn-new-post-header">
+                    <i class="fa-solid fa-plus"></i> 写文章
+                </button>
+            </nav>
+        </div>
+    </header>
+
+    <!-- ========== Main Layout ========== -->
+    <div class="container">
+        <!-- Sidebar -->
+        <aside class="sidebar">
+            <div class="profile-card" id="profile-card">
+                <div class="profile-avatar-wrapper">
+                    <div class="profile-avatar" id="profile-avatar">
+                        <i class="fa-solid fa-user"></i>
+                    </div>
+                    <button class="avatar-edit-btn" id="btn-edit-profile" title="编辑资料">
+                        <i class="fa-solid fa-pen"></i>
+                    </button>
+                </div>
+                <h2 class="profile-name" id="profile-name">未设置姓名</h2>
+                <p class="profile-bio" id="profile-bio">还没有简介，点击编辑来介绍一下自己吧。</p>
+                <div class="profile-meta">
+                    <div class="profile-meta-item" id="profile-email-display" style="display:none">
+                        <i class="fa-solid fa-envelope"></i>
+                        <span id="profile-email-text"></span>
+                    </div>
+                    <div class="profile-meta-item" id="profile-location-display" style="display:none">
+                        <i class="fa-solid fa-location-dot"></i>
+                        <span id="profile-location-text"></span>
+                    </div>
+                </div>
+                <div class="profile-social" id="profile-social"></div>
+                <div class="profile-stats">
+                    <div class="stat">
+                        <span class="stat-num" id="stat-articles">0</span>
+                        <span class="stat-label">文章</span>
+                    </div>
+                    <div class="stat">
+                        <span class="stat-num" id="stat-categories">0</span>
+                        <span class="stat-label">分类</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Categories -->
+            <div class="sidebar-card">
+                <h3 class="sidebar-card-title">
+                    <i class="fa-solid fa-folder"></i> 文章分类
+                </h3>
+                <ul class="category-list" id="category-list">
+                    <li class="category-item active" data-category="all">全部</li>
+                </ul>
+            </div>
+
+            <!-- Game News -->
+            <div class="sidebar-card game-news-card">
+                <h3 class="sidebar-card-title">
+                    <i class="fa-solid fa-gamepad"></i> 游戏新闻速递
+                </h3>
+                <div class="game-news-tabs">
+                    <button class="game-news-tab active" data-game="genshin">原神</button>
+                    <button class="game-news-tab" data-game="starrail">星穹铁道</button>
+                    <button class="game-news-tab" data-game="endfield">终末地</button>
+                    <button class="game-news-tab" data-game="nte">异环</button>
+                </div>
+                <div class="game-news-content" id="game-news-content">
+                    <div class="game-news-panel active" id="news-genshin">
+                        <div class="game-news-item">
+                            <span class="game-news-tag tag-version">6.7版本</span>
+                            <p class="game-news-title">「映夏！归乡？千灵节！」7月1日上线 — 桑多涅(木偶)冰大剑登场，月球地图开放</p>
+                        </div>
+                        <div class="game-news-item">
+                            <span class="game-news-tag tag-character">新角色</span>
+                            <p class="game-news-title">愚人众「木偶」桑多涅 — 冰系大剑站场C，星超导反应机制，专属武器「超越之匙」</p>
+                        </div>
+                        <div class="game-news-item">
+                            <span class="game-news-tag tag-map">新地图</span>
+                            <p class="game-news-title">提瓦特首个外星区域「霜月」(月球)开放 — 低重力探索，限时奖励400原石</p>
+                        </div>
+                        <div class="game-news-item">
+                            <span class="game-news-tag tag-skin">活动</span>
+                            <p class="game-news-title">千灵节：深海潜水+场馆经营+捕鱼，免费送夏洛蒂+限定衣装「赫尔洛克变奏曲」</p>
+                        </div>
+                        <div class="game-news-item">
+                            <span class="game-news-tag tag-event">前瞻</span>
+                            <p class="game-news-title">7.0至冬国8月12日上线！冰神+七位新角色登场，告别「月之」系列篇章</p>
+                        </div>
+                        <div class="game-news-item">
+                            <span class="game-news-tag tag-buff">角色加强</span>
+                            <p class="game-news-title">「月谕圣牌」系统：八重神子、赛诺、七七、北斗等7位老角色大幅强化</p>
+                        </div>
+                    </div>
+                    <div class="game-news-panel" id="news-starrail" style="display:none">
+                        <div class="game-news-item">
+                            <span class="game-news-tag tag-version">4.4版本</span>
+                            <p class="game-news-title">「鸣笛于归寂之时」7月15日上线 — SP姬子·启行登场，Fate二期联动正式开启</p>
+                        </div>
+                        <div class="game-news-item">
+                            <span class="game-news-tag tag-character">新角色</span>
+                            <p class="game-news-title">下半卡池UP中：昔涟(记忆·冰) + 白厄(毁灭·物理)，截止7月14日</p>
+                        </div>
+                        <div class="game-news-item">
+                            <span class="game-news-tag tag-fate">Fate联动</span>
+                            <p class="game-news-title">Fate/stay night [UBW] 二期7月15日上线 — 远坂凛+吉尔伽美什，卡池永久开放</p>
+                        </div>
+                        <div class="game-news-item">
+                            <span class="game-news-tag tag-event">前瞻</span>
+                            <p class="game-news-title">4.4前瞻直播7月3日19:30！4.5新角色预告6月30日公布，SP砂金度假形态曝光</p>
+                        </div>
+                        <div class="game-news-item">
+                            <span class="game-news-tag tag-collab">联动</span>
+                            <p class="game-news-title">绿联 × 星穹铁道联名礼盒6月18日发售，全国21家主题门店开放中</p>
+                        </div>
+                        <div class="game-news-item">
+                            <span class="game-news-tag tag-version">未来版本</span>
+                            <p class="game-news-title">4.5版本预告将至，千星城度假胜地与翁法罗斯回归，二相乐园终章剧情</p>
+                        </div>
+                    </div>
+                    <div class="game-news-panel" id="news-endfield" style="display:none">
+                        <div class="game-news-item">
+                            <span class="game-news-tag tag-version">1.4版本</span>
+                            <p class="game-news-title">「重返北境」7月中旬上线 — 新角色李织烟(诀)登场，神秘笞心魔偶像即将公开</p>
+                        </div>
+                        <div class="game-news-item">
+                            <span class="game-news-tag tag-character">新角色</span>
+                            <p class="game-news-title">卡缪限定UP进行中！六星近卫弭弗同步UP，武陵城巡卫队队长清波武艺传人</p>
+                        </div>
+                        <div class="game-news-item">
+                            <span class="game-news-tag tag-map">新地图</span>
+                            <p class="game-news-title">1.3版本新区域「藏剑谷」开放 — 远古机关山谷，迎战未知巨兽探寻炎国宝藏</p>
+                        </div>
+                        <div class="game-news-item">
+                            <span class="game-news-tag tag-event">活动</span>
+                            <p class="game-news-title">「卡莉的武陵童话」拍照活动进行中，卡缪EP「Under My Breath」同步上线</p>
+                        </div>
+                        <div class="game-news-item">
+                            <span class="game-news-tag tag-version">公测捷报</span>
+                            <p class="game-news-title">全球公测半年累计下载突破3000万，1.4版本下半年内容路线图即将公布</p>
+                        </div>
+                    </div>
+                    <div class="game-news-panel" id="news-nte" style="display:none">
+                        <div class="game-news-item">
+                            <span class="game-news-tag tag-version">1.2版本</span>
+                            <p class="game-news-title">「九百九十九夜」7月2日上线 — S级光属性主C「真红」龙娘登场，爆发AOE</p>
+                        </div>
+                        <div class="game-news-item">
+                            <span class="game-news-tag tag-character">新角色</span>
+                            <p class="game-news-title">下半卡池7/23开启 — 首位限定奶妈「伊洛伊」灵属性治疗，集回血护盾复活于一体</p>
+                        </div>
+                        <div class="game-news-item">
+                            <span class="game-news-tag tag-map">新地图</span>
+                            <p class="game-news-title">海特洛市郊游乐园全域开放 — 昼夜切换天气系统，嘉年华场景+过山车+迷宫</p>
+                        </div>
+                        <div class="game-news-item">
+                            <span class="game-news-tag tag-gameplay">新玩法</span>
+                            <p class="game-news-title">桌游式肉鸽战棋「九百九十九夜」常驻上线，四人联机卡丁车竞速开跑</p>
+                        </div>
+                        <div class="game-news-item">
+                            <span class="game-news-tag tag-event">福利</span>
+                            <p class="game-news-title">登录即送S级常驻角色自选箱！14套免费时装，保时捷918联动盲盒7月8日截止</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="game-news-footer">
+                    <span class="game-news-updated">🕐 更新于 2026年7月2日</span>
+                    <button class="game-news-refresh" id="btn-refresh-news" title="刷新新闻">
+                        <i class="fa-solid fa-rotate"></i>
+                    </button>
+                </div>
+            </div>
+        </aside>
+
+        <!-- Main Content -->
+        <main class="main-content">
+            <!-- Toolbar -->
+            <div class="toolbar">
+                <div class="search-box">
+                    <i class="fa-solid fa-magnifying-glass"></i>
+                    <input type="text" id="search-input" placeholder="搜索文章标题或内容...">
+                </div>
+                <div class="toolbar-actions">
+                    <select id="sort-select" class="select-sm">
+                        <option value="newest">最新优先</option>
+                        <option value="oldest">最早优先</option>
+                        <option value="title">按标题</option>
+                    </select>
+                </div>
+            </div>
+
+            <!-- Sub-category Bar -->
+            <div class="subcat-bar" id="subcat-bar" style="display:none">
+                <span class="subcat-label"><i class="fa-solid fa-tags"></i> 子分类：</span>
+                <div class="subcat-chips" id="subcat-chips"></div>
+            </div>
+
+            <!-- Article Grid -->
+            <div class="article-grid" id="article-grid"></div>
+
+            <!-- Empty State -->
+            <div class="empty-state" id="empty-state" style="display:none">
+                <i class="fa-solid fa-pen-to-square"></i>
+                <h3>还没有文章</h3>
+                <p>点击"写文章"按钮开始创作你的第一篇文章吧！</p>
+                <button class="btn btn-primary" id="btn-empty-write">
+                    <i class="fa-solid fa-plus"></i> 写第一篇文章
+                </button>
+            </div>
+        </main>
+    </div>
+
+    <!-- ========== Profile Edit Modal ========== -->
+    <div class="modal-overlay" id="profile-modal-overlay">
+        <div class="modal" id="profile-modal">
+            <div class="modal-header">
+                <h2>编辑个人资料</h2>
+                <button class="modal-close" data-close="profile-modal-overlay">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+            <div class="modal-body">
+                <form id="profile-form">
+                    <div class="form-group">
+                        <label for="pf-name">姓名</label>
+                        <input type="text" id="pf-name" placeholder="你的名字" maxlength="30">
+                    </div>
+                    <div class="form-group">
+                        <label for="pf-bio">个人简介</label>
+                        <textarea id="pf-bio" rows="3" placeholder="介绍一下你自己..." maxlength="200"></textarea>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="pf-email">邮箱</label>
+                            <input type="email" id="pf-email" placeholder="your@email.com">
+                        </div>
+                        <div class="form-group">
+                            <label for="pf-location">所在地</label>
+                            <input type="text" id="pf-location" placeholder="城市" maxlength="50">
+                        </div>
+                    </div>
+                    <div class="form-group" id="pf-avatar-group">
+                        <label>头像图片</label>
+                        <div class="image-upload" data-target="pf-avatar">
+                            <div class="image-upload-zone" id="pf-avatar-zone">
+                                <div class="upload-placeholder">
+                                    <i class="fa-solid fa-cloud-arrow-up"></i>
+                                    <span>点击上传或拖拽图片到此处</span>
+                                    <small>PNG / JPG / GIF / WebP · 最大 10MB</small>
+                                </div>
+                                <div class="upload-preview" id="pf-avatar-preview" style="display:none">
+                                    <img src="" alt="头像预览">
+                                    <button type="button" class="upload-remove" title="移除图片">&times;</button>
+                                </div>
+                                <div class="upload-progress" id="pf-avatar-progress" style="display:none">
+                                    <div class="upload-progress-bar"></div>
+                                </div>
+                            </div>
+                            <input type="file" id="pf-avatar-file" accept="image/png,image/jpeg,image/gif,image/webp,image/avif" hidden>
+                            <input type="url" id="pf-avatar" placeholder="或输入图片URL https://..." class="image-url-input">
+                        </div>
+                        <small>支持本地上传或粘贴图片，也可输入URL链接。留空使用默认图标</small>
+                    </div>
+                    <div class="form-group">
+                        <label>社交链接</label>
+                        <div class="social-inputs">
+                            <div class="social-input-row">
+                                <i class="fa-brands fa-github"></i>
+                                <input type="url" id="pf-github" placeholder="GitHub 主页链接">
+                            </div>
+                            <div class="social-input-row">
+                                <i class="fa-brands fa-twitter"></i>
+                                <input type="url" id="pf-twitter" placeholder="Twitter / X 链接">
+                            </div>
+                            <div class="social-input-row">
+                                <i class="fa-solid fa-globe"></i>
+                                <input type="url" id="pf-website" placeholder="个人网站链接">
+                            </div>
+                        </div>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-outline" data-close="profile-modal-overlay">取消</button>
+                <button class="btn btn-primary" id="btn-login-edit" style="display:none">
+                    <i class="fa-solid fa-lock-open"></i> 登录并编辑
+                </button>
+                <button class="btn btn-primary" id="btn-save-profile">
+                    <i class="fa-solid fa-check"></i> 保存
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ========== Article Editor Modal ========== -->
+    <div class="modal-overlay" id="article-modal-overlay">
+        <div class="modal modal-lg" id="article-modal">
+            <div class="modal-header">
+                <h2 id="article-modal-title">写文章</h2>
+                <button class="modal-close" data-close="article-modal-overlay">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+            <div class="modal-body">
+                <form id="article-form">
+                    <input type="hidden" id="art-id">
+                    <div class="form-group">
+                        <label for="art-title">文章标题 <span class="required">*</span></label>
+                        <input type="text" id="art-title" placeholder="输入文章标题..." maxlength="100" required>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="art-category">分类</label>
+                            <input type="text" id="art-category" placeholder="例如：技术、生活、旅行" list="category-datalist" maxlength="30">
+                            <datalist id="category-datalist"></datalist>
+                        </div>
+                        <div class="form-group" id="art-subcategory-group" style="display:none">
+                            <label for="art-subcategory">子分类</label>
+                            <input type="text" id="art-subcategory" placeholder="选择或输入新的子分类..." list="subcategory-datalist" maxlength="30">
+                            <datalist id="subcategory-datalist"></datalist>
+                            <small>可从列表中选择已有子分类，也可直接输入新子分类</small>
+                        </div>
+                        <div class="form-group">
+                            <label for="art-tags">标签</label>
+                            <input type="text" id="art-tags" placeholder="用逗号分隔，例如：JavaScript, CSS" maxlength="200">
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label for="art-summary">摘要</label>
+                        <textarea id="art-summary" rows="2" placeholder="简短描述文章内容..." maxlength="300"></textarea>
+                    </div>
+                    <div class="form-group">
+                        <label>封面图片</label>
+                        <div class="image-upload" data-target="art-cover">
+                            <div class="image-upload-zone" id="art-cover-zone">
+                                <div class="upload-placeholder">
+                                    <i class="fa-solid fa-cloud-arrow-up"></i>
+                                    <span>点击上传或拖拽图片到此处</span>
+                                    <small>PNG / JPG / GIF / WebP · 最大 10MB</small>
+                                </div>
+                                <div class="upload-preview" id="art-cover-preview" style="display:none">
+                                    <img src="" alt="封面预览">
+                                    <button type="button" class="upload-remove" title="移除图片">&times;</button>
+                                </div>
+                                <div class="upload-progress" id="art-cover-progress" style="display:none">
+                                    <div class="upload-progress-bar"></div>
+                                </div>
+                            </div>
+                            <input type="file" id="art-cover-file" accept="image/png,image/jpeg,image/gif,image/webp,image/avif" hidden>
+                            <input type="url" id="art-cover" placeholder="或输入图片URL https://... (可选)" class="image-url-input">
+                        </div>
+                    </div>
+                    <div class="form-group form-checkbox">
+                        <label class="checkbox-label">
+                            <input type="checkbox" id="art-pinned">
+                            <span class="checkbox-text">
+                                <i class="fa-solid fa-thumbtack"></i> 置顶文章
+                            </span>
+                            <span class="checkbox-hint">置顶的文章将始终显示在列表最前面</span>
+                        </label>
+                    </div>
+                    <div class="form-group">
+                        <label for="art-content">文章内容 <span class="required">*</span></label>
+                        <div class="editor-toolbar" id="editor-toolbar">
+                            <button type="button" class="editor-btn" data-tag="h3" title="标题"><i class="fa-solid fa-heading"></i></button>
+                            <button type="button" class="editor-btn" data-tag="strong" title="加粗"><i class="fa-solid fa-bold"></i></button>
+                            <button type="button" class="editor-btn" data-tag="em" title="斜体"><i class="fa-solid fa-italic"></i></button>
+                            <button type="button" class="editor-btn" data-tag="u" title="下划线"><i class="fa-solid fa-underline"></i></button>
+                            <button type="button" class="editor-btn" data-tag="blockquote" title="引用"><i class="fa-solid fa-quote-right"></i></button>
+                            <button type="button" class="editor-btn" data-tag="code" title="代码"><i class="fa-solid fa-code"></i></button>
+                            <button type="button" class="editor-btn" data-tag="a" title="链接"><i class="fa-solid fa-link"></i></button>
+                            <button type="button" class="editor-btn" data-tag="hr" title="分隔线"><i class="fa-solid fa-minus"></i></button>
+                        </div>
+                        <textarea id="art-content" rows="12" placeholder="开始写作...&#10;&#10;支持 HTML 标签排版。使用上方工具栏快速插入格式。" required></textarea>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-outline" data-close="article-modal-overlay">取消</button>
+                <button class="btn btn-primary" id="btn-save-article">
+                    <i class="fa-solid fa-check"></i> 发布
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ========== Article Detail Modal ========== -->
+    <div class="modal-overlay" id="detail-modal-overlay">
+        <div class="modal modal-lg" id="detail-modal">
+            <div class="modal-header">
+                <h2 id="detail-title"></h2>
+                <button class="modal-close" data-close="detail-modal-overlay">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+            <div class="modal-body">
+                <div class="article-meta" id="detail-meta"></div>
+                <div class="article-cover-wrapper" id="detail-cover-wrapper" style="display:none">
+                    <img id="detail-cover" src="" alt="封面图">
+                </div>
+                <div class="article-content" id="detail-content"></div>
+                <div class="article-tags" id="detail-tags"></div>
+
+                <!-- Like & Share Bar -->
+                <div class="article-engage-bar">
+                    <button class="engage-btn like-btn" id="btn-detail-like" title="点赞">
+                        <i class="fa-regular fa-heart"></i>
+                        <span id="detail-like-count">0</span>
+                    </button>
+                    <button class="engage-btn" id="btn-scroll-comments" title="评论">
+                        <i class="fa-regular fa-comment"></i>
+                        <span id="detail-comment-count">0</span>
+                    </button>
+                </div>
+
+                <!-- Comments Section -->
+                <div class="comments-section" id="comments-section">
+                    <h3 class="comments-title">
+                        <i class="fa-regular fa-comments"></i> 评论 (<span id="comments-count">0</span>)
+                    </h3>
+                    <div class="comment-form">
+                        <input type="text" id="comment-author" placeholder="你的昵称" maxlength="30" class="comment-input">
+                        <div class="comment-input-row">
+                            <textarea id="comment-content" placeholder="写下你的想法..." rows="3" maxlength="500" class="comment-textarea"></textarea>
+                            <button class="btn btn-primary btn-sm" id="btn-submit-comment">
+                                <i class="fa-solid fa-paper-plane"></i> 发表
+                            </button>
+                        </div>
+                    </div>
+                    <div class="comments-list" id="comments-list"></div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-outline btn-sm" id="btn-detail-pin" title="置顶/取消置顶">
+                    <i class="fa-solid fa-thumbtack"></i> <span id="btn-detail-pin-text">置顶</span>
+                </button>
+                <button class="btn btn-outline btn-sm" id="btn-detail-delete">
+                    <i class="fa-solid fa-trash"></i> 删除
+                </button>
+                <button class="btn btn-primary" id="btn-detail-edit">
+                    <i class="fa-solid fa-pen"></i> 编辑
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ========== Delete Confirm Modal ========== -->
+    <div class="modal-overlay" id="confirm-modal-overlay">
+        <div class="modal modal-sm" id="confirm-modal">
+            <div class="modal-header">
+                <h2>确认删除</h2>
+                <button class="modal-close" data-close="confirm-modal-overlay">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+            <div class="modal-body">
+                <p id="confirm-message">确定要删除这篇文章吗？此操作不可撤销。</p>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-outline" data-close="confirm-modal-overlay">取消</button>
+                <button class="btn btn-danger" id="btn-confirm-delete">
+                    <i class="fa-solid fa-trash"></i> 确认删除
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ========== Login Modal ========== -->
+    <div class="modal-overlay" id="login-modal-overlay">
+        <div class="modal modal-sm" id="login-modal">
+            <div class="modal-header">
+                <h2><i class="fa-solid fa-lock"></i> 管理员登录</h2>
+                <button class="modal-close" data-close="login-modal-overlay">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+            <div class="modal-body">
+                <form id="login-form">
+                    <div class="form-group">
+                        <label for="login-username">账号</label>
+                        <input type="text" id="login-username" placeholder="请输入账号" maxlength="30" autocomplete="username">
+                    </div>
+                    <div class="form-group">
+                        <label for="login-password">密码</label>
+                        <input type="password" id="login-password" placeholder="请输入密码" maxlength="50" autocomplete="current-password">
+                    </div>
+                    <p class="login-error" id="login-error" style="display:none"></p>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-outline" data-close="login-modal-overlay">取消</button>
+                <button class="btn btn-primary" id="btn-login">
+                    <i class="fa-solid fa-right-to-bracket"></i> 登录
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ========== Toast ========== -->
+    <div class="toast-container" id="toast-container"></div>
+
+    <script src="js/app.js"></script>
+</body>
+</html>
