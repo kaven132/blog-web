@@ -1,0 +1,41 @@
+# ============================================
+# Kaven's Blog — Caddyfile (HTTPS 自动证书)
+# ============================================
+# 使用方法:
+#   1. 将域名 DNS 解析到服务器 IP
+#   2. docker compose -f docker-compose.caddy.yml up -d
+#
+# 替换 your-domain.com 为你的域名
+
+your-domain.com {
+    # API 反向代理到 Node.js
+    handle /api/* {
+        reverse_proxy app:3000
+    }
+
+    # 上传图片
+    handle /uploads/* {
+        root * /data
+        file_server
+    }
+
+    # 静态文件 + SPA fallback
+    handle {
+        root * /usr/share/nginx/html
+        file_server {
+            index index.html
+        }
+        try_files {path} /index.html
+    }
+
+    # 安全头
+    header X-Frame-Options "SAMEORIGIN"
+    header X-Content-Type-Options "nosniff"
+    header X-XSS-Protection "1; mode=block"
+
+    # 静态资源缓存
+    @static {
+        path /css/* /js/* /image/* /uploads/*
+    }
+    header @static Cache-Control "public, max-age=604800"
+}

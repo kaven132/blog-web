@@ -1,0 +1,53 @@
+# ============================================
+# Kaven's Blog — Docker Compose (Caddy + HTTPS)
+# ============================================
+# 使用此文件替代默认的 nginx，自动申请 Let's Encrypt 证书
+#
+# 使用前:
+#   1. 编辑 Caddyfile，将 your-domain.com 改为你的域名
+#   2. 确保域名 DNS 已解析到服务器 IP
+#   3. 启动: docker compose -f docker-compose.yml -f docker-compose.caddy.yml up -d
+#
+# 如果不需要 Nginx（只用 Caddy），直接:
+#   docker compose -f docker-compose.caddy.yml up -d
+
+services:
+  # 移除 nginx，改用 Caddy
+  nginx:
+    profiles:
+      - disabled
+
+  # 添加 Caddy
+  caddy:
+    image: caddy:2-alpine
+    container_name: blog-caddy
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+      # Static files
+      - ./index.html:/usr/share/nginx/html/index.html:ro
+      - ./css:/usr/share/nginx/html/css:ro
+      - ./js:/usr/share/nginx/html/js:ro
+      - ./image:/usr/share/nginx/html/image:ro
+      # Uploaded images
+      - blog-uploads:/data/uploads:ro
+    networks:
+      - blog-net
+    depends_on:
+      app:
+        condition: service_healthy
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+volumes:
+  caddy-data:
+  caddy-config:
+  # blog-data 和 blog-uploads 在 docker-compose.yml 中已定义

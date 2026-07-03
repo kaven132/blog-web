@@ -22,6 +22,12 @@ services:
       - blog-uploads:/app/uploads
     networks:
       - blog-net
+    healthcheck:
+      test: ["CMD", "node", "-e", "require('http').get('http://localhost:3000/api/health',r=>{process.exit(r.statusCode===200?0:1)})"]
+      interval: 30s
+      timeout: 3s
+      start_period: 5s
+      retries: 3
     logging:
       driver: "json-file"
       options:
@@ -48,12 +54,39 @@ services:
     networks:
       - blog-net
     depends_on:
-      - app
+      app:
+        condition: service_healthy
     logging:
       driver: "json-file"
       options:
         max-size: "10m"
         max-file: "3"
+
+  # ── Database Backup (daily) ────────────────
+  backup:
+    image: alpine:latest
+    container_name: blog-backup
+    restart: unless-stopped
+    volumes:
+      - blog-data:/data:ro
+      - ./backups:/backups
+    environment:
+      - TZ=Asia/Shanghai
+    entrypoint: |
+      sh -c '
+        while true; do
+          # Wait 1 day, then backup
+          sleep 86400
+          cp /data/data.db /backups/data_$$(date +%Y%m%d_%H%M%S).db 2>/dev/null || true
+          # Keep only latest 30 backups
+          ls -t /backups/data_*.db 2>/dev/null | tail -n +31 | xargs rm -f 2>/dev/null || true
+        done
+      '
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "1m"
+        max-file: "1"
 
 volumes:
   # Database persists here

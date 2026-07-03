@@ -1,10 +1,12 @@
 node_modules/
 .env
 data.db
-data.db-wal
 data.db-shm
+data.db-wal
 uploads/*
 !uploads/.gitkeep
+backups/*
+!backups/.gitkeep
 .DS_Store
 .claude/
 scripts/data.db

@@ -818,7 +818,7 @@ app.get('/api/health', (_req, res) => {
 // ════════════════════════════════════════════════
 //  Start Server
 // ════════════════════════════════════════════════
-app.listen(PORT, '0.0.0.0', () => {
+const server = app.listen(PORT, '0.0.0.0', () => {
   console.log('📝 Kaven\'s Blog server running at http://0.0.0.0:' + PORT);
   console.log('   Database: ' + dbPath + ' (better-sqlite3, WAL mode)');
   if (CREDS_AUTO_GENERATED) {
@@ -831,3 +831,22 @@ app.listen(PORT, '0.0.0.0', () => {
     console.log('──────────────────────────────────────────────');
   }
 });
+
+// ── Graceful shutdown ──────────────────────────
+function shutdown(signal) {
+  console.log('\n⚠  Received ' + signal + ', shutting down gracefully...');
+  server.close(() => {
+    console.log('   HTTP server closed');
+    db.close();
+    console.log('   Database closed');
+    process.exit(0);
+  });
+  // Force exit after 10s
+  setTimeout(() => {
+    console.error('   Forced shutdown after timeout');
+    process.exit(1);
+  }, 10000);
+}
+
+process.on('SIGTERM', () => shutdown('SIGTERM'));
+process.on('SIGINT', () => shutdown('SIGINT'));
