@@ -1643,6 +1643,76 @@ document.getElementById('btn-logout').addEventListener('click', () => {
 // ============================================
 // Render All
 // ============================================
+// ============================================
+// Sidebar Toggle (off-canvas on narrow screens)
+// ============================================
+(function initSidebar() {
+    const toggleBtn = document.getElementById('sidebar-toggle');
+    const closeBtn = document.getElementById('sidebar-close');
+    const sidebar = document.querySelector('.sidebar');
+    const overlay = document.getElementById('sidebar-overlay');
+
+    if (!toggleBtn || !sidebar || !overlay) return;
+
+    function openSidebar() {
+        sidebar.classList.add('open');
+        overlay.classList.add('visible');
+        document.body.style.overflow = 'hidden';
+        toggleBtn.setAttribute('aria-expanded', 'true');
+    }
+
+    function closeSidebar() {
+        sidebar.classList.remove('open');
+        overlay.classList.remove('visible');
+        document.body.style.overflow = '';
+        toggleBtn.setAttribute('aria-expanded', 'false');
+    }
+
+    function isOpen() {
+        return sidebar.classList.contains('open');
+    }
+
+    toggleBtn.addEventListener('click', () => {
+        if (isOpen()) {
+            closeSidebar();
+        } else {
+            openSidebar();
+        }
+    });
+
+    // Close button inside sidebar
+    if (closeBtn) {
+        closeBtn.addEventListener('click', closeSidebar);
+    }
+
+    // Click overlay to close
+    overlay.addEventListener('click', closeSidebar);
+
+    // Escape key to close
+    document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape' && isOpen()) {
+            closeSidebar();
+            toggleBtn.focus();
+        }
+    });
+
+    // Close sidebar when a category or nav link is clicked
+    sidebar.addEventListener('click', (e) => {
+        const link = e.target.closest('a, .category-item, .subcat-chip');
+        if (link) {
+            // Small delay to let the navigation happen first
+            setTimeout(closeSidebar, 150);
+        }
+    });
+
+    // Auto-close sidebar when resizing above the off-canvas breakpoint
+    window.addEventListener('resize', () => {
+        if (window.innerWidth > 1000 && isOpen()) {
+            closeSidebar();
+        }
+    });
+})();
+
 async function renderAll() {
     // Load articles first so counts are available
     try {

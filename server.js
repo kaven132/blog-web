@@ -819,7 +819,7 @@ app.get('/api/health', (_req, res) => {
 //  Start Server
 // ════════════════════════════════════════════════
 const server = app.listen(PORT, '0.0.0.0', () => {
-  console.log('📝 Kaven\'s Blog server running at http://0.0.0.0:' + PORT);
+  console.log('📝 Kaven\'s Blog server running at http://localhost:' + PORT);
   console.log('   Database: ' + dbPath + ' (better-sqlite3, WAL mode)');
   if (CREDS_AUTO_GENERATED) {
     console.log('──────────────────────────────────────────────');

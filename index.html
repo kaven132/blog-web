@@ -14,6 +14,9 @@
     <!-- ========== Header ========== -->
     <header class="header">
         <div class="header-inner">
+            <button class="sidebar-toggle" id="sidebar-toggle" title="切换侧边栏" aria-label="切换侧边栏">
+                <i class="fa-solid fa-bars"></i>
+            </button>
             <a href="#" class="logo" id="home-link">
                 <i class="fa-solid fa-feather-pointed"></i>
                 <span id="site-title">Kaven的博客</span>
@@ -39,10 +42,19 @@
         </div>
     </header>
 
+    <!-- Sidebar overlay for mobile -->
+    <div class="sidebar-overlay" id="sidebar-overlay"></div>
+
     <!-- ========== Main Layout ========== -->
     <div class="container">
         <!-- Sidebar -->
         <aside class="sidebar">
+            <div class="sidebar-header">
+                <span class="sidebar-header-title">Kaven的博客</span>
+                <button class="sidebar-close" id="sidebar-close" title="关闭侧边栏" aria-label="关闭侧边栏">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
             <div class="profile-card" id="profile-card">
                 <div class="profile-avatar-wrapper">
                     <div class="profile-avatar" id="profile-avatar">
