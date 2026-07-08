@@ -420,17 +420,7 @@ document.querySelectorAll('.game-news-tab').forEach(tab => {
     });
 });
 
-// Refresh news button (placeholder for future dynamic fetching)
-document.getElementById('btn-refresh-news').addEventListener('click', () => {
-    const btn = document.getElementById('btn-refresh-news');
-    const icon = btn.querySelector('i');
-    icon.classList.add('fa-spin');
-    setTimeout(() => {
-        icon.classList.remove('fa-spin');
-        const footer = document.querySelector('.game-news-updated');
-        if (footer) footer.textContent = '🕐 已更新于 ' + new Date().toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' });
-    }, 1500);
-});
+
 
 // ============================================
 // Helpers

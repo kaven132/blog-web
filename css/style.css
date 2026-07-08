@@ -1880,9 +1880,9 @@ img {
         gap: 0;
     }
 
-    /* Game news: shorter panels when sidebar is off-canvas */
+    /* Game news: allow full content when sidebar is off-canvas */
     .game-news-content {
-        max-height: 260px;
+        max-height: none;
     }
 }
 
@@ -2080,7 +2080,6 @@ img {
    Game News Sidebar Card
    ============================================ */
 .game-news-card {
-    overflow: hidden;
 }
 
 .game-news-card .sidebar-card-title i {
@@ -2242,4 +2241,3 @@ img {
     color: var(--primary);
     border-color: var(--primary-light);
 }
-
