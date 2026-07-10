@@ -2,6 +2,9 @@
 
 基于 **Docker + better-sqlite3 + Nginx** 的容器化个人博客系统。
 
+> 🚧 **正在迁移到 Astro + React + TypeScript + Tailwind v4 + Drizzle ORM**
+> 详见 [MIGRATION_PLAN.md](./MIGRATION_PLAN.md)。当前阶段：**Phase 1 完成，Phase 2 待开始**。
+
 ## v2.0 升级亮点
 
 | 对比维度 | v1.0 (blog/) | v2.0 (blog2/) |
@@ -68,10 +71,19 @@ docker compose -f docker-compose.yml -f docker-compose.caddy.yml up -d
 
 ## 本地开发（无 Docker）
 
+**Express（当前主栈）**
 ```bash
 npm install
 NO_STATIC=false node server.js
 # 访问 http://localhost:3000
+```
+
+**Astro（新栈 — Phase 1 已完成，Phase 2 开发中）**
+```bash
+npm install
+npm run dev:astro
+# 访问 http://localhost:4321
+# Express 仍在 :3000 独立运行，互不影响（双轨）
 ```
 
 > `NO_STATIC=false` 让 Node 直接提供静态文件，无需 Nginx。
@@ -79,14 +91,24 @@ NO_STATIC=false node server.js
 ## 目录结构
 
 ```
-├── server.js                # Express API 服务 (better-sqlite3)
-├── index.html               # 前端页面
-├── css/style.css            # 样式
-├── js/app.js                # 前端逻辑
+├── server.js                # Express API 服务 (better-sqlite3) — 当前运行中
+├── index.html               # 前端 SPA 页面
+├── css/style.css            # 样式（将与 Tailwind 共存逐步替换）
+├── js/app.js                # 前端逻辑（Vanilla JS）
 ├── image/                   # 图标等静态资源
 ├── uploads/                 # 上传图片目录 (挂载到卷)
 ├── backups/                 # 数据库每日自动备份
 ├── data.db                  # SQLite 数据库 (自动生成，不提交)
+│
+├── astro.config.ts          # 🆕 Astro SSR + React + Tailwind 配置
+├── tsconfig.json            # 🆕 TypeScript 配置
+├── drizzle.config.ts        # 🆕 Drizzle Kit 配置
+├── src/                     # 🆕 Astro 源码 (Phase 1 完成)
+│   ├── db/schema.ts         #   Drizzle schema (6 张表)
+│   ├── lib/db.ts            #   数据库连接
+│   ├── lib/utils.ts         #   工具函数
+│   ├── styles/global.css    #   Tailwind v4 @theme
+│   └── pages/index.astro   #   SSR 验证页面
 │
 ├── Dockerfile               # 多阶段构建 (编译 → 运行)
 ├── nginx.conf               # Nginx 配置
@@ -94,6 +116,7 @@ NO_STATIC=false node server.js
 ├── docker-compose.yml       # 多容器编排
 ├── docker-compose.caddy.yml # Caddy HTTPS 附加配置
 ├── deploy.sh                # 一键部署脚本
+├── MIGRATION_PLAN.md        # 🆕 迁移计划与进度
 ├── .env.example             # 环境变量模板
 ├── .dockerignore
 ├── .gitignore
@@ -139,9 +162,18 @@ curl -X POST http://localhost:3000/api/demo/init
 
 ## 技术栈
 
+**当前（Express）**
 - **运行时**: Node.js 22 Alpine
 - **后端**: Express 4.x
 - **数据库**: better-sqlite3 (WAL 模式，原生性能)
 - **Web 服务器**: Nginx 1.27 Alpine / Caddy 2 (HTTPS)
 - **认证**: scrypt 密码哈希 + HMAC-SHA256 Token
 - **容器**: Docker + Docker Compose (多阶段构建)
+
+**目标（Astro）** — Phase 1 ✅
+- **框架**: Astro 7.x SSR + React 19 Islands
+- **语言**: TypeScript 5.x
+- **样式**: Tailwind CSS v4 + 旧 style.css 共存
+- **ORM**: Drizzle ORM + better-sqlite3
+- **认证**: JWT httpOnly Cookie (jose) + 旧 Bearer Token 双认证
+- **部署**: @astrojs/node standalone

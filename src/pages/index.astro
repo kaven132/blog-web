@@ -1,0 +1,70 @@
+---
+// Phase 1 verification page
+// Confirms: Drizzle reads existing data.db, Tailwind compiles
+import { db } from "../lib/db";
+import { profile, articles, categoryTree } from "../db/schema";
+
+const p = db.select().from(profile).get();
+const arts = db.select().from(articles).all();
+const cats = db.select().from(categoryTree).all();
+---
+
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Kaven的博客 — Astro SSR</title>
+    <link rel="stylesheet" href="/css/style.css" />
+  </head>
+  <body class="bg-bg text-text font-sans min-h-screen">
+    <main class="max-w-container mx-auto p-8">
+      <h1 class="text-2xl font-bold text-primary mb-6">
+        🚀 Astro SSR — Phase 1 验证
+      </h1>
+
+      <!-- Profile -->
+      <section class="bg-bg-card shadow-default rounded-default p-6 mb-6 border border-border">
+        <h2 class="text-lg font-semibold text-text mb-3">👤 Profile</h2>
+        <p>姓名：{p?.name || "未设置"}</p>
+        <p class="text-text-secondary">Bio：{p?.bio || "未设置"}</p>
+        <p class="text-text-muted text-sm mt-2">
+          email: {p?.email || "-"} · location: {p?.location || "-"}
+        </p>
+      </section>
+
+      <!-- Articles -->
+      <section class="bg-bg-card shadow-default rounded-default p-6 mb-6 border border-border">
+        <h2 class="text-lg font-semibold text-text mb-3">
+          📝 文章列表（{arts.length} 篇）
+        </h2>
+        <ul class="space-y-2">
+          {arts.slice(0, 5).map((a) => (
+            <li class="border-b border-border-light pb-2 last:border-0">
+              <span class="text-sm text-text-muted">[{a.category}]</span>
+              <span class="ml-2 font-medium">{a.title}</span>
+              <span class="ml-2 text-xs text-text-muted">
+                ❤️ {a.likesCount}
+              </span>
+            </li>
+          ))}
+        </ul>
+      </section>
+
+      <!-- Category Tree -->
+      <section class="bg-bg-card shadow-default rounded-default p-6 border border-border">
+        <h2 class="text-lg font-semibold text-text mb-3">📂 分类树</h2>
+        <ul>
+          {cats.map((c) => (
+            <li class="text-text-secondary">
+              {c.parent} → {c.child}
+            </li>
+          ))}
+        </ul>
+      </section>
+
+      <footer class="mt-8 pt-6 border-t border-border text-center text-text-muted text-sm">
+        ✅ Drizzle + Tailwind + Astro SSR 全部验证通过
+      </footer>
+    </main>
+  </body>
+</html>

@@ -1,0 +1,86 @@
+/* ============================================
+   Kaven's Blog — Tailwind v4 Global Styles
+
+   CSS Coexistence Strategy (MIGRATION_PLAN Phase 3):
+   1. Tailwind → layout (flex/grid/spacing), colors, typography
+   2. Old css/style.css → remaining component styles (loaded AFTER)
+   3. Old CSS overrides Tailwind conflicts via cascade
+   4. Each Phase progressively trims style.css
+   ============================================ */
+
+@import "tailwindcss";
+
+/* ── Design Tokens (1:1 mapped from css/style.css :root) ── */
+
+@theme {
+  /* Colors */
+  --color-primary: #4f46e5;
+  --color-primary-hover: #4338ca;
+  --color-primary-light: #eef2ff;
+  --color-danger: #ef4444;
+  --color-danger-hover: #dc2626;
+  --color-success: #10b981;
+  --color-warning: #f59e0b;
+
+  /* Surfaces */
+  --color-bg: #f8fafc;
+  --color-bg-card: #ffffff;
+  --color-bg-sidebar: #ffffff;
+  --color-bg-header: #ffffff;
+
+  /* Text */
+  --color-text: #1e293b;
+  --color-text-secondary: #64748b;
+  --color-text-muted: #94a3b8;
+
+  /* Borders */
+  --color-border: #e2e8f0;
+  --color-border-light: #f1f5f9;
+
+  /* Shadows (override Tailwind defaults with project values) */
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.05);
+  --shadow-default: 0 1px 3px rgba(0, 0, 0, 0.1), 0 1px 2px rgba(0, 0, 0, 0.06);
+  --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -2px rgba(0, 0, 0, 0.1);
+  --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -4px rgba(0, 0, 0, 0.1);
+
+  /* Border Radii (override Tailwind defaults with project values) */
+  --radius-sm: 6px;
+  --radius-default: 10px;
+  --radius-lg: 14px;
+  --radius-xl: 20px;
+
+  /* Font */
+  --font-sans: "Inter", "Noto Sans SC", -apple-system, BlinkMacSystemFont, sans-serif;
+
+  /* Layout Dimensions (accessible as w-sidebar, h-header, max-w-container) */
+  --spacing-sidebar: 320px;
+  --spacing-header: 64px;
+  --spacing-container: 1200px;
+}
+
+/* ── Base Layer ───────────────────────────────── */
+
+@layer base {
+  html {
+    font-size: 16px;
+    scroll-behavior: smooth;
+  }
+
+  body {
+    font-family: var(--font-sans);
+    background-color: var(--color-bg);
+    color: var(--color-text);
+    line-height: 1.6;
+    min-height: 100vh;
+  }
+
+  a {
+    color: var(--color-primary);
+    text-decoration: none;
+  }
+
+  img {
+    max-width: 100%;
+    height: auto;
+  }
+}

@@ -5,12 +5,34 @@
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
-    "dev": "node server.js"
+    "dev": "node server.js",
+    "dev:astro": "astro dev",
+    "build:astro": "astro build",
+    "preview:astro": "astro preview",
+    "check:astro": "astro check",
+    "db:check": "drizzle-kit check",
+    "db:introspect": "drizzle-kit introspect"
   },
   "dependencies": {
+    "@astrojs/node": "^11.0.2",
+    "@astrojs/react": "^6.0.1",
     "better-sqlite3": "^12.11.1",
     "dotenv": "^17.4.2",
+    "drizzle-orm": "^0.45.2",
     "express": "^4.21.0",
-    "multer": "^2.2.0"
+    "jose": "^6.2.3",
+    "multer": "^2.2.0",
+    "react": "^19.2.7",
+    "react-dom": "^19.2.7"
+  },
+  "devDependencies": {
+    "@tailwindcss/vite": "^4.3.2",
+    "@types/better-sqlite3": "^7.6.13",
+    "@types/node": "^26.1.1",
+    "@types/react": "^19.2.17",
+    "@types/react-dom": "^19.2.3",
+    "drizzle-kit": "^0.31.10",
+    "tailwindcss": "^4.3.2",
+    "typescript": "^7.0.2"
   }
 }
