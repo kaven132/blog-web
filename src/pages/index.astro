@@ -1,21 +1,18 @@
 ---
 // Home page — SSR-rendered article list
-// Query params: category, subcategory, search, sort (same as GET /api/articles)
 import BaseLayout from "../components/layout/BaseLayout.astro";
 import ArticleGrid from "../components/article/ArticleGrid.astro";
 import { db } from "../lib/db";
-import { articles } from "../db/schema";
+import { articles, categoryTree } from "../db/schema";
 import { eq, like, or, and, desc, asc } from "drizzle-orm";
 import { articleToJSON } from "../lib/utils";
 
-// Parse query params from request URL
 const url = new URL(Astro.request.url);
 const category = url.searchParams.get("category") || "";
 const subcategory = url.searchParams.get("subcategory") || "";
 const search = url.searchParams.get("search") || "";
 const sort = url.searchParams.get("sort") || "newest";
 
-// Helper: build URL for sort switching (preserving current filters)
 function buildSortUrl(newSort: string): string {
   const params = new URLSearchParams();
   if (category && category !== "all") params.set("category", category);
@@ -25,55 +22,47 @@ function buildSortUrl(newSort: string): string {
   return "/?" + params.toString();
 }
 
+// Fetch subcategories for active category
+let subcategories: string[] = [];
+if (category && category !== "all") {
+  const subRows = db
+    .select({ child: categoryTree.child })
+    .from(categoryTree)
+    .where(eq(categoryTree.parent, category))
+    .orderBy(asc(categoryTree.child))
+    .all();
+  subcategories = subRows.map((r) => r.child);
+}
+const hasSubcategories = subcategories.length > 0;
+
 // Build query conditions
 const conditions = [];
-
 if (category && category !== "all") {
   conditions.push(eq(articles.category, category));
 }
-
 if (subcategory && subcategory !== "all") {
   conditions.push(eq(articles.subcategory, subcategory));
 }
-
 if (search.trim()) {
   const q = "%" + search.trim() + "%";
   conditions.push(
-    or(
-      like(articles.title, q),
-      like(articles.summary, q),
-      like(articles.content, q),
-      like(articles.tags, q),
-    )!,
+    or(like(articles.title, q), like(articles.summary, q), like(articles.content, q), like(articles.tags, q))!,
   );
 }
 
 let query = db.select().from(articles).$dynamic();
+if (conditions.length > 0) query = query.where(and(...conditions));
 
-if (conditions.length > 0) {
-  query = query.where(and(...conditions));
-}
-
-// Order: pinned first, then by sort param
 switch (sort) {
-  case "oldest":
-    query = query.orderBy(desc(articles.isPinned), asc(articles.createdAt));
-    break;
-  case "title":
-    query = query.orderBy(desc(articles.isPinned), asc(articles.title));
-    break;
-  case "newest":
-  default:
-    query = query.orderBy(desc(articles.isPinned), desc(articles.createdAt));
+  case "oldest": query = query.orderBy(desc(articles.isPinned), asc(articles.createdAt)); break;
+  case "title": query = query.orderBy(desc(articles.isPinned), asc(articles.title)); break;
+  default: query = query.orderBy(desc(articles.isPinned), desc(articles.createdAt));
 }
 
 const rows = query.all();
 const articleList = rows.map(articleToJSON);
 
-// Page title
-const pageTitle = category && category !== "all"
-  ? `${category} · Kaven的博客`
-  : "Kaven的个人博客";
+const pageTitle = category && category !== "all" ? `${category} · Kaven的博客` : "Kaven的个人博客";
 ---
 
 <BaseLayout pageTitle={pageTitle}>
@@ -82,27 +71,14 @@ const pageTitle = category && category !== "all"
     <div class="search-box">
       <i class="fa-solid fa-magnifying-glass"></i>
       <form action="/" method="get" class="search-form-inline">
-        {category && category !== "all" && (
-          <input type="hidden" name="category" value={category} />
-        )}
-        {subcategory && subcategory !== "all" && (
-          <input type="hidden" name="subcategory" value={subcategory} />
-        )}
-        <input
-          type="text"
-          id="search-input"
-          name="search"
-          placeholder="搜索文章标题或内容..."
-          value={search}
-        />
+        {category && category !== "all" && (<input type="hidden" name="category" value={category} />)}
+        {subcategory && subcategory !== "all" && (<input type="hidden" name="subcategory" value={subcategory} />)}
+        <input type="text" id="search-input" name="search" placeholder="搜索文章标题或内容..." value={search} />
       </form>
     </div>
     <div class="toolbar-actions">
-      <select
-        id="sort-select"
-        class="select-sm"
-        onchange={`window.location.href='${buildSortUrl("__SORT__")}'.replace('__SORT__', this.value)`}
-      >
+      <select id="sort-select" class="select-sm"
+        onchange={`window.location.href='${buildSortUrl("__SORT__")}'.replace('__SORT__', this.value)`}>
         <option value="newest" selected={sort === "newest"}>最新优先</option>
         <option value="oldest" selected={sort === "oldest"}>最早优先</option>
         <option value="title" selected={sort === "title"}>按标题</option>
@@ -110,6 +86,81 @@ const pageTitle = category && category !== "all"
     </div>
   </div>
 
+  <!-- Subcategory chips (shown below toolbar when category has subcategories) -->
+  {hasSubcategories && (
+    <div class="subcat-bar" id="subcat-bar">
+      <span class="subcat-label"><i class="fa-solid fa-tags"></i> {category}</span>
+      <div class="subcat-chips" id="subcat-chips">
+        <a href={`/?category=${encodeURIComponent(category)}`}
+           class={`subcat-chip${!subcategory || subcategory === "all" ? " active" : ""}`}>
+          全部
+        </a>
+        {subcategories.map((sub) => (
+          <a href={`/?category=${encodeURIComponent(category)}&subcategory=${encodeURIComponent(sub)}`}
+             class={`subcat-chip${sub === subcategory ? " active" : ""}`}>
+            {sub}
+          </a>
+        ))}
+      </div>
+    </div>
+  )}
+
   <!-- Article Grid -->
   <ArticleGrid articles={articleList} />
 </BaseLayout>
+
+<style>
+  .subcat-bar {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 14px;
+    margin-bottom: 16px;
+    background: var(--color-bg-card, #fff);
+    border: 1px solid var(--color-border, #e2e8f0);
+    border-radius: var(--radius-default, 10px);
+    flex-wrap: wrap;
+  }
+  .subcat-label {
+    font-size: 0.82rem;
+    font-weight: 600;
+    color: var(--color-text-secondary, #64748b);
+    white-space: nowrap;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex-shrink: 0;
+  }
+  .subcat-label i {
+    color: var(--color-primary, #4f46e5);
+  }
+  .subcat-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+  .subcat-chip {
+    font-size: 0.8rem;
+    padding: 5px 14px;
+    border-radius: 20px;
+    text-decoration: none;
+    color: var(--color-text-secondary, #64748b);
+    background: var(--color-bg, #f8fafc);
+    border: 1px solid var(--color-border-light, #f1f5f9);
+    transition: all 0.18s ease;
+    font-weight: 500;
+    white-space: nowrap;
+  }
+  .subcat-chip:hover {
+    background: var(--color-primary-light, #eef2ff);
+    color: var(--color-primary, #4f46e5);
+    border-color: var(--color-primary, #4f46e5);
+  }
+  .subcat-chip.active {
+    background: var(--color-primary, #4f46e5);
+    color: #fff;
+    border-color: var(--color-primary, #4f46e5);
+    font-weight: 600;
+    box-shadow: 0 2px 6px rgba(79,70,229,0.3);
+  }
+</style>

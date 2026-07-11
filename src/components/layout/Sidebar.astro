@@ -6,12 +6,8 @@ import { db } from "../../lib/db";
 import { articles, categoryTree } from "../../db/schema";
 import { count, isNotNull, asc } from "drizzle-orm";
 
-// Get category list with article counts (for sidebar category filter)
 const categoryRows = db
-  .select({
-    category: articles.category,
-    cnt: count(),
-  })
+  .select({ category: articles.category, cnt: count() })
   .from(articles)
   .where(isNotNull(articles.category))
   .groupBy(articles.category)
@@ -19,24 +15,19 @@ const categoryRows = db
   .all()
   .filter((r): r is { category: string; cnt: number } => r.category !== null && r.category !== "");
 
-// Get category tree
 const treeRows = db
-  .select()
-  .from(categoryTree)
+  .select().from(categoryTree)
   .orderBy(asc(categoryTree.parent), asc(categoryTree.child))
   .all();
 
-// Group tree by parent
 const tree: Record<string, string[]> = {};
 for (const row of treeRows) {
   if (!tree[row.parent]) tree[row.parent] = [];
   tree[row.parent].push(row.child);
 }
 
-// Current category/subcategory from URL (passed via Astro.url)
 const url = new URL(Astro.request?.url || "http://localhost:4321");
 const activeCategory = url.searchParams.get("category") || "all";
-const activeSubcategory = url.searchParams.get("subcategory") || "all";
 ---
 
 <aside class="sidebar">
@@ -47,7 +38,6 @@ const activeSubcategory = url.searchParams.get("subcategory") || "all";
     </button>
   </div>
 
-  <!-- Profile Card -->
   <ProfileCard />
 
   <!-- Categories -->
@@ -55,47 +45,112 @@ const activeSubcategory = url.searchParams.get("subcategory") || "all";
     <h3 class="sidebar-card-title">
       <i class="fa-solid fa-folder"></i> 文章分类
     </h3>
-    <ul class="category-list" id="category-list">
-      <li class={`category-item${activeCategory === "all" ? " active" : ""}`}>
-        <a href="/" data-category="all">全部</a>
-      </li>
+    <nav class="category-nav" id="category-list">
+      <a href="/" class={`cat-link${activeCategory === "all" ? " active" : ""}`}>
+        <span class="cat-icon"><i class="fa-solid fa-border-all"></i></span>
+        <span class="cat-label">全部</span>
+        <span class="cat-count">{categoryRows.reduce((s, r) => s + r.cnt, 0)}</span>
+      </a>
       {categoryRows.map((cat) => {
         const isActive = cat.category === activeCategory;
-        const subcategories = tree[cat.category] || [];
+        const hasSubs = (tree[cat.category] || []).length > 0;
         return (
-          <li class={`category-item${isActive ? " active" : ""}`}>
-            <a
-              href={`/?category=${encodeURIComponent(cat.category)}`}
-              data-category={cat.category}
-            >
-              {cat.category}
-              <span class="category-count">{cat.cnt}</span>
-            </a>
-            {subcategories.length > 0 && isActive && (
-              <ul class="subcategory-list mt-1 ml-4">
-                <li class={`category-item text-sm${activeSubcategory === "all" ? " active" : ""}`}>
-                  <a href={`/?category=${encodeURIComponent(cat.category)}`} data-subcategory="all">
-                    全部
-                  </a>
-                </li>
-                {subcategories.map((sub: string) => (
-                  <li class={`category-item text-sm${sub === activeSubcategory ? " active" : ""}`}>
-                    <a
-                      href={`/?category=${encodeURIComponent(cat.category)}&subcategory=${encodeURIComponent(sub)}`}
-                      data-subcategory={sub}
-                    >
-                      {sub}
-                    </a>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </li>
+          <a
+            href={`/?category=${encodeURIComponent(cat.category)}`}
+            class={`cat-link${isActive ? " active" : ""}`}
+          >
+            <span class="cat-icon">
+              <i class={`fa-solid ${hasSubs ? 'fa-folder-tree' : 'fa-folder'}`}></i>
+            </span>
+            <span class="cat-label">{cat.category}</span>
+            <span class="cat-count">{cat.cnt}</span>
+          </a>
         );
       })}
-    </ul>
+    </nav>
   </div>
 
-  <!-- Game News -->
   <GameNews />
 </aside>
+
+<style>
+  .category-nav {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+  .cat-link {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 9px 12px;
+    border-radius: 8px;
+    text-decoration: none;
+    color: var(--color-text, #1e293b);
+    font-size: 0.9rem;
+    font-weight: 500;
+    transition: all 0.18s ease;
+    cursor: pointer;
+    position: relative;
+    border: 1px solid transparent;
+  }
+  .cat-link:hover {
+    background: var(--color-primary-light, #eef2ff);
+    color: var(--color-primary, #4f46e5);
+    border-color: var(--color-primary-light, #eef2ff);
+  }
+  .cat-link.active {
+    background: var(--color-primary-light, #eef2ff);
+    color: var(--color-primary, #4f46e5);
+    font-weight: 600;
+    border-color: var(--color-primary, #4f46e5);
+    box-shadow: 0 0 0 1px var(--color-primary, #4f46e5) inset;
+  }
+  .cat-icon {
+    width: 28px;
+    height: 28px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 6px;
+    background: var(--color-bg, #f8fafc);
+    font-size: 0.75rem;
+    color: var(--color-text-muted, #94a3b8);
+    flex-shrink: 0;
+    transition: all 0.18s ease;
+  }
+  .cat-link.active .cat-icon {
+    background: var(--color-primary, #4f46e5);
+    color: #fff;
+  }
+  .cat-link:hover .cat-icon {
+    background: var(--color-primary, #4f46e5);
+    color: #fff;
+  }
+  .cat-label {
+    flex: 1;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .cat-count {
+    font-size: 0.72rem;
+    font-weight: 600;
+    background: var(--color-bg, #f8fafc);
+    color: var(--color-text-muted, #94a3b8);
+    padding: 2px 9px;
+    border-radius: 20px;
+    min-width: 24px;
+    text-align: center;
+    flex-shrink: 0;
+    transition: all 0.18s ease;
+  }
+  .cat-link.active .cat-count {
+    background: var(--color-primary, #4f46e5);
+    color: #fff;
+  }
+  .cat-link:hover .cat-count {
+    background: var(--color-primary, #4f46e5);
+    color: #fff;
+  }
+</style>

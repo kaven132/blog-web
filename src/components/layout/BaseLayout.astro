@@ -3,13 +3,8 @@
 // Wraps everything in global React Islands: ToastProvider, AuthProvider
 import Header from "./Header.astro";
 import Sidebar from "./Sidebar.astro";
-import { ToastProvider } from "../react/Toast";
-import { AuthProvider } from "../react/AuthProvider";
+import AppShell from "../react/AppShell";
 import SidebarToggle from "../react/SidebarToggle";
-import LoginModal from "../react/LoginModal";
-import ArticleEditor from "../react/ArticleEditor";
-import ProfileEditor from "../react/ProfileEditor";
-import GameNewsEditor from "../react/GameNewsEditor";
 
 interface Props {
   pageTitle?: string;
@@ -40,32 +35,24 @@ const { pageTitle = "Kaven的个人博客" } = Astro.props;
   <link rel="stylesheet" href="/css/style.css" />
 </head>
 <body>
-  <ToastProvider client:load>
-    <AuthProvider client:load>
-      <!-- Header -->
-      <Header />
+  <AppShell client:load>
+    <!-- Header -->
+    <Header />
 
-      <!-- Sidebar overlay for mobile -->
-      <div class="sidebar-overlay" id="sidebar-overlay"></div>
+    <!-- Sidebar overlay for mobile -->
+    <div class="sidebar-overlay" id="sidebar-overlay"></div>
 
-      <!-- Main Layout -->
-      <div class="container">
-        <!-- Sidebar -->
-        <Sidebar />
+    <!-- Main Layout -->
+    <div class="container">
+      <!-- Sidebar -->
+      <Sidebar />
 
-        <!-- Main Content — slot for page-specific content -->
-        <main class="main-content">
-          <slot />
-        </main>
-      </div>
-
-      <!-- React Island modals -->
-      <LoginModal client:only="react" />
-      <ArticleEditor client:only="react" />
-      <ProfileEditor client:only="react" />
-      <GameNewsEditor client:only="react" />
-    </AuthProvider>
-  </ToastProvider>
+      <!-- Main Content — slot for page-specific content -->
+      <main class="main-content">
+        <slot />
+      </main>
+    </div>
+  </AppShell>
 
   <!-- Non-critical React Islands -->
   <SidebarToggle client:idle />

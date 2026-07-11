@@ -57,24 +57,20 @@ const dateStr = `${now.getFullYear()}年${now.getMonth() + 1}月${now.getDate()}
 
     // Check if a cached value is valid (not HTML, not expired)
     function isValidCache(entry) {
-      if (!entry || !entry.data || !entry.time) return false;
+      if (!entry || !entry.icon || !entry.time) return false;
       if (Date.now() - entry.time > CACHE_TTL) return false;
-      // Reject HTML responses (stale data from old script)
-      if (/^\s*<(!DOCTYPE|html|head|body)/i.test(entry.data)) return false;
       return true;
     }
 
-    function updateIcon(trimmed) {
-      var icon = weatherEl?.querySelector('i');
-      if (!icon) return;
-      var cls = 'fa-solid fa-cloud-sun';
-      if (trimmed.includes('☀') || /sun|clear/i.test(trimmed)) cls = 'fa-solid fa-sun';
-      else if (trimmed.includes('🌧') || trimmed.includes('🌦') || trimmed.includes('⛈') || /rain|drizzle/i.test(trimmed)) cls = 'fa-solid fa-cloud-rain';
-      else if (trimmed.includes('❄') || trimmed.includes('🌨') || /snow/i.test(trimmed)) cls = 'fa-solid fa-snowflake';
-      else if (trimmed.includes('☁') || trimmed.includes('⛅') || /cloud|overcast/i.test(trimmed)) cls = 'fa-solid fa-cloud';
-      else if (trimmed.includes('🌫') || /fog|mist|haze/i.test(trimmed)) cls = 'fa-solid fa-smog';
-      else if (trimmed.includes('⚡') || /thunder/i.test(trimmed)) cls = 'fa-solid fa-bolt';
-      icon.className = cls;
+    function renderWeather(data) {
+      // Clean display: emoji icon + temp + location
+      var icon = data.icon || '🌤';
+      var temp = (data.temp || '').replace(/^\+/, ''); // strip leading +
+      var loc  = data.location || '';
+      var parts = [icon];
+      if (temp) parts.push(temp);
+      if (loc)  parts.push(loc);
+      weatherText.textContent = parts.join(' ');
     }
 
     function fetchWeather() {
@@ -83,24 +79,17 @@ const dateStr = `${now.getFullYear()}年${now.getMonth() + 1}月${now.getDate()}
       fetch('/api/weather')
         .then(function(res) { return res.json(); })
         .then(function(data) {
-          var trimmed = (data.text || '').trim();
-          if (trimmed && trimmed !== '天气不可用') {
-            weatherText.textContent = trimmed;
-            updateIcon(trimmed);
-            try { localStorage.setItem(CACHE_KEY, JSON.stringify({ data: trimmed, time: Date.now() })); } catch(e) {}
+          if (data.icon) {
+            renderWeather(data);
+            try { localStorage.setItem(CACHE_KEY, JSON.stringify({ icon: data.icon, temp: data.temp, location: data.location, time: Date.now() })); } catch(e) {}
           }
         })
         .catch(function() {
-          // On network error, try reading a valid cache as fallback
           try {
             var cached = JSON.parse(localStorage.getItem(CACHE_KEY) || 'null');
-            if (isValidCache(cached)) {
-              weatherText.textContent = cached.data;
-              updateIcon(cached.data);
-              return;
-            }
+            if (isValidCache(cached)) { renderWeather(cached); return; }
           } catch(e) {}
-          weatherText.textContent = '天气不可用';
+          weatherText.textContent = '🌤 --°C';
         });
     }
 
@@ -108,8 +97,7 @@ const dateStr = `${now.getFullYear()}年${now.getMonth() + 1}月${now.getDate()}
     try {
       var cached = JSON.parse(localStorage.getItem(CACHE_KEY) || 'null');
       if (isValidCache(cached)) {
-        weatherText.textContent = cached.data;
-        updateIcon(cached.data);
+        renderWeather(cached);
       } else {
         fetchWeather();
       }
