@@ -34,9 +34,9 @@ const { pageTitle = "Kaven的个人博客" } = Astro.props;
     rel="stylesheet"
     href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css"
   />
-  <!-- Tailwind v4 global styles -->
+  <!-- Tailwind v4 global styles (design tokens) -->
   <link rel="stylesheet" href="/src/styles/global.css" />
-  <!-- Old style.css — progressively replaced, loaded LAST for cascade priority -->
+  <!-- Legacy component styles — loaded AFTER Tailwind for cascade override -->
   <link rel="stylesheet" href="/css/style.css" />
 </head>
 <body>
@@ -59,7 +59,7 @@ const { pageTitle = "Kaven的个人博客" } = Astro.props;
         </main>
       </div>
 
-      <!-- React Island modals (client:only — no SSR, hydrates as React only) -->
+      <!-- React Island modals -->
       <LoginModal client:only="react" />
       <ArticleEditor client:only="react" />
       <ProfileEditor client:only="react" />
@@ -69,5 +69,136 @@ const { pageTitle = "Kaven的个人博客" } = Astro.props;
 
   <!-- Non-critical React Islands -->
   <SidebarToggle client:idle />
+
+  <!-- Article Detail Modal -->
+  <div class="modal-overlay" id="detail-modal-overlay">
+    <div class="modal modal-lg" id="detail-modal">
+      <div class="modal-header">
+        <h2 id="detail-title"></h2>
+        <button class="modal-close" id="detail-modal-close">
+          <i class="fa-solid fa-xmark"></i>
+        </button>
+      </div>
+      <div class="modal-body">
+        <div class="article-meta" id="detail-meta"></div>
+        <div class="article-cover-wrapper" id="detail-cover-wrapper" style="display:none">
+          <img id="detail-cover" src="" alt="">
+        </div>
+        <div class="article-content" id="detail-content"></div>
+        <div class="article-tags" id="detail-tags"></div>
+        <div class="article-engage-bar">
+          <a class="engage-btn like-btn" id="btn-detail-like" href="#">
+            <i class="fa-regular fa-heart"></i>
+            <span id="detail-like-count">0</span>
+          </a>
+          <a class="engage-btn" id="btn-scroll-comments" href="#">
+            <i class="fa-regular fa-comment"></i>
+            <span id="detail-comment-count">0</span>
+          </a>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <a class="btn btn-primary" id="btn-detail-read" href="#">
+          <i class="fa-solid fa-book-open"></i> 阅读全文
+        </a>
+      </div>
+    </div>
+  </div>
+
+  <script is:inline>
+    // Article card click → modal popup
+    (function() {
+      var overlay = document.getElementById('detail-modal-overlay');
+      var closeBtn = document.getElementById('detail-modal-close');
+      if (!overlay || !closeBtn) return;
+
+      function closeModal() {
+        overlay.classList.remove('open');
+        document.body.style.overflow = '';
+      }
+      function openModalFn() {
+        overlay.classList.add('open');
+        document.body.style.overflow = 'hidden';
+      }
+
+      closeBtn.addEventListener('click', closeModal);
+      overlay.addEventListener('click', function(e) {
+        if (e.target === overlay) closeModal();
+      });
+      document.addEventListener('keydown', function(e) {
+        if (e.key === 'Escape' && overlay.classList.contains('open')) closeModal();
+      });
+
+      function formatDateStr(ds) {
+        var d = new Date(ds);
+        return d.getFullYear() + '年' + (d.getMonth()+1) + '月' + d.getDate() + '日 ' +
+               String(d.getHours()).padStart(2,'0') + ':' + String(d.getMinutes()).padStart(2,'0');
+      }
+
+      // Intercept article card clicks
+      document.addEventListener('click', function(e) {
+        var card = e.target.closest('.article-card');
+        if (!card) return;
+        var link = card.querySelector('a[href*="/article/"]');
+        if (!link) return;
+        var href = link.getAttribute('href');
+        if (!href) return;
+        var parts = href.split('/article/');
+        if (parts.length < 2) return;
+        var articleId = parts[1];
+        if (!articleId) return;
+
+        e.preventDefault();
+        e.stopPropagation();
+
+        fetch('/api/articles/' + articleId)
+          .then(function(res) {
+            if (!res.ok) throw new Error('not found');
+            return res.json();
+          })
+          .then(function(article) {
+            document.getElementById('detail-title').textContent = article.title;
+            document.getElementById('detail-meta').innerHTML =
+              '<time><i class="fa-regular fa-calendar"></i> ' + formatDateStr(article.createdAt) + '</time>' +
+              (article.updatedAt !== article.createdAt ? ' · <span><i class="fa-solid fa-pen"></i> 更新于 ' + formatDateStr(article.updatedAt) + '</span>' : '');
+
+            var coverWrap = document.getElementById('detail-cover-wrapper');
+            var coverImg = document.getElementById('detail-cover');
+            if (article.coverImage) {
+              coverWrap.style.display = '';
+              coverImg.src = article.coverImage;
+            } else {
+              coverWrap.style.display = 'none';
+            }
+
+            document.getElementById('detail-content').innerHTML = article.content;
+            document.getElementById('detail-like-count').textContent = article.likesCount;
+            document.getElementById('detail-comment-count').textContent = '-';
+
+            var tagsEl = document.getElementById('detail-tags');
+            if (article.tags && article.tags.length > 0) {
+              tagsEl.innerHTML = article.tags.map(function(t) {
+                return '<span style="display:inline-block;margin:0 4px 4px 0;font-size:0.75rem;background:var(--color-bg);color:var(--color-text-secondary);padding:2px 10px;border-radius:20px;border:1px solid var(--color-border)">#' + t + '</span>';
+              }).join('');
+              tagsEl.style.display = '';
+            } else {
+              tagsEl.style.display = 'none';
+            }
+
+            var readBtn = document.getElementById('btn-detail-read');
+            readBtn.href = '/article/' + articleId;
+            var likeBtn = document.getElementById('btn-detail-like');
+            likeBtn.href = '/article/' + articleId;
+            var commentBtn = document.getElementById('btn-scroll-comments');
+            commentBtn.href = '/article/' + articleId + '#comments-section';
+
+            openModalFn();
+          })
+          .catch(function() {
+            window.location.href = href;
+          });
+      });
+    })();
+  </script>
 </body>
 </html>

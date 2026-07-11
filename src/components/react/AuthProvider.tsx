@@ -39,24 +39,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [username, setUsername] = useState<string | null>(null);
 
-  // Check auth on mount via cookie presence
+  // Check auth on mount via silent API call
   const checkAuth = useCallback(async () => {
     try {
-      // Try to access a protected operation — cookie is sent automatically
-      const res = await fetch("/api/profile", { method: "PUT", headers: { "Content-Type": "application/json" }, body: "{}" });
+      const res = await fetch("/api/auth/me");
       if (res.ok) {
+        const data = await res.json();
         setIsLoggedIn(true);
-        setUsername("admin");
+        setUsername(data.username);
         return;
       }
     } catch {
-      // Not logged in
+      // Network error — not logged in
     }
 
-    // Fallback: check if cookie exists
-    const hasCookie = document.cookie.includes("blog_session");
-    setIsLoggedIn(hasCookie);
-    setUsername(hasCookie ? "admin" : null);
+    setIsLoggedIn(false);
+    setUsername(null);
   }, []);
 
   useEffect(() => {

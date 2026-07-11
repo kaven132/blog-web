@@ -28,12 +28,19 @@ function tagClass(tag: string): string {
   return TAG_STYLES[tag] || "tag-version";
 }
 
-// Fetch all game news, ordered by game + sort_order
-const allNews = db
-  .select()
-  .from(gameNews)
-  .orderBy(asc(gameNews.game), asc(gameNews.sortOrder))
-  .all();
+// Fetch all game news, ordered by game + sort_order.
+// Gracefully handle case where table doesn't exist yet (older databases).
+let allNews: any[] = [];
+try {
+  allNews = db
+    .select()
+    .from(gameNews)
+    .orderBy(asc(gameNews.game), asc(gameNews.sortOrder))
+    .all();
+} catch {
+  // game_news table not yet created — show empty state
+  allNews = [];
+}
 
 // Group by game
 const newsByGame: Record<string, typeof allNews> = {};
@@ -99,3 +106,38 @@ const hasAnyNews = allNews.length > 0;
     </div>
   )}
 </div>
+
+<script>
+  // Tab switching for game news panel
+  (function() {
+    const tabs = document.querySelectorAll('.game-news-tab');
+    const panels = document.querySelectorAll('.game-news-panel');
+
+    if (tabs.length === 0) return;
+
+    tabs.forEach((tab) => {
+      tab.addEventListener('click', () => {
+        const game = tab.getAttribute('data-game');
+        if (!game) return;
+
+        // Deactivate all tabs and panels
+        tabs.forEach((t) => t.classList.remove('active'));
+        panels.forEach((p) => {
+          const el = p as HTMLElement;
+          el.classList.remove('active');
+          el.style.display = 'none';
+        });
+
+        // Activate clicked tab
+        tab.classList.add('active');
+
+        // Show matching panel
+        const panel = document.getElementById(`news-${game}`);
+        if (panel) {
+          panel.classList.add('active');
+          panel.style.display = '';
+        }
+      });
+    });
+  })();
+</script>

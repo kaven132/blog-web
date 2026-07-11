@@ -19,4 +19,18 @@ sqlite.pragma("journal_mode = WAL");
 sqlite.pragma("foreign_keys = ON");
 sqlite.pragma("busy_timeout = 5000");
 
+// Auto-create new tables that may not exist in older database files
+// (matches Express pattern: CREATE TABLE IF NOT EXISTS)
+sqlite.exec(`
+  CREATE TABLE IF NOT EXISTS game_news (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    game TEXT NOT NULL,
+    tag TEXT NOT NULL,
+    title TEXT NOT NULL,
+    sort_order INTEGER DEFAULT 0,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+  )
+`);
+
 export const db = drizzle(sqlite, { schema });

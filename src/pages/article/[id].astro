@@ -1,6 +1,6 @@
 ---
 // Article detail page — SSR-rendered
-// URL: /article/:id — renders full article + comments
+// URL: /article/:id
 import BaseLayout from "../../components/layout/BaseLayout.astro";
 import LikeButton from "../../components/react/LikeButton";
 import CommentSection from "../../components/react/CommentSection";
@@ -11,12 +11,7 @@ import { articleToJSON } from "../../lib/utils";
 
 const { id } = Astro.params;
 
-// Fetch article
-const row = db
-  .select()
-  .from(articles)
-  .where(eq(articles.id, id!))
-  .get();
+const row = db.select().from(articles).where(eq(articles.id, id!)).get();
 
 if (!row) {
   return new Response(
@@ -27,121 +22,116 @@ if (!row) {
 
 const article = articleToJSON(row);
 
-// Fetch comments
 const commentList = db
-  .select()
-  .from(comments)
+  .select().from(comments)
   .where(eq(comments.articleId, id!))
   .orderBy(desc(comments.createdAt))
   .all();
 
-// Format date helper
 function formatFullDate(dateStr: string): string {
   const d = new Date(dateStr);
-  return d.toLocaleDateString("zh-CN", {
-    year: "numeric",
-    month: "long",
-    day: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
+  return d.toLocaleDateString("zh-CN", { year: "numeric", month: "long", day: "numeric", hour: "2-digit", minute: "2-digit" });
 }
+
+function readingTime(content: string): number {
+  const text = content.replace(/<[^>]+>/g, '');
+  return Math.max(1, Math.ceil(text.length / 300));
+}
+const readMin = readingTime(article.content);
+
+const categoryGradients: Record<string, string> = {
+  "技术": "linear-gradient(135deg, #3b82f6, #06b6d4)",
+  "游戏": "linear-gradient(135deg, #8b5cf6, #ec4899)",
+  "生活": "linear-gradient(135deg, #f59e0b, #f97316)",
+  "随笔": "linear-gradient(135deg, #10b981, #14b8a6)",
+};
+const headerGradient = categoryGradients[article.category] || "linear-gradient(135deg, #4f46e5, #7c3aed)";
 ---
 
 <BaseLayout pageTitle={`${article.title} · Kaven的博客`}>
-  <article class="article-detail bg-bg-card shadow-default rounded-default border border-border p-6 md:p-8">
+  <article class="article-detail">
+    <!-- Gradient header bar -->
+    <div class="detail-header-bar" style={`background: ${headerGradient}`}></div>
+
     <!-- Header -->
-    <header class="mb-6">
-      <div class="flex items-center gap-2 mb-3">
+    <header class="detail-header">
+      <div class="detail-breadcrumb">
+        <a href="/">首页</a>
         {article.category && (
-          <a
-            href={`/?category=${encodeURIComponent(article.category)}`}
-            class="text-xs font-medium text-primary bg-primary-light px-2.5 py-0.5 rounded-full hover:bg-primary hover:text-white transition-colors"
-          >
-            {article.category}
-          </a>
+          <>
+            <i class="fa-solid fa-chevron-right"></i>
+            <a href={`/?category=${encodeURIComponent(article.category)}`}>{article.category}</a>
+          </>
         )}
         {article.subcategory && (
-          <span class="text-xs text-text-muted">
-            <i class="fa-solid fa-chevron-right mx-1"></i>
-            {article.subcategory}
+          <>
+            <i class="fa-solid fa-chevron-right"></i>
+            <span>{article.subcategory}</span>
+          </>
+        )}
+      </div>
+
+      <h1 class="detail-title">{article.title}</h1>
+
+      <div class="detail-meta">
+        <time datetime={article.createdAt}>
+          <i class="fa-regular fa-calendar"></i> {formatFullDate(article.createdAt)}
+        </time>
+        {article.updatedAt !== article.createdAt && (
+          <span class="updated-badge">
+            <i class="fa-solid fa-pen"></i> 已更新
           </span>
         )}
+        <span class="meta-sep">·</span>
+        <span><i class="fa-regular fa-clock"></i> {readMin} 分钟阅读</span>
+        <span class="meta-sep">·</span>
+        <span><i class="fa-regular fa-heart"></i> {article.likesCount} 点赞</span>
+        <span class="meta-sep">·</span>
+        <span><i class="fa-regular fa-comment"></i> {commentList.length} 评论</span>
         {article.isPinned ? (
-          <span class="text-xs text-warning ml-auto" title="已置顶">
-            <i class="fa-solid fa-thumbtack"></i> 置顶
-          </span>
+          <>
+            <span class="meta-sep">·</span>
+            <span class="pinned-tag"><i class="fa-solid fa-thumbtack"></i> 置顶</span>
+          </>
         ) : null}
       </div>
 
-      <h1 class="text-2xl md:text-3xl font-bold text-text mb-3 leading-tight">
-        {article.title}
-      </h1>
-
-      <div class="flex items-center gap-4 text-sm text-text-muted">
-        <time datetime={article.createdAt} class="flex items-center gap-1">
-          <i class="fa-regular fa-calendar"></i>
-          {formatFullDate(article.createdAt)}
-        </time>
-        {article.updatedAt !== article.createdAt && (
-          <span class="flex items-center gap-1">
-            <i class="fa-solid fa-pen"></i>
-            更新于 {formatFullDate(article.updatedAt)}
-          </span>
-        )}
-        <span class="flex items-center gap-1">
-          <i class="fa-regular fa-heart text-danger"></i>
-          {article.likesCount}
-        </span>
-        <span class="flex items-center gap-1">
-          <i class="fa-regular fa-comment"></i>
-          {commentList.length}
-        </span>
-      </div>
+      {article.tags.length > 0 && (
+        <div class="detail-tags">
+          {article.tags.map((tag: string) => (
+            <span class="tag-chip">#{tag}</span>
+          ))}
+        </div>
+      )}
     </header>
 
     <!-- Cover image -->
     {article.coverImage && (
-      <div class="mb-6 rounded-default overflow-hidden">
-        <img
-          src={article.coverImage}
-          alt={article.title}
-          class="w-full max-h-96 object-cover"
-        />
+      <div class="detail-cover">
+        <img src={article.coverImage} alt={article.title} />
       </div>
     )}
 
-    <!-- Article content (admin-authored HTML — rendered with set:html) -->
-    <div class="article-content prose-custom mb-8" set:html={article.content} />
+    <!-- Article content -->
+    <div class="detail-content" set:html={article.content} />
 
-    <!-- Tags -->
-    {article.tags.length > 0 && (
-      <div class="article-tags flex flex-wrap gap-2 mb-8 pt-6 border-t border-border">
-        {article.tags.map((tag: string) => (
-          <span class="text-xs bg-bg text-text-secondary px-3 py-1.5 rounded-full border border-border">
-            #{tag}
-          </span>
-        ))}
-      </div>
-    )}
-
-    <!-- Like & Comment bar (React Island: LikeButton w/ optimistic update) -->
-    <div class="article-engage-bar flex items-center gap-4 py-4 border-t border-border">
+    <!-- Engage bar -->
+    <div class="detail-engage">
       <LikeButton
         client:load
         articleId={article.id}
         initialCount={article.likesCount}
         initialLiked={false}
       />
-      <div class="engage-btn flex items-center gap-1.5 text-text-secondary">
-        <i class="fa-regular fa-comment text-lg"></i>
-        <span>{commentList.length}</span>
-      </div>
+      <a href="#comments-section" class="engage-link">
+        <i class="fa-regular fa-comment"></i>
+        <span>{commentList.length} 条评论</span>
+      </a>
     </div>
   </article>
 
-  <!-- Comments Section (React Island) -->
-  <div class="comments-section-wrapper mt-5">
+  <!-- Comments -->
+  <div class="detail-comments" id="comments-section">
     <CommentSection
       client:visible
       articleId={article.id}
@@ -151,77 +141,262 @@ function formatFullDate(dateStr: string): string {
 </BaseLayout>
 
 <style>
-  /* Article content styling (matches original design) */
-  .prose-custom :global(h3) {
-    font-size: 1.25rem;
-    font-weight: 600;
-    margin: 1.5rem 0 0.75rem;
-    color: var(--color-text);
+  .article-detail {
+    background: var(--color-bg-card, #fff);
+    border-radius: var(--radius-default, 10px);
+    border: 1px solid var(--color-border, #e2e8f0);
+    overflow: hidden;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+  }
+
+  /* Gradient bar */
+  .detail-header-bar {
+    height: 5px;
+    width: 100%;
+  }
+
+  /* Header */
+  .detail-header {
+    padding: 28px 28px 20px;
+  }
+
+  .detail-breadcrumb {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 0.8rem;
+    color: var(--color-text-muted, #94a3b8);
+    margin-bottom: 16px;
+  }
+  .detail-breadcrumb a {
+    color: var(--color-primary, #4f46e5);
+    text-decoration: none;
+    font-weight: 500;
+  }
+  .detail-breadcrumb a:hover {
+    text-decoration: underline;
+  }
+  .detail-breadcrumb i {
+    font-size: 0.55rem;
+  }
+
+  .detail-title {
+    font-size: 1.75rem;
+    font-weight: 700;
+    color: var(--color-text, #1e293b);
+    line-height: 1.35;
+    margin: 0 0 14px;
+    letter-spacing: -0.01em;
+  }
+  @media (min-width: 768px) {
+    .detail-title { font-size: 2rem; }
+  }
+
+  .detail-meta {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px;
+    font-size: 0.82rem;
+    color: var(--color-text-muted, #94a3b8);
+  }
+  .detail-meta time {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+  }
+  .meta-sep {
+    color: var(--color-border, #e2e8f0);
+  }
+  .updated-badge {
+    font-size: 0.7rem;
+    background: #fef3c7;
+    color: #92400e;
+    padding: 1px 8px;
+    border-radius: 10px;
+    font-weight: 500;
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+  }
+  .pinned-tag {
+    color: var(--color-warning, #f59e0b);
+    font-weight: 500;
+  }
+
+  .detail-tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: 14px;
+    padding-top: 14px;
+    border-top: 1px solid var(--color-border-light, #f1f5f9);
+  }
+  .tag-chip {
+    font-size: 0.75rem;
+    background: var(--color-bg, #f8fafc);
+    color: var(--color-text-secondary, #64748b);
+    padding: 4px 12px;
+    border-radius: 20px;
+    border: 1px solid var(--color-border-light, #f1f5f9);
+    transition: all 0.2s;
+  }
+  .tag-chip:hover {
+    border-color: var(--color-primary, #4f46e5);
+    color: var(--color-primary, #4f46e5);
+  }
+
+  /* Cover */
+  .detail-cover {
+    padding: 0 28px;
+    margin-bottom: 8px;
+  }
+  .detail-cover img {
+    width: 100%;
+    max-height: 420px;
+    object-fit: cover;
+    border-radius: var(--radius-sm, 6px);
+  }
+
+  /* Content */
+  .detail-content {
+    padding: 8px 28px 24px;
+    font-size: 0.98rem;
+    line-height: 1.85;
+    color: var(--color-text, #1e293b);
+  }
+  .detail-content :global(h2) {
+    font-size: 1.45rem;
+    font-weight: 700;
+    margin: 2rem 0 0.75rem;
+    padding-bottom: 0.5rem;
+    border-bottom: 2px solid var(--color-border-light, #f1f5f9);
+  }
+  .detail-content :global(h3) {
+    font-size: 1.2rem;
+    font-weight: 650;
+    margin: 1.75rem 0 0.6rem;
     padding-left: 0.75rem;
-    border-left: 4px solid var(--color-primary);
+    border-left: 4px solid var(--color-primary, #4f46e5);
     line-height: 1.4;
   }
-  .prose-custom :global(p) {
-    margin: 0.75rem 0;
-    line-height: 1.8;
-    color: var(--color-text);
+  .detail-content :global(h4) {
+    font-size: 1.05rem;
+    font-weight: 600;
+    margin: 1.25rem 0 0.5rem;
+    color: var(--color-text-secondary, #64748b);
   }
-  .prose-custom :global(blockquote) {
-    margin: 1rem 0;
-    padding: 0.75rem 1rem;
-    background: var(--color-primary-light);
-    border-left: 4px solid var(--color-primary);
-    border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
-    color: var(--color-text-secondary);
+  .detail-content :global(p) {
+    margin: 0.85rem 0;
   }
-  .prose-custom :global(code) {
-    background: var(--color-bg);
-    padding: 0.15em 0.4em;
-    border-radius: 3px;
-    font-size: 0.9em;
-    font-family: 'Consolas', 'Monaco', monospace;
-    color: var(--color-danger);
+  .detail-content :global(blockquote) {
+    margin: 1.25rem 0;
+    padding: 1rem 1.25rem;
+    background: var(--color-primary-light, #eef2ff);
+    border-left: 4px solid var(--color-primary, #4f46e5);
+    border-radius: 0 var(--radius-sm, 6px) var(--radius-sm, 6px) 0;
+    color: var(--color-text-secondary, #64748b);
+    font-style: italic;
   }
-  .prose-custom :global(pre) {
+  .detail-content :global(blockquote p) {
+    margin: 0;
+  }
+  .detail-content :global(code) {
+    background: #f1f5f9;
+    padding: 0.15em 0.45em;
+    border-radius: 4px;
+    font-size: 0.88em;
+    font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+    color: #e11d48;
+    font-weight: 500;
+  }
+  .detail-content :global(pre) {
     background: #1e293b;
     color: #e2e8f0;
-    padding: 1rem 1.25rem;
-    border-radius: var(--radius-sm);
+    padding: 1.25rem 1.5rem;
+    border-radius: var(--radius-sm, 6px);
     overflow-x: auto;
-    margin: 1rem 0;
-    font-size: 0.88rem;
-    line-height: 1.6;
+    margin: 1.25rem 0;
+    font-size: 0.85rem;
+    line-height: 1.7;
+    position: relative;
   }
-  .prose-custom :global(pre code) {
+  .detail-content :global(pre code) {
     background: transparent;
     color: inherit;
     padding: 0;
     font-size: inherit;
+    font-weight: 400;
   }
-  .prose-custom :global(ul), .prose-custom :global(ol) {
+  .detail-content :global(ul), .detail-content :global(ol) {
     margin: 0.75rem 0;
-    padding-left: 1.5rem;
+    padding-left: 1.75rem;
   }
-  .prose-custom :global(li) {
-    margin: 0.25rem 0;
-    line-height: 1.7;
+  .detail-content :global(li) {
+    margin: 0.35rem 0;
   }
-  .prose-custom :global(strong) {
-    font-weight: 600;
-    color: var(--color-text);
+  .detail-content :global(strong) {
+    font-weight: 650;
   }
-  .prose-custom :global(a) {
-    color: var(--color-primary);
+  .detail-content :global(a) {
+    color: var(--color-primary, #4f46e5);
     text-decoration: underline;
+    text-underline-offset: 2px;
   }
-  .prose-custom :global(hr) {
+  .detail-content :global(a:hover) {
+    color: var(--color-primary-hover, #4338ca);
+  }
+  .detail-content :global(hr) {
     border: none;
-    border-top: 1px solid var(--color-border);
-    margin: 1.5rem 0;
+    border-top: 1px solid var(--color-border, #e2e8f0);
+    margin: 2rem 0;
   }
-  .prose-custom :global(img) {
+  .detail-content :global(img) {
     max-width: 100%;
-    border-radius: var(--radius-sm);
+    border-radius: var(--radius-sm, 6px);
     margin: 1rem 0;
+  }
+  .detail-content :global(table) {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 1rem 0;
+  }
+  .detail-content :global(th), .detail-content :global(td) {
+    border: 1px solid var(--color-border, #e2e8f0);
+    padding: 8px 12px;
+    text-align: left;
+    font-size: 0.9rem;
+  }
+  .detail-content :global(th) {
+    background: var(--color-bg, #f8fafc);
+    font-weight: 600;
+  }
+
+  /* Engage bar */
+  .detail-engage {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    padding: 16px 28px;
+    border-top: 1px solid var(--color-border, #e2e8f0);
+    background: var(--color-bg, #f8fafc);
+    border-radius: 0 0 var(--radius-default, 10px) var(--radius-default, 10px);
+  }
+  .engage-link {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 0.88rem;
+    color: var(--color-text-secondary, #64748b);
+    text-decoration: none;
+    transition: color 0.2s;
+  }
+  .engage-link:hover {
+    color: var(--color-primary, #4f46e5);
+  }
+
+  /* Comments */
+  .detail-comments {
+    margin-top: 20px;
   }
 </style>

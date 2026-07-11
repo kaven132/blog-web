@@ -1,6 +1,6 @@
 ---
 // Header.astro — Top navigation bar (SSR)
-// Shows: sidebar toggle, logo, date, weather placeholder, nav actions
+// Shows: sidebar toggle, logo, date, weather, nav actions
 
 // Format today's date in Chinese
 const now = new Date();
@@ -37,9 +37,86 @@ const dateStr = `${now.getFullYear()}年${now.getMonth() + 1}月${now.getDate()}
       <button class="btn btn-sm btn-logout" id="btn-logout" style="display:none" title="退出登录">
         <i class="fa-solid fa-right-from-bracket"></i> 退出
       </button>
-      <button class="btn btn-primary btn-sm" id="btn-new-post-header">
+      <button class="btn btn-primary btn-sm" id="btn-new-post-header"
+        onclick="document.dispatchEvent(new CustomEvent('open-article-editor'))">
         <i class="fa-solid fa-plus"></i> 写文章
       </button>
     </nav>
   </div>
 </header>
+
+<script is:inline>
+  // Fetch weather via server-side proxy API (no CORS issues)
+  (function() {
+    var CACHE_KEY = 'blog_weather_v2'; // v2: new key to invalidate old HTML-cached data
+    var CACHE_TTL = 30 * 60 * 1000;    // 30 minutes
+
+    var weatherEl = document.getElementById('header-weather');
+    var weatherText = weatherEl?.querySelector('.weather-text');
+    if (!weatherEl || !weatherText) return;
+
+    // Check if a cached value is valid (not HTML, not expired)
+    function isValidCache(entry) {
+      if (!entry || !entry.data || !entry.time) return false;
+      if (Date.now() - entry.time > CACHE_TTL) return false;
+      // Reject HTML responses (stale data from old script)
+      if (/^\s*<(!DOCTYPE|html|head|body)/i.test(entry.data)) return false;
+      return true;
+    }
+
+    function updateIcon(trimmed) {
+      var icon = weatherEl?.querySelector('i');
+      if (!icon) return;
+      var cls = 'fa-solid fa-cloud-sun';
+      if (trimmed.includes('☀') || /sun|clear/i.test(trimmed)) cls = 'fa-solid fa-sun';
+      else if (trimmed.includes('🌧') || trimmed.includes('🌦') || trimmed.includes('⛈') || /rain|drizzle/i.test(trimmed)) cls = 'fa-solid fa-cloud-rain';
+      else if (trimmed.includes('❄') || trimmed.includes('🌨') || /snow/i.test(trimmed)) cls = 'fa-solid fa-snowflake';
+      else if (trimmed.includes('☁') || trimmed.includes('⛅') || /cloud|overcast/i.test(trimmed)) cls = 'fa-solid fa-cloud';
+      else if (trimmed.includes('🌫') || /fog|mist|haze/i.test(trimmed)) cls = 'fa-solid fa-smog';
+      else if (trimmed.includes('⚡') || /thunder/i.test(trimmed)) cls = 'fa-solid fa-bolt';
+      icon.className = cls;
+    }
+
+    function fetchWeather() {
+      weatherText.textContent = '获取中...';
+
+      fetch('/api/weather')
+        .then(function(res) { return res.json(); })
+        .then(function(data) {
+          var trimmed = (data.text || '').trim();
+          if (trimmed && trimmed !== '天气不可用') {
+            weatherText.textContent = trimmed;
+            updateIcon(trimmed);
+            try { localStorage.setItem(CACHE_KEY, JSON.stringify({ data: trimmed, time: Date.now() })); } catch(e) {}
+          }
+        })
+        .catch(function() {
+          // On network error, try reading a valid cache as fallback
+          try {
+            var cached = JSON.parse(localStorage.getItem(CACHE_KEY) || 'null');
+            if (isValidCache(cached)) {
+              weatherText.textContent = cached.data;
+              updateIcon(cached.data);
+              return;
+            }
+          } catch(e) {}
+          weatherText.textContent = '天气不可用';
+        });
+    }
+
+    // Try cache first
+    try {
+      var cached = JSON.parse(localStorage.getItem(CACHE_KEY) || 'null');
+      if (isValidCache(cached)) {
+        weatherText.textContent = cached.data;
+        updateIcon(cached.data);
+      } else {
+        fetchWeather();
+      }
+    } catch(e) {
+      fetchWeather();
+    }
+
+    weatherEl.addEventListener('click', fetchWeather);
+  })();
+</script>

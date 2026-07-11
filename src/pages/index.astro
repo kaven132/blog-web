@@ -3,7 +3,6 @@
 // Query params: category, subcategory, search, sort (same as GET /api/articles)
 import BaseLayout from "../components/layout/BaseLayout.astro";
 import ArticleGrid from "../components/article/ArticleGrid.astro";
-import CategoryFilter from "../components/react/CategoryFilter";
 import { db } from "../lib/db";
 import { articles } from "../db/schema";
 import { eq, like, or, and, desc, asc } from "drizzle-orm";
@@ -111,22 +110,6 @@ const pageTitle = category && category !== "all"
     </div>
   </div>
 
-  <!-- Sub-category bar -->
-  {category && category !== "all" && (
-    <div class="subcat-bar" id="subcat-bar">
-      <span class="subcat-label"><i class="fa-solid fa-tags"></i> 子分类：</span>
-      <div class="subcat-chips" id="subcat-chips">
-        <a
-          href={`/?category=${encodeURIComponent(category)}`}
-          class={`subcat-chip${!subcategory || subcategory === "all" ? " active" : ""}`}
-        >全部</a>
-      </div>
-    </div>
-  )}
-
   <!-- Article Grid -->
   <ArticleGrid articles={articleList} />
-
-  <!-- CategoryFilter React Island (enhances sidebar interaction) -->
-  <CategoryFilter client:load />
 </BaseLayout>
