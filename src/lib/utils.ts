@@ -9,13 +9,13 @@ export interface ArticleRow {
   id: string;
   title: string;
   content: string;
-  category: string;
-  subcategory: string;
-  tags: string; // JSON string in DB
-  summary: string;
-  coverImage: string;
-  likesCount: number;
-  isPinned: number;
+  category: string | null;
+  subcategory: string | null;
+  tags: string | null; // JSON string in DB
+  summary: string | null;
+  coverImage: string | null;
+  likesCount: number | null;
+  isPinned: number | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -36,14 +36,14 @@ export interface ArticleJSON {
 }
 
 export interface ProfileRow {
-  name: string;
-  bio: string;
-  email: string;
-  location: string;
-  avatar: string;
-  socialGithub: string;
-  socialTwitter: string;
-  socialWebsite: string;
+  name: string | null;
+  bio: string | null;
+  email: string | null;
+  location: string | null;
+  avatar: string | null;
+  socialGithub: string | null;
+  socialTwitter: string | null;
+  socialWebsite: string | null;
 }
 
 export interface ProfileJSON {
@@ -75,7 +75,8 @@ export function generateId(prefix = "art"): string {
 /** Safely parse a JSON string array into a real array */
 export function parseTags(tagsStr: string | null | undefined): string[] {
   try {
-    return JSON.parse(tagsStr || "[]");
+    const parsed = JSON.parse(tagsStr || "[]");
+    return Array.isArray(parsed) ? parsed : [];
   } catch {
     return [];
   }
@@ -84,23 +85,33 @@ export function parseTags(tagsStr: string | null | undefined): string[] {
 /** Serialize a raw DB article row → API JSON (parses tags) */
 export function articleToJSON(row: ArticleRow): ArticleJSON {
   return {
-    ...row,
+    id: row.id,
+    title: row.title,
+    content: row.content,
+    category: row.category ?? "",
+    subcategory: row.subcategory ?? "",
     tags: parseTags(row.tags),
+    summary: row.summary ?? "",
+    coverImage: row.coverImage ?? "",
+    likesCount: row.likesCount ?? 0,
+    isPinned: row.isPinned ?? 0,
+    createdAt: row.createdAt,
+    updatedAt: row.updatedAt,
   };
 }
 
 /** Serialize a raw DB profile row → API JSON (nests social fields) */
 export function profileToJSON(row: ProfileRow): ProfileJSON {
   return {
-    name: row.name,
-    bio: row.bio,
-    email: row.email,
-    location: row.location,
-    avatar: row.avatar,
+    name: row.name ?? "",
+    bio: row.bio ?? "",
+    email: row.email ?? "",
+    location: row.location ?? "",
+    avatar: row.avatar ?? "",
     social: {
-      github: row.socialGithub,
-      twitter: row.socialTwitter,
-      website: row.socialWebsite,
+      github: row.socialGithub ?? "",
+      twitter: row.socialTwitter ?? "",
+      website: row.socialWebsite ?? "",
     },
   };
 }

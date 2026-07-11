@@ -1,0 +1,26 @@
+---
+// ArticleGrid.astro — SSR-rendered responsive article grid
+// Props: articles (ArticleJSON[])
+import type { ArticleJSON } from "../../lib/utils";
+import ArticleCard from "./ArticleCard.astro";
+
+interface Props {
+  articles: ArticleJSON[];
+}
+
+const { articles } = Astro.props;
+---
+
+{articles.length === 0 ? (
+  <div class="empty-state text-center py-16">
+    <i class="fa-solid fa-pen-to-square text-5xl text-text-muted mb-4 block"></i>
+    <h3 class="text-lg font-semibold text-text mb-2">还没有文章</h3>
+    <p class="text-text-secondary">点击"写文章"按钮开始创作你的第一篇文章吧！</p>
+  </div>
+) : (
+  <div class="article-grid grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+    {articles.map((article) => (
+      <ArticleCard article={article} showPin={true} />
+    ))}
+  </div>
+)}

@@ -1,6 +1,7 @@
 #!/bin/bash
 # ============================================
 # Kaven's Blog — 一键部署脚本
+# Astro SSR + Nginx + Docker Compose
 # ============================================
 set -e
 
@@ -17,8 +18,7 @@ echo "[1/4] 检查 Docker 环境..."
 
 if ! command -v docker &> /dev/null; then
     echo "❌ 未安装 Docker，请先安装 Docker"
-    echo "   腾讯云: yum install -y docker 或 apt install -y docker.io"
-    echo "   阿里云: 同标准安装方式"
+    echo "   curl -fsSL https://get.docker.com | bash"
     exit 1
 fi
 
@@ -99,12 +99,11 @@ SERVER_IP=$(curl -s ifconfig.me 2>/dev/null || curl -s ip.sb 2>/dev/null || echo
 echo "  访问地址: http://${SERVER_IP}"
 echo "  服务状态: docker compose ps"
 echo "  查看日志: docker compose logs -f"
-echo "  管理后台: http://${SERVER_IP}/admin (登录后)"
 echo ""
 echo "  常用命令:"
-echo "    重启:    docker compose restart"
-echo "    停止:    docker compose down"
-echo "    更新:    git pull && docker compose up -d --build"
+echo "    重启:     docker compose restart"
+echo "    停止:     docker compose down"
+echo "    更新:     git pull && docker compose up -d --build"
 echo "    备份数据库: docker compose exec app cat /app/data.db > backups/data_\$(date +%Y%m%d).db"
 echo ""
 echo "  备份目录: ./backups/ (每日自动备份，保留30份)"

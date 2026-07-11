@@ -1,70 +1,132 @@
 ---
-// Phase 1 verification page
-// Confirms: Drizzle reads existing data.db, Tailwind compiles
+// Home page — SSR-rendered article list
+// Query params: category, subcategory, search, sort (same as GET /api/articles)
+import BaseLayout from "../components/layout/BaseLayout.astro";
+import ArticleGrid from "../components/article/ArticleGrid.astro";
+import CategoryFilter from "../components/react/CategoryFilter";
 import { db } from "../lib/db";
-import { profile, articles, categoryTree } from "../db/schema";
+import { articles } from "../db/schema";
+import { eq, like, or, and, desc, asc } from "drizzle-orm";
+import { articleToJSON } from "../lib/utils";
 
-const p = db.select().from(profile).get();
-const arts = db.select().from(articles).all();
-const cats = db.select().from(categoryTree).all();
+// Parse query params from request URL
+const url = new URL(Astro.request.url);
+const category = url.searchParams.get("category") || "";
+const subcategory = url.searchParams.get("subcategory") || "";
+const search = url.searchParams.get("search") || "";
+const sort = url.searchParams.get("sort") || "newest";
+
+// Helper: build URL for sort switching (preserving current filters)
+function buildSortUrl(newSort: string): string {
+  const params = new URLSearchParams();
+  if (category && category !== "all") params.set("category", category);
+  if (subcategory && subcategory !== "all") params.set("subcategory", subcategory);
+  if (search.trim()) params.set("search", search.trim());
+  params.set("sort", newSort);
+  return "/?" + params.toString();
+}
+
+// Build query conditions
+const conditions = [];
+
+if (category && category !== "all") {
+  conditions.push(eq(articles.category, category));
+}
+
+if (subcategory && subcategory !== "all") {
+  conditions.push(eq(articles.subcategory, subcategory));
+}
+
+if (search.trim()) {
+  const q = "%" + search.trim() + "%";
+  conditions.push(
+    or(
+      like(articles.title, q),
+      like(articles.summary, q),
+      like(articles.content, q),
+      like(articles.tags, q),
+    )!,
+  );
+}
+
+let query = db.select().from(articles).$dynamic();
+
+if (conditions.length > 0) {
+  query = query.where(and(...conditions));
+}
+
+// Order: pinned first, then by sort param
+switch (sort) {
+  case "oldest":
+    query = query.orderBy(desc(articles.isPinned), asc(articles.createdAt));
+    break;
+  case "title":
+    query = query.orderBy(desc(articles.isPinned), asc(articles.title));
+    break;
+  case "newest":
+  default:
+    query = query.orderBy(desc(articles.isPinned), desc(articles.createdAt));
+}
+
+const rows = query.all();
+const articleList = rows.map(articleToJSON);
+
+// Page title
+const pageTitle = category && category !== "all"
+  ? `${category} · Kaven的博客`
+  : "Kaven的个人博客";
 ---
 
-<html lang="zh-CN">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Kaven的博客 — Astro SSR</title>
-    <link rel="stylesheet" href="/css/style.css" />
-  </head>
-  <body class="bg-bg text-text font-sans min-h-screen">
-    <main class="max-w-container mx-auto p-8">
-      <h1 class="text-2xl font-bold text-primary mb-6">
-        🚀 Astro SSR — Phase 1 验证
-      </h1>
+<BaseLayout pageTitle={pageTitle}>
+  <!-- Toolbar -->
+  <div class="toolbar">
+    <div class="search-box">
+      <i class="fa-solid fa-magnifying-glass"></i>
+      <form action="/" method="get" class="search-form-inline">
+        {category && category !== "all" && (
+          <input type="hidden" name="category" value={category} />
+        )}
+        {subcategory && subcategory !== "all" && (
+          <input type="hidden" name="subcategory" value={subcategory} />
+        )}
+        <input
+          type="text"
+          id="search-input"
+          name="search"
+          placeholder="搜索文章标题或内容..."
+          value={search}
+        />
+      </form>
+    </div>
+    <div class="toolbar-actions">
+      <select
+        id="sort-select"
+        class="select-sm"
+        onchange={`window.location.href='${buildSortUrl("__SORT__")}'.replace('__SORT__', this.value)`}
+      >
+        <option value="newest" selected={sort === "newest"}>最新优先</option>
+        <option value="oldest" selected={sort === "oldest"}>最早优先</option>
+        <option value="title" selected={sort === "title"}>按标题</option>
+      </select>
+    </div>
+  </div>
 
-      <!-- Profile -->
-      <section class="bg-bg-card shadow-default rounded-default p-6 mb-6 border border-border">
-        <h2 class="text-lg font-semibold text-text mb-3">👤 Profile</h2>
-        <p>姓名：{p?.name || "未设置"}</p>
-        <p class="text-text-secondary">Bio：{p?.bio || "未设置"}</p>
-        <p class="text-text-muted text-sm mt-2">
-          email: {p?.email || "-"} · location: {p?.location || "-"}
-        </p>
-      </section>
+  <!-- Sub-category bar -->
+  {category && category !== "all" && (
+    <div class="subcat-bar" id="subcat-bar">
+      <span class="subcat-label"><i class="fa-solid fa-tags"></i> 子分类：</span>
+      <div class="subcat-chips" id="subcat-chips">
+        <a
+          href={`/?category=${encodeURIComponent(category)}`}
+          class={`subcat-chip${!subcategory || subcategory === "all" ? " active" : ""}`}
+        >全部</a>
+      </div>
+    </div>
+  )}
 
-      <!-- Articles -->
-      <section class="bg-bg-card shadow-default rounded-default p-6 mb-6 border border-border">
-        <h2 class="text-lg font-semibold text-text mb-3">
-          📝 文章列表（{arts.length} 篇）
-        </h2>
-        <ul class="space-y-2">
-          {arts.slice(0, 5).map((a) => (
-            <li class="border-b border-border-light pb-2 last:border-0">
-              <span class="text-sm text-text-muted">[{a.category}]</span>
-              <span class="ml-2 font-medium">{a.title}</span>
-              <span class="ml-2 text-xs text-text-muted">
-                ❤️ {a.likesCount}
-              </span>
-            </li>
-          ))}
-        </ul>
-      </section>
+  <!-- Article Grid -->
+  <ArticleGrid articles={articleList} />
 
-      <!-- Category Tree -->
-      <section class="bg-bg-card shadow-default rounded-default p-6 border border-border">
-        <h2 class="text-lg font-semibold text-text mb-3">📂 分类树</h2>
-        <ul>
-          {cats.map((c) => (
-            <li class="text-text-secondary">
-              {c.parent} → {c.child}
-            </li>
-          ))}
-        </ul>
-      </section>
-
-      <footer class="mt-8 pt-6 border-t border-border text-center text-text-muted text-sm">
-        ✅ Drizzle + Tailwind + Astro SSR 全部验证通过
-      </footer>
-    </main>
-  </body>
-</html>
+  <!-- CategoryFilter React Island (enhances sidebar interaction) -->
+  <CategoryFilter client:load />
+</BaseLayout>

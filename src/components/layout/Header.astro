@@ -1,0 +1,45 @@
+---
+// Header.astro — Top navigation bar (SSR)
+// Shows: sidebar toggle, logo, date, weather placeholder, nav actions
+
+// Format today's date in Chinese
+const now = new Date();
+const weekDays = ["日", "一", "二", "三", "四", "五", "六"];
+const dateStr = `${now.getFullYear()}年${now.getMonth() + 1}月${now.getDate()}日 · 星期${weekDays[now.getDay()]}`;
+---
+
+<header class="header">
+  <div class="header-inner">
+    <button class="sidebar-toggle" id="sidebar-toggle" title="切换侧边栏" aria-label="切换侧边栏">
+      <i class="fa-solid fa-bars"></i>
+    </button>
+
+    <a href="/" class="logo" id="home-link">
+      <i class="fa-solid fa-feather-pointed"></i>
+      <span id="site-title">Kaven的博客</span>
+    </a>
+
+    <div class="header-info" id="header-info">
+      <span class="header-date" id="header-date">
+        <i class="fa-regular fa-calendar"></i>
+        {dateStr}
+      </span>
+      <span class="header-weather" id="header-weather" title="点击刷新天气">
+        <i class="fa-solid fa-cloud-sun"></i>
+        <span class="weather-text">获取天气中...</span>
+      </span>
+    </div>
+
+    <nav class="header-nav">
+      <span class="login-indicator" id="login-indicator" style="display:none" title="已登录">
+        <i class="fa-solid fa-user-shield"></i> 已登录
+      </span>
+      <button class="btn btn-sm btn-logout" id="btn-logout" style="display:none" title="退出登录">
+        <i class="fa-solid fa-right-from-bracket"></i> 退出
+      </button>
+      <button class="btn btn-primary btn-sm" id="btn-new-post-header">
+        <i class="fa-solid fa-plus"></i> 写文章
+      </button>
+    </nav>
+  </div>
+</header>

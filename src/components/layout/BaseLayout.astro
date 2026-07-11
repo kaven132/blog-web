@@ -1,0 +1,73 @@
+---
+// BaseLayout.astro — HTML shell for all SSR pages
+// Wraps everything in global React Islands: ToastProvider, AuthProvider
+import Header from "./Header.astro";
+import Sidebar from "./Sidebar.astro";
+import { ToastProvider } from "../react/Toast";
+import { AuthProvider } from "../react/AuthProvider";
+import SidebarToggle from "../react/SidebarToggle";
+import LoginModal from "../react/LoginModal";
+import ArticleEditor from "../react/ArticleEditor";
+import ProfileEditor from "../react/ProfileEditor";
+import GameNewsEditor from "../react/GameNewsEditor";
+
+interface Props {
+  pageTitle?: string;
+}
+
+const { pageTitle = "Kaven的个人博客" } = Astro.props;
+---
+
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>{pageTitle}</title>
+  <link rel="icon" type="image/png" href="/image/pen.png" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link
+    href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Noto+Sans+SC:wght@300;400;500;700&family=Noto+Serif+SC:wght@400;600;700;900&family=Playfair+Display:ital,wght@0,500;0,700;0,900;1,500&display=swap"
+    rel="stylesheet"
+  />
+  <link
+    rel="stylesheet"
+    href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css"
+  />
+  <!-- Tailwind v4 global styles -->
+  <link rel="stylesheet" href="/src/styles/global.css" />
+  <!-- Old style.css — progressively replaced, loaded LAST for cascade priority -->
+  <link rel="stylesheet" href="/css/style.css" />
+</head>
+<body>
+  <ToastProvider client:load>
+    <AuthProvider client:load>
+      <!-- Header -->
+      <Header />
+
+      <!-- Sidebar overlay for mobile -->
+      <div class="sidebar-overlay" id="sidebar-overlay"></div>
+
+      <!-- Main Layout -->
+      <div class="container">
+        <!-- Sidebar -->
+        <Sidebar />
+
+        <!-- Main Content — slot for page-specific content -->
+        <main class="main-content">
+          <slot />
+        </main>
+      </div>
+
+      <!-- React Island modals (client:only — no SSR, hydrates as React only) -->
+      <LoginModal client:only="react" />
+      <ArticleEditor client:only="react" />
+      <ProfileEditor client:only="react" />
+      <GameNewsEditor client:only="react" />
+    </AuthProvider>
+  </ToastProvider>
+
+  <!-- Non-critical React Islands -->
+  <SidebarToggle client:idle />
+</body>
+</html>

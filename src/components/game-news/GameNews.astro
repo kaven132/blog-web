@@ -1,0 +1,101 @@
+---
+// GameNews.astro — Data-driven game news panel (SSR)
+// Reads from game_news table, grouped by game, sorted by sort_order
+import { db } from "../../lib/db";
+import { gameNews } from "../../db/schema";
+import { asc } from "drizzle-orm";
+
+const GAMES = [
+  { key: "genshin", label: "原神" },
+  { key: "starrail", label: "星铁" },
+  { key: "endfield", label: "终末地" },
+  { key: "nte", label: "异环" },
+] as const;
+
+const TAG_STYLES: Record<string, string> = {
+  "新版本": "tag-version",
+  "更新": "tag-version",
+  "活动": "tag-event",
+  "新活动": "tag-event",
+  "卡池角色": "tag-character",
+  "角色": "tag-character",
+  "前瞻": "tag-collab",
+  "联动": "tag-collab",
+  "福利": "tag-buff",
+};
+
+function tagClass(tag: string): string {
+  return TAG_STYLES[tag] || "tag-version";
+}
+
+// Fetch all game news, ordered by game + sort_order
+const allNews = db
+  .select()
+  .from(gameNews)
+  .orderBy(asc(gameNews.game), asc(gameNews.sortOrder))
+  .all();
+
+// Group by game
+const newsByGame: Record<string, typeof allNews> = {};
+for (const g of GAMES) {
+  newsByGame[g.key] = allNews.filter((n) => n.game === g.key);
+}
+
+const hasAnyNews = allNews.length > 0;
+---
+
+<div class="sidebar-card game-news-card">
+  <h3 class="sidebar-card-title">
+    <i class="fa-solid fa-gamepad"></i> 游戏新闻速递
+  </h3>
+
+  {hasAnyNews ? (
+    <>
+      <!-- Tab buttons -->
+      <div class="game-news-tabs">
+        {GAMES.map((g, i) => (
+          <button
+            class={`game-news-tab${i === 0 ? ' active' : ''}`}
+            data-game={g.key}
+          >
+            {g.label}
+          </button>
+        ))}
+      </div>
+
+      <!-- News panels -->
+      <div class="game-news-content" id="game-news-content">
+        {GAMES.map((g, i) => (
+          <div
+            class={`game-news-panel${i === 0 ? ' active' : ''}`}
+            id={`news-${g.key}`}
+            style={i === 0 ? '' : 'display:none'}
+          >
+            {newsByGame[g.key].length === 0 ? (
+              <div class="game-news-item">
+                <p class="game-news-title text-text-muted">暂无 {g.label} 新闻</p>
+              </div>
+            ) : (
+              newsByGame[g.key].map((item) => (
+                <div class="game-news-item">
+                  <span class={`game-news-tag ${tagClass(item.tag)}`}>{item.tag}</span>
+                  <p class="game-news-title">{item.title}</p>
+                </div>
+              ))
+            )}
+          </div>
+        ))}
+      </div>
+
+      <div class="game-news-footer">
+        <span class="game-news-updated">🕐 数据驱动 · 实时更新</span>
+      </div>
+    </>
+  ) : (
+    <div class="game-news-content">
+      <div class="game-news-item">
+        <p class="game-news-title text-text-muted">暂无游戏新闻数据</p>
+      </div>
+    </div>
+  )}
+</div>

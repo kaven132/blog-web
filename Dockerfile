@@ -1,30 +1,29 @@
 # ============================================
 # Kaven's Blog — Dockerfile (Multi-stage Build)
+# Astro SSR + React + Tailwind v4 + Drizzle ORM
 # ============================================
 
-# ── Stage 1: Build native modules ──────────
+# ── Stage 1: Build ──────────────────────────
 FROM node:22-alpine AS builder
 
 RUN apk add --no-cache python3 make g++
 
 WORKDIR /app
 COPY package.json package-lock.json ./
-RUN npm ci --only=production
+RUN npm ci
 
-# ── Stage 2: Runtime image ────────────────
+COPY . .
+RUN npm run build
+
+# ── Stage 2: Runtime ─────────────────────────
 FROM node:22-alpine
 
 WORKDIR /app
 
-# Copy compiled node_modules from builder
+# Copy built artifacts and production dependencies
+COPY --from=builder /app/dist ./dist
 COPY --from=builder /app/node_modules ./node_modules
-
-# Copy application code
-COPY server.js ./
-COPY css/ ./css/
-COPY js/ ./js/
-COPY image/ ./image/
-COPY index.html ./
+COPY --from=builder /app/package.json ./
 
 # Create uploads directory
 RUN mkdir -p uploads && chown -R node:node /app
@@ -32,10 +31,10 @@ RUN mkdir -p uploads && chown -R node:node /app
 # Run as non-root user
 USER node
 
-EXPOSE 3000
+EXPOSE 4321
 
-# Health check using Node.js (no extra packages needed)
+# Health check
 HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
-  CMD node -e "require('http').get('http://localhost:3000/api/health',r=>{process.exit(r.statusCode===200?0:1)})"
+  CMD node -e "require('http').get('http://localhost:4321/api/health',r=>{process.exit(r.statusCode===200?0:1)})"
 
-CMD ["node", "server.js"]
+CMD ["node", "dist/server/entry.mjs"]

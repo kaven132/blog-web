@@ -1,179 +1,148 @@
-# Kaven 的个人博客 v2.0
+# Kaven 的个人博客
 
-基于 **Docker + better-sqlite3 + Nginx** 的容器化个人博客系统。
-
-> 🚧 **正在迁移到 Astro + React + TypeScript + Tailwind v4 + Drizzle ORM**
-> 详见 [MIGRATION_PLAN.md](./MIGRATION_PLAN.md)。当前阶段：**Phase 1 完成，Phase 2 待开始**。
-
-## v2.0 升级亮点
-
-| 对比维度 | v1.0 (blog/) | v2.0 (blog2/) |
-|----------|-------------|---------------|
-| 数据库 | sql.js (纯JS，内存加载) | **better-sqlite3** (原生C，WAL模式) |
-| 静态资源 | Express 直接服务 | **Nginx** 高性能服务 + Gzip + 缓存 |
-| 部署方式 | 手动 Node 进程 | **Docker Compose** 一键编排 |
-| 进程守护 | 需额外 PM2 | Docker `restart: unless-stopped` |
-| 数据库备份 | 无 | **每日自动备份** (保留30份) |
-| 镜像构建 | 单阶段 | **多阶段构建** (更小镜像) |
-| 优雅关闭 | 无 | SIGTERM 安全关闭 DB |
-| HTTPS | 需手动配置 | **可选 Caddy 自动 SSL** |
-| 可移植性 | 依赖 Node 环境 | **容器化**，任意Linux服务器即跑 |
-
-## 架构
-
-```
-请求 → Nginx (:80) 或 Caddy (:443)
-        ├── /css, /js, /image  → 直接返回 (缓存7-30天)
-        ├── /uploads/          → Nginx 读取共享卷
-        ├── /api/*             → 反向代理到 Node (:3000)
-        └── /                  → index.html (SPA fallback)
-```
-
-## 快速部署
-
-### 前置要求
-
-- Docker ≥ 24.0
-- Docker Compose ≥ 2.0
-
-### 一键部署（推荐）
-
-```bash
-# 1. 克隆代码
-git clone <your-repo-url> blog && cd blog
-
-# 2. 运行部署脚本
-chmod +x deploy.sh && ./deploy.sh
-```
-
-### 手动部署
-
-```bash
-# 1. 配置环境变量
-cp .env.example .env
-# 编辑 .env 设置密码和密钥
-
-# 2. 启动服务
-docker compose up -d --build
-
-# 3. 查看初始密码（如果未在 .env 中设置）
-docker compose logs app | grep "密码"
-```
-
-### 启用 HTTPS（自动 SSL 证书）
-
-```bash
-# 1. 编辑 Caddyfile，将 your-domain.com 改为你的域名
-# 2. 确保域名 DNS 解析到服务器 IP
-# 3. 启动
-docker compose -f docker-compose.yml -f docker-compose.caddy.yml up -d
-```
-
-## 本地开发（无 Docker）
-
-**Express（当前主栈）**
-```bash
-npm install
-NO_STATIC=false node server.js
-# 访问 http://localhost:3000
-```
-
-**Astro（新栈 — Phase 1 已完成，Phase 2 开发中）**
-```bash
-npm install
-npm run dev:astro
-# 访问 http://localhost:4321
-# Express 仍在 :3000 独立运行，互不影响（双轨）
-```
-
-> `NO_STATIC=false` 让 Node 直接提供静态文件，无需 Nginx。
-
-## 目录结构
-
-```
-├── server.js                # Express API 服务 (better-sqlite3) — 当前运行中
-├── index.html               # 前端 SPA 页面
-├── css/style.css            # 样式（将与 Tailwind 共存逐步替换）
-├── js/app.js                # 前端逻辑（Vanilla JS）
-├── image/                   # 图标等静态资源
-├── uploads/                 # 上传图片目录 (挂载到卷)
-├── backups/                 # 数据库每日自动备份
-├── data.db                  # SQLite 数据库 (自动生成，不提交)
-│
-├── astro.config.ts          # 🆕 Astro SSR + React + Tailwind 配置
-├── tsconfig.json            # 🆕 TypeScript 配置
-├── drizzle.config.ts        # 🆕 Drizzle Kit 配置
-├── src/                     # 🆕 Astro 源码 (Phase 1 完成)
-│   ├── db/schema.ts         #   Drizzle schema (6 张表)
-│   ├── lib/db.ts            #   数据库连接
-│   ├── lib/utils.ts         #   工具函数
-│   ├── styles/global.css    #   Tailwind v4 @theme
-│   └── pages/index.astro   #   SSR 验证页面
-│
-├── Dockerfile               # 多阶段构建 (编译 → 运行)
-├── nginx.conf               # Nginx 配置
-├── Caddyfile                # Caddy HTTPS 配置（可选）
-├── docker-compose.yml       # 多容器编排
-├── docker-compose.caddy.yml # Caddy HTTPS 附加配置
-├── deploy.sh                # 一键部署脚本
-├── MIGRATION_PLAN.md        # 🆕 迁移计划与进度
-├── .env.example             # 环境变量模板
-├── .dockerignore
-├── .gitignore
-└── package.json
-```
-
-## 常用命令
-
-```bash
-# 启动 / 更新
-docker compose up -d --build
-
-# 重启服务
-docker compose restart
-
-# 停止服务
-docker compose down
-
-# 查看运行状态
-docker compose ps
-
-# 查看日志
-docker compose logs -f app     # 只看 Node
-docker compose logs -f nginx   # 只看 Nginx
-
-# 手动备份数据库
-docker compose exec app cat /app/data.db > backups/data_$(date +%Y%m%d_%H%M%S).db
-
-# 进入容器调试
-docker compose exec app sh
-
-# 初始化演示数据
-curl -X POST http://localhost:3000/api/demo/init
-```
-
-## HTTPS 配置
-
-| 方案 | 说明 | 适用场景 |
-|------|------|---------|
-| Caddy（推荐） | 自动 Let's Encrypt，零配置 | 有域名 |
-| Nginx + certbot | 手动配置证书 | 需要精细控制 |
-| Cloudflare Tunnel | 免证书，Cloudflare 代理 | 不想暴露 IP |
+基于 **Astro SSR + React Islands + TypeScript + Tailwind CSS v4 + Drizzle ORM + SQLite** 的个人博客系统，Docker 容器化部署。
 
 ## 技术栈
 
-**当前（Express）**
-- **运行时**: Node.js 22 Alpine
-- **后端**: Express 4.x
-- **数据库**: better-sqlite3 (WAL 模式，原生性能)
-- **Web 服务器**: Nginx 1.27 Alpine / Caddy 2 (HTTPS)
-- **认证**: scrypt 密码哈希 + HMAC-SHA256 Token
-- **容器**: Docker + Docker Compose (多阶段构建)
+| 层级 | 技术 |
+|------|------|
+| 框架 | Astro 7.x SSR (standalone mode) |
+| UI | React 19 Islands + Tailwind CSS v4 |
+| 语言 | TypeScript 5.x (strict) |
+| 数据库 | better-sqlite3 (WAL 模式) |
+| ORM | Drizzle ORM (类型安全) |
+| 认证 | JWT httpOnly Cookie (jose) |
+| 部署 | Docker Compose + Nginx |
+| 测试 | Vitest |
+| HTTPS | 可选 Caddy (自动 Let's Encrypt) |
 
-**目标（Astro）** — Phase 1 ✅
-- **框架**: Astro 7.x SSR + React 19 Islands
-- **语言**: TypeScript 5.x
-- **样式**: Tailwind CSS v4 + 旧 style.css 共存
-- **ORM**: Drizzle ORM + better-sqlite3
-- **认证**: JWT httpOnly Cookie (jose) + 旧 Bearer Token 双认证
-- **部署**: @astrojs/node standalone
+## 快速开始
+
+```bash
+# 开发模式
+npm install
+npm run dev          # http://localhost:4321
+
+# 运行测试
+npm test
+
+# 生产构建
+npm run build
+npm start            # node dist/server/entry.mjs
+
+# Docker 部署
+docker compose up -d --build
+```
+
+## 项目结构
+
+```
+├── src/
+│   ├── pages/
+│   │   ├── index.astro                  # 首页 (SSR)
+│   │   ├── article/[id].astro           # 文章详情 (SSR)
+│   │   └── api/                         # 14 个 API 路由文件
+│   │       ├── auth/login.ts            #   登录 (JWT cookie)
+│   │       ├── auth/logout.ts           #   登出
+│   │       ├── profile.ts               #   个人信息
+│   │       ├── articles/index.ts        #   文章列表 + 创建
+│   │       ├── articles/[id].ts         #   文章详情 + 编辑 + 删除
+│   │       ├── articles/[id]/toggle-pin.ts
+│   │       ├── articles/[id]/comments.ts
+│   │       ├── articles/[id]/likes.ts
+│   │       ├── categories.ts
+│   │       ├── comments/[id].ts
+│   │       ├── upload.ts
+│   │       ├── demo/init.ts
+│   │       └── health.ts
+│   ├── components/
+│   │   ├── layout/                      # Astro 布局
+│   │   │   ├── BaseLayout.astro         #   HTML 外壳
+│   │   │   ├── Header.astro             #   顶栏
+│   │   │   └── Sidebar.astro            #   侧边栏
+│   │   ├── article/                     # Astro 文章组件
+│   │   │   ├── ArticleCard.astro
+│   │   │   └── ArticleGrid.astro
+│   │   ├── profile/ProfileCard.astro    # Astro 个人信息卡片
+│   │   ├── game-news/GameNews.astro     # Astro 游戏新闻面板
+│   │   └── react/                       # React Islands (13 个)
+│   │       ├── Toast.tsx                #   client:load
+│   │       ├── AuthProvider.tsx          #   client:load
+│   │       ├── LikeButton.tsx           #   client:load
+│   │       ├── CommentSection.tsx       #   client:visible
+│   │       ├── LogoutButton.tsx          #   client:load
+│   │       ├── SearchSort.tsx           #   client:load
+│   │       ├── CategoryFilter.tsx       #   client:load
+│   │       ├── ImageUpload.tsx          #   client:load
+│   │       ├── SidebarToggle.tsx        #   client:idle
+│   │       ├── LoginModal.tsx           #   client:only
+│   │       ├── ArticleEditor.tsx        #   client:only
+│   │       ├── ProfileEditor.tsx        #   client:only
+│   │       └── GameNewsEditor.tsx       #   client:only
+│   ├── db/schema.ts                     # Drizzle schema (6 张表)
+│   ├── lib/
+│   │   ├── db.ts                        # 数据库连接
+│   │   ├── auth.ts                      # JWT 认证
+│   │   └── utils.ts                     # 工具函数
+│   └── styles/global.css                # Tailwind v4 @theme
+├── public/image/pen.png                 # 静态资源 (favicon)
+├── tests/                               # Vitest 测试
+├── Dockerfile                           # 多阶段构建
+├── nginx.conf                           # Nginx 反向代理配置
+├── Caddyfile                            # Caddy HTTPS 配置 (可选)
+├── docker-compose.yml                   # Docker Compose 编排
+├── docker-compose.caddy.yml             # Caddy HTTPS 附加配置
+├── deploy.sh                            # 一键部署脚本
+├── astro.config.ts                      # Astro 配置
+├── drizzle.config.ts                    # Drizzle Kit 配置
+├── tsconfig.json                        # TypeScript 配置
+└── vitest.config.ts                     # Vitest 配置
+```
+
+## API 端点 (18 个)
+
+| 方法 | 路径 | 认证 | 说明 |
+|------|------|------|------|
+| GET | `/api/health` | - | 健康检查 |
+| POST | `/api/auth/login` | - | 登录 |
+| POST | `/api/auth/logout` | - | 登出 |
+| GET | `/api/profile` | - | 获取个人信息 |
+| PUT | `/api/profile` | ✅ | 更新个人信息 |
+| GET | `/api/articles` | - | 文章列表 (支持 ?category/subcategory/search/sort) |
+| POST | `/api/articles` | ✅ | 创建文章 |
+| GET | `/api/articles/:id` | - | 文章详情 |
+| PUT | `/api/articles/:id` | ✅ | 更新文章 |
+| DELETE | `/api/articles/:id` | ✅ | 删除文章 |
+| POST | `/api/articles/:id/toggle-pin` | ✅ | 切换置顶 |
+| GET | `/api/articles/:id/comments` | - | 评论列表 |
+| POST | `/api/articles/:id/comments` | - | 添加评论 |
+| DELETE | `/api/comments/:id` | - | 删除评论 |
+| GET | `/api/articles/:id/likes` | - | 点赞状态 |
+| POST | `/api/articles/:id/likes` | - | 点赞 |
+| DELETE | `/api/articles/:id/likes` | - | 取消点赞 |
+| GET | `/api/categories` | - | 分类 + 分类树 |
+| POST | `/api/upload` | ✅ | 图片上传 (10MB) |
+| POST | `/api/demo/init` | - | 初始化演示数据 |
+
+## 部署
+
+详见 [DEPLOY.md](./DEPLOY.md)。
+
+```bash
+# 一键部署
+chmod +x deploy.sh && ./deploy.sh
+
+# 或手动
+cp .env.example .env   # 编辑管理员密码
+docker compose up -d --build
+```
+
+## 环境变量
+
+| 变量 | 说明 | 默认值 |
+|------|------|--------|
+| `ADMIN_USERNAME` | 管理员账号 | `admin` |
+| `ADMIN_PASSWORD` | 管理员密码 | - (必填) |
+| `AUTH_SECRET` | JWT 签名密钥 | 自动生成 |
+| `PORT_EXPOSE` | 对外端口 | `80` |
+| `TZ` | 时区 | `Asia/Shanghai` |

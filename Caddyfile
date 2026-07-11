@@ -1,31 +1,22 @@
 # ============================================
 # Kaven's Blog — Caddyfile (HTTPS 自动证书)
+# Astro SSR standalone mode
 # ============================================
 # 使用方法:
 #   1. 将域名 DNS 解析到服务器 IP
-#   2. docker compose -f docker-compose.caddy.yml up -d
+#   2. 将 your-domain.com 替换为你的域名
+#   3. docker compose -f docker-compose.caddy.yml up -d
 #
-# 替换 your-domain.com 为你的域名
-
 your-domain.com {
-    # API 反向代理到 Node.js
-    handle /api/* {
-        reverse_proxy app:3000
-    }
-
-    # 上传图片
+    # 上传图片 (直接从卷读取)
     handle /uploads/* {
         root * /data
         file_server
     }
 
-    # 静态文件 + SPA fallback
+    # 所有请求反向代理到 Astro SSR
     handle {
-        root * /usr/share/nginx/html
-        file_server {
-            index index.html
-        }
-        try_files {path} /index.html
+        reverse_proxy app:4321
     }
 
     # 安全头
@@ -35,7 +26,7 @@ your-domain.com {
 
     # 静态资源缓存
     @static {
-        path /css/* /js/* /image/* /uploads/*
+        path /uploads/*
     }
     header @static Cache-Control "public, max-age=604800"
 }

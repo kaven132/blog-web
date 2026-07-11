@@ -9,9 +9,10 @@ backups/*
 !backups/.gitkeep
 .DS_Store
 .claude/
-scripts/data.db
 # Astro
 .astro/
 dist/
 # Drizzle Kit
 drizzle/
+# Tests
+coverage/

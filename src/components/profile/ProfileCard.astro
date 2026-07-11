@@ -1,0 +1,79 @@
+---
+// ProfileCard.astro — SSR-rendered profile card in sidebar
+// Reads profile (id=1) from DB + article/category stats
+import { db } from "../../lib/db";
+import { profile, articles } from "../../db/schema";
+import { count, isNotNull, eq } from "drizzle-orm";
+import { profileToJSON } from "../../lib/utils";
+
+const row = db.select().from(profile).where(eq(profile.id, 1)).get();
+const profileData = row ? profileToJSON(row) : null;
+
+const [{ cnt: articleCount }] = db
+  .select({ cnt: count() })
+  .from(articles)
+  .all();
+
+const categoryRows = db
+  .selectDistinct({ category: articles.category })
+  .from(articles)
+  .where(isNotNull(articles.category))
+  .all()
+  .filter((r) => r.category !== "");
+const uniqueCategoryCount = categoryRows.length;
+---
+
+<div class="profile-card" id="profile-card">
+  <div class="profile-avatar-wrapper">
+    <div class="profile-avatar" id="profile-avatar">
+      {profileData?.avatar ? (
+        <img src={profileData.avatar} alt={profileData.name} />
+      ) : (
+        <i class="fa-solid fa-user"></i>
+      )}
+    </div>
+  </div>
+  <h2 class="profile-name" id="profile-name">{profileData?.name || "未设置姓名"}</h2>
+  <p class="profile-bio" id="profile-bio">{profileData?.bio || "还没有简介，来介绍一下自己吧。"}</p>
+  <div class="profile-meta">
+    {profileData?.email && (
+      <div class="profile-meta-item">
+        <i class="fa-solid fa-envelope"></i>
+        <span>{profileData.email}</span>
+      </div>
+    )}
+    {profileData?.location && (
+      <div class="profile-meta-item">
+        <i class="fa-solid fa-location-dot"></i>
+        <span>{profileData.location}</span>
+      </div>
+    )}
+  </div>
+  <div class="profile-social" id="profile-social">
+    {profileData?.social.github && (
+      <a href={profileData.social.github} target="_blank" rel="noopener noreferrer" class="social-link" title="GitHub">
+        <i class="fa-brands fa-github"></i>
+      </a>
+    )}
+    {profileData?.social.twitter && (
+      <a href={profileData.social.twitter} target="_blank" rel="noopener noreferrer" class="social-link" title="Twitter">
+        <i class="fa-brands fa-twitter"></i>
+      </a>
+    )}
+    {profileData?.social.website && (
+      <a href={profileData.social.website} target="_blank" rel="noopener noreferrer" class="social-link" title="Website">
+        <i class="fa-solid fa-globe"></i>
+      </a>
+    )}
+  </div>
+  <div class="profile-stats">
+    <div class="stat">
+      <span class="stat-num" id="stat-articles">{articleCount}</span>
+      <span class="stat-label">文章</span>
+    </div>
+    <div class="stat">
+      <span class="stat-num" id="stat-categories">{uniqueCategoryCount}</span>
+      <span class="stat-label">分类</span>
+    </div>
+  </div>
+</div>

@@ -4,24 +4,22 @@
   "description": "Kaven的个人博客 — Docker + better-sqlite3 + Nginx 部署版",
   "main": "server.js",
   "scripts": {
-    "start": "node server.js",
-    "dev": "node server.js",
-    "dev:astro": "astro dev",
-    "build:astro": "astro build",
-    "preview:astro": "astro preview",
-    "check:astro": "astro check",
+    "dev": "astro dev",
+    "build": "astro build",
+    "preview": "astro preview",
+    "check": "astro check",
     "db:check": "drizzle-kit check",
-    "db:introspect": "drizzle-kit introspect"
+    "db:introspect": "drizzle-kit introspect",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "start": "node dist/server/entry.mjs"
   },
   "dependencies": {
     "@astrojs/node": "^11.0.2",
     "@astrojs/react": "^6.0.1",
     "better-sqlite3": "^12.11.1",
-    "dotenv": "^17.4.2",
     "drizzle-orm": "^0.45.2",
-    "express": "^4.21.0",
     "jose": "^6.2.3",
-    "multer": "^2.2.0",
     "react": "^19.2.7",
     "react-dom": "^19.2.7"
   },
@@ -33,6 +31,7 @@
     "@types/react-dom": "^19.2.3",
     "drizzle-kit": "^0.31.10",
     "tailwindcss": "^4.3.2",
-    "typescript": "^7.0.2"
+    "typescript": "^7.0.2",
+    "vitest": "^3.2.7"
   }
 }
