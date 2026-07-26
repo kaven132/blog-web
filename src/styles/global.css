@@ -1,86 +1,211 @@
-/* ============================================
-   Kaven's Blog — Tailwind v4 Global Styles
-
-   CSS Coexistence Strategy (MIGRATION_PLAN Phase 3):
-   1. Tailwind → layout (flex/grid/spacing), colors, typography
-   2. Old css/style.css → remaining component styles (loaded AFTER)
-   3. Old CSS overrides Tailwind conflicts via cascade
-   4. Each Phase progressively trims style.css
-   ============================================ */
-
 @import "tailwindcss";
 
-/* ── Design Tokens (1:1 mapped from css/style.css :root) ── */
-
 @theme {
-  /* Colors */
-  --color-primary: #4f46e5;
-  --color-primary-hover: #4338ca;
-  --color-primary-light: #eef2ff;
-  --color-danger: #ef4444;
-  --color-danger-hover: #dc2626;
-  --color-success: #10b981;
-  --color-warning: #f59e0b;
+  /* ── Warm monochrome + coral accent palette ── */
+  --color-accent: oklch(58% 0.22 20);
+  --color-accent-hover: oklch(50% 0.22 20);
+  --color-accent-muted: oklch(58% 0.22 20 / 0.08);
+  --color-bg: oklch(97.5% 0.004 95);
+  --color-surface: oklch(100% 0 0);
+  --color-text: oklch(15% 0.01 260);
+  --color-text-muted: oklch(40% 0.015 260);
+  --color-text-subtle: oklch(60% 0.01 260);
+  --color-border: oklch(88% 0.008 95);
+  --color-border-hover: oklch(78% 0.01 260);
 
-  /* Surfaces */
-  --color-bg: #f8fafc;
-  --color-bg-card: #ffffff;
-  --color-bg-sidebar: #ffffff;
-  --color-bg-header: #ffffff;
+  /* ── Typography ── */
+  --font-family-sans: "DM Sans", "Noto Sans SC", ui-sans-serif, system-ui, sans-serif;
+  --font-family-serif: "Noto Serif SC", "Source Serif 4", Georgia, serif;
+  --font-family-mono: "JetBrains Mono", "Fira Code", ui-monospace, monospace;
+  --spacing-container: 72rem;
 
-  /* Text */
-  --color-text: #1e293b;
-  --color-text-secondary: #64748b;
-  --color-text-muted: #94a3b8;
-
-  /* Borders */
-  --color-border: #e2e8f0;
-  --color-border-light: #f1f5f9;
-
-  /* Shadows (override Tailwind defaults with project values) */
-  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.05);
-  --shadow-default: 0 1px 3px rgba(0, 0, 0, 0.1), 0 1px 2px rgba(0, 0, 0, 0.06);
-  --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -2px rgba(0, 0, 0, 0.1);
-  --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -4px rgba(0, 0, 0, 0.1);
-
-  /* Border Radii (override Tailwind defaults with project values) */
-  --radius-sm: 6px;
-  --radius-default: 10px;
-  --radius-lg: 14px;
-  --radius-xl: 20px;
-
-  /* Font */
-  --font-sans: "Inter", "Noto Sans SC", -apple-system, BlinkMacSystemFont, sans-serif;
-
-  /* Layout Dimensions (accessible as w-sidebar, h-header, max-w-container) */
-  --spacing-sidebar: 320px;
-  --spacing-header: 64px;
-  --spacing-container: 1200px;
+  /* ── Animation ── */
+  --animate-fade-in: fade-in 0.6s ease-out both;
+  --animate-slide-up: slide-up 0.5s ease-out both;
+  --animate-scale-in: scale-in 0.3s ease-out both;
 }
 
-/* ── Base Layer ───────────────────────────────── */
-
-@layer base {
-  html {
-    font-size: 16px;
-    scroll-behavior: smooth;
-  }
-
-  body {
-    font-family: var(--font-sans);
-    background-color: var(--color-bg);
-    color: var(--color-text);
-    line-height: 1.6;
-    min-height: 100vh;
-  }
-
-  a {
-    color: var(--color-primary);
-    text-decoration: none;
-  }
-
-  img {
-    max-width: 100%;
-    height: auto;
-  }
+@keyframes fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
 }
+
+@keyframes slide-up {
+  from { opacity: 0; transform: translateY(16px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes scale-in {
+  from { opacity: 0; transform: scale(0.95); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+@keyframes shimmer {
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(100%); }
+}
+
+/* ── Base ── */
+body {
+  background-color: var(--color-bg);
+  color: var(--color-text);
+  font-family: var(--font-family-sans);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+::selection {
+  background-color: var(--color-accent);
+  color: white;
+}
+
+/* ── Focus ring ── */
+*:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+/* ── Scrollbar ── */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--color-border);
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--color-border-hover);
+}
+
+/* ── Prose (article content) ── */
+.prose {
+  font-family: var(--font-family-serif);
+  line-height: 1.85;
+  color: var(--color-text);
+}
+
+.prose h2 {
+  font-family: var(--font-family-sans);
+  font-size: 1.5rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  margin-top: 2.75rem;
+  margin-bottom: 1rem;
+  color: var(--color-text);
+}
+
+.prose h3 {
+  font-family: var(--font-family-sans);
+  font-size: 1.2rem;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  margin-top: 2rem;
+  margin-bottom: 0.75rem;
+  color: var(--color-text);
+}
+
+.prose p {
+  margin-bottom: 1.25rem;
+  line-height: 1.85;
+  font-size: 1.05rem;
+  color: oklch(25% 0.015 260);
+}
+
+.prose ul,
+.prose ol {
+  margin-bottom: 1.25rem;
+  padding-left: 1.5rem;
+}
+
+.prose li {
+  margin-bottom: 0.5rem;
+  line-height: 1.85;
+  font-size: 1.05rem;
+}
+
+.prose code {
+  background-color: oklch(95% 0.005 95);
+  color: var(--color-accent);
+  padding: 0.15em 0.4em;
+  border-radius: 0.25rem;
+  font-size: 0.88em;
+  font-family: var(--font-family-mono);
+  font-weight: 500;
+}
+
+.prose pre {
+  background-color: oklch(22% 0.01 260);
+  color: oklch(93% 0.005 260);
+  padding: 1.25rem 1.5rem;
+  border-radius: 0.75rem;
+  overflow-x: auto;
+  margin-bottom: 1.5rem;
+  font-size: 0.9rem;
+  line-height: 1.7;
+}
+
+.prose pre code {
+  background: none;
+  padding: 0;
+  color: inherit;
+  font-weight: 400;
+  font-size: inherit;
+}
+
+.prose blockquote {
+  border-left: 3px solid var(--color-accent);
+  padding: 0.5rem 0 0.5rem 1.25rem;
+  margin: 1.75rem 0;
+  color: var(--color-text-muted);
+  font-style: italic;
+  background: var(--color-accent-muted);
+  border-radius: 0 0.5rem 0.5rem 0;
+}
+
+.prose a {
+  color: var(--color-accent);
+  text-decoration: none;
+  background-image: linear-gradient(var(--color-accent), var(--color-accent));
+  background-size: 0% 1.5px;
+  background-position: 0 100%;
+  background-repeat: no-repeat;
+  transition: background-size 0.3s ease;
+}
+
+.prose a:hover {
+  background-size: 100% 1.5px;
+}
+
+.prose strong {
+  font-weight: 700;
+  color: var(--color-text);
+}
+
+/* ── Skeleton loading ── */
+.skeleton {
+  background: linear-gradient(
+    90deg,
+    var(--color-border) 25%,
+    var(--color-bg) 50%,
+    var(--color-border) 75%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 1.5s infinite;
+  border-radius: 0.5rem;
+}
+
+/* ── Staggered card entrance ── */
+.stagger-1 { animation-delay: 0.05s; }
+.stagger-2 { animation-delay: 0.1s; }
+.stagger-3 { animation-delay: 0.15s; }
+.stagger-4 { animation-delay: 0.2s; }
+.stagger-5 { animation-delay: 0.25s; }
+.stagger-6 { animation-delay: 0.3s; }

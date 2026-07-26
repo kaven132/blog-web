@@ -1,0 +1,195 @@
+---
+import Layout from "../../layouts/Layout.astro";
+import LikeButton from "../../components/LikeButton";
+import ReadingProgress from "../../components/ReadingProgress";
+import { db } from "../../db";
+import { posts, comments, likes } from "../../db/schema";
+import { eq } from "drizzle-orm";
+
+export const prerender = false;
+
+const { slug } = Astro.params;
+const post = db.select().from(posts).where(eq(posts.slug, slug)).get();
+
+if (!post || !post.published) {
+  return Astro.redirect("/404");
+}
+
+const postLikes = db.select().from(likes).where(eq(likes.postId, post.id)).get();
+const postComments = db
+  .select()
+  .from(comments)
+  .where(eq(comments.postId, post.id))
+  .orderBy(comments.createdAt)
+  .all();
+
+const tagList: string[] = (() => {
+  try {
+    return JSON.parse(post.tags);
+  } catch {
+    return [];
+  }
+})();
+
+const formattedDate = new Date(post.createdAt).toLocaleDateString("zh-CN", {
+  year: "numeric",
+  month: "long",
+  day: "numeric",
+});
+
+function renderContent(content: string): string {
+  return content
+    .split("\n")
+    .map((line) => {
+      if (line.startsWith("## ")) return `<h2>${line.replace("## ", "")}</h2>`;
+      if (line.startsWith("### ")) return `<h3>${line.replace("### ", "")}</h3>`;
+      if (line.startsWith("- ")) return `<li>${line.replace("- ", "")}</li>`;
+      if (line.startsWith("```")) return `<pre><code>`;
+      if (line.trim() === "") return `<br />`;
+      if (/^\d+\.\s/.test(line)) return `<li>${line.replace(/^\d+\.\s/, "")}</li>`;
+      return `<p>${line}</p>`;
+    })
+    .join("\n")
+    .replace(/<pre><code>/g, '<pre><code>')
+    .replace(/<\/code><\/pre>\n<pre><code[^>]*>/g, "\n")
+    .replace(/<p>```/g, "</code></pre>");
+}
+---
+
+<Layout title={post.title} description={post.excerpt}>
+  <ReadingProgress client:load />
+
+  <article class="max-w-3xl mx-auto py-10 md:py-14">
+    <!-- Back navigation -->
+    <a
+      href="/posts"
+      class="inline-flex items-center gap-1.5 text-sm text-[var(--color-text-subtle)] hover:text-[var(--color-accent)] transition-colors mb-8 group"
+    >
+      <span class="inline-block transition-transform group-hover:-translate-x-1">←</span>
+      返回文章列表
+    </a>
+
+    <!-- Header -->
+    <header class="mb-10">
+      <!-- Tags -->
+      <div class="flex flex-wrap items-center gap-1.5 mb-5">
+        {tagList.map((tag) => (
+          <span
+            class="text-[11px] font-semibold tracking-wide uppercase px-2.5 py-0.5 rounded-md bg-[var(--color-accent-muted)] text-[var(--color-accent)]"
+          >
+            {tag}
+          </span>
+        ))}
+      </div>
+
+      <!-- Title -->
+      <h1 class="text-3xl md:text-4xl lg:text-[2.5rem] font-bold tracking-[-0.02em] leading-[1.2] mb-5 text-[var(--color-text)]">
+        {post.title}
+      </h1>
+
+      <!-- Meta -->
+      <div class="flex items-center gap-3 text-sm text-[var(--color-text-subtle)] font-medium">
+        <time datetime={post.createdAt}>{formattedDate}</time>
+        {
+          post.updatedAt !== post.createdAt && (
+            <>
+              <span class="w-1 h-1 rounded-full bg-[var(--color-text-subtle)]" />
+              <span>更新于 {new Date(post.updatedAt).toLocaleDateString("zh-CN")}</span>
+            </>
+          )
+        }
+        <span class="w-1 h-1 rounded-full bg-[var(--color-text-subtle)]" />
+        <span>{Math.ceil(post.content.length / 400)} 分钟阅读</span>
+      </div>
+    </header>
+
+    <!-- Content -->
+    <div class="prose max-w-none mb-14" set:html={renderContent(post.content)} />
+
+    <!-- Divider -->
+    <div class="flex items-center gap-4 mb-10">
+      <div class="flex-1 h-px bg-[var(--color-border)]" />
+      <span class="text-xs text-[var(--color-text-subtle)] uppercase tracking-widest font-semibold">End</span>
+      <div class="flex-1 h-px bg-[var(--color-border)]" />
+    </div>
+
+    <!-- Like section -->
+    <div class="flex flex-col items-center gap-3 mb-14">
+      <p class="text-xs text-[var(--color-text-subtle)] uppercase tracking-widest font-semibold">
+        这篇文章对你有帮助吗？
+      </p>
+      <LikeButton client:load postId={post.id} initialCount={postLikes?.count || 0} />
+    </div>
+
+    <!-- Comments section -->
+    <section id="comments" class="max-w-2xl mx-auto">
+      <div class="flex items-center gap-3 mb-8">
+        <h2 class="text-lg font-bold tracking-[-0.01em]">评论</h2>
+        <span class="text-xs font-semibold px-2 py-0.5 rounded-full bg-[var(--color-border)] text-[var(--color-text-subtle)]">
+          {postComments.length}
+        </span>
+      </div>
+
+      <!-- Comment list -->
+      {
+        postComments.length === 0 ? (
+          <p class="text-center py-10 text-sm text-[var(--color-text-subtle)] font-serif">
+            暂无评论，成为第一个留言的人
+          </p>
+        ) : (
+          <div class="space-y-3 mb-10">
+            {postComments.map((comment) => (
+              <div class="bg-[var(--color-surface)] border border-[var(--color-border)] rounded-xl p-4 hover:border-[var(--color-border-hover)] transition-colors duration-200">
+                <div class="flex items-center gap-2.5 mb-2.5">
+                  <div class="w-7 h-7 rounded-full bg-[var(--color-accent-muted)] text-[var(--color-accent)] flex items-center justify-center text-xs font-bold">
+                    {comment.author.charAt(0)}
+                  </div>
+                  <span class="font-semibold text-sm text-[var(--color-text)]">{comment.author}</span>
+                  <span class="text-xs text-[var(--color-text-subtle)]">
+                    {new Date(comment.createdAt).toLocaleDateString("zh-CN", {
+                      month: "short",
+                      day: "numeric",
+                    })}
+                  </span>
+                </div>
+                <p class="text-sm text-[var(--color-text-muted)] leading-relaxed pl-9">{comment.content}</p>
+              </div>
+            ))}
+          </div>
+        )
+      }
+
+      <!-- Comment form -->
+      <form method="POST" action="/api/comment" class="space-y-3">
+        <input type="hidden" name="postId" value={post.id} />
+        <input type="hidden" name="slug" value={slug} />
+        <div class="flex flex-col sm:flex-row gap-3">
+          <input
+            type="text"
+            name="author"
+            placeholder="昵称"
+            maxlength="20"
+            required
+            class="sm:w-28 px-3.5 py-2.5 text-sm rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] text-[var(--color-text)] placeholder:text-[var(--color-text-subtle)]/50 focus:outline-none focus:border-[var(--color-accent)] transition-all duration-300"
+          />
+          <div class="flex-1 flex gap-2.5">
+            <input
+              type="text"
+              name="content"
+              placeholder="写下你的想法..."
+              maxlength="500"
+              required
+              class="flex-1 px-3.5 py-2.5 text-sm rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] text-[var(--color-text)] placeholder:text-[var(--color-text-subtle)]/50 focus:outline-none focus:border-[var(--color-accent)] transition-all duration-300"
+            />
+            <button
+              type="submit"
+              class="px-5 py-2.5 text-sm font-semibold rounded-xl bg-[var(--color-accent)] text-white hover:bg-[var(--color-accent-hover)] transition-colors duration-200 active:scale-[0.97]"
+            >
+              发送
+            </button>
+          </div>
+        </div>
+      </form>
+    </section>
+  </article>
+</Layout>

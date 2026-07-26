@@ -1,58 +1,83 @@
 import type { APIRoute } from "astro";
-import { db } from "../../lib/db";
+import { db } from "../../db";
 import { profile } from "../../db/schema";
 import { eq } from "drizzle-orm";
-import { requireAuth } from "../../lib/auth";
-import { profileToJSON } from "../../lib/utils";
 
-/**
- * GET /api/profile — Public, returns profile row (id=1)
- */
-export const GET: APIRoute = () => {
-  const row = db.select().from(profile).where(eq(profile.id, 1)).get();
+const DEFAULTS = {
+  name: "kaven",
+  bio: "",
+  city: "",
+  gender: "",
+  avatar: "",
+  github: "",
+  website: "",
+};
 
-  if (!row) {
-    return new Response(JSON.stringify({ error: "个人信息不存在" }), {
-      status: 404,
+// GET — read profile
+export const GET: APIRoute = async () => {
+  const data = db.select().from(profile).where(eq(profile.id, 1)).get();
+  if (!data) {
+    return new Response(JSON.stringify(DEFAULTS), {
       headers: { "Content-Type": "application/json" },
     });
   }
-
-  return new Response(JSON.stringify(profileToJSON(row)), {
-    status: 200,
+  return new Response(JSON.stringify(data), {
     headers: { "Content-Type": "application/json" },
   });
 };
 
-/**
- * PUT /api/profile — Protected, updates profile row
- * Body: { name, bio, email, location, avatar, social: { github, twitter, website } }
- */
-export const PUT: APIRoute = async ({ request }) => {
-  const auth = await requireAuth(request);
-  if (auth instanceof Response) return auth;
+// PUT — update profile (auth required)
+export const PUT: APIRoute = async ({ request, cookies }) => {
+  const authed = cookies.get("auth")?.value === "true";
+  if (!authed) {
+    return new Response(JSON.stringify({ error: "请先登录" }), {
+      status: 401,
+      headers: { "Content-Type": "application/json" },
+    });
+  }
 
-  const body = await request.json();
-  const { name, bio, email, location, avatar, social } = body || {};
+  try {
+    const body = await request.json();
+    const { name, bio, city, gender, avatar, github, website } = body;
 
-  db.update(profile)
-    .set({
-      name: name || "",
-      bio: bio || "",
-      email: email || "",
-      location: location || "",
-      avatar: avatar || "",
-      socialGithub: social?.github || "",
-      socialTwitter: social?.twitter || "",
-      socialWebsite: social?.website || "",
-    })
-    .where(eq(profile.id, 1))
-    .run();
+    const existing = db.select().from(profile).where(eq(profile.id, 1)).get();
 
-  const row = db.select().from(profile).where(eq(profile.id, 1)).get();
+    if (existing) {
+      db.update(profile)
+        .set({
+          name: name ?? existing.name,
+          bio: bio ?? existing.bio,
+          city: city ?? existing.city,
+          gender: gender ?? existing.gender,
+          avatar: avatar ?? existing.avatar,
+          github: github ?? existing.github,
+          website: website ?? existing.website,
+        })
+        .where(eq(profile.id, 1))
+        .run();
+    } else {
+      db.insert(profile)
+        .values({
+          id: 1,
+          name: name || DEFAULTS.name,
+          bio: bio || DEFAULTS.bio,
+          city: city || DEFAULTS.city,
+          gender: gender || DEFAULTS.gender,
+          avatar: avatar || DEFAULTS.avatar,
+          github: github || DEFAULTS.github,
+          website: website || DEFAULTS.website,
+        })
+        .run();
+    }
 
-  return new Response(JSON.stringify(profileToJSON(row!)), {
-    status: 200,
-    headers: { "Content-Type": "application/json" },
-  });
+    const updated = db.select().from(profile).where(eq(profile.id, 1)).get();
+    return new Response(JSON.stringify(updated), {
+      headers: { "Content-Type": "application/json" },
+    });
+  } catch (err) {
+    return new Response(JSON.stringify({ error: "更新失败" }), {
+      status: 500,
+      headers: { "Content-Type": "application/json" },
+    });
+  }
 };

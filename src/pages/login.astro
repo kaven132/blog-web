@@ -1,0 +1,114 @@
+---
+import Layout from "../layouts/Layout.astro";
+
+// Redirect if already logged in
+const authCookie = Astro.cookies.get("auth")?.value;
+if (authCookie === "true") {
+  return Astro.redirect("/write");
+}
+---
+
+<Layout title="登录">
+  <div class="max-w-sm mx-auto py-20">
+    <h1 class="text-2xl font-bold tracking-[-0.01em] mb-2 text-center">登录</h1>
+    <p class="text-sm text-[var(--color-text-muted)] text-center mb-8 font-serif">登录以管理博客内容</p>
+
+    <form id="login-form" class="space-y-3.5">
+      <!-- Account -->
+      <input
+        type="text"
+        name="account"
+        placeholder="账号"
+        required
+        autofocus
+        class="w-full px-4 py-3 text-sm rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] text-[var(--color-text)] placeholder:text-[var(--color-text-subtle)]/50 focus:outline-none focus:border-[var(--color-accent)] transition-all text-center"
+      />
+
+      <!-- Password with toggle -->
+      <div class="relative">
+        <input
+          type="password"
+          name="password"
+          id="password-input"
+          placeholder="密码"
+          required
+          class="w-full px-4 py-3 pr-11 text-sm rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] text-[var(--color-text)] placeholder:text-[var(--color-text-subtle)]/50 focus:outline-none focus:border-[var(--color-accent)] transition-all text-center"
+        />
+        <button
+          type="button"
+          id="toggle-password"
+          class="absolute right-3 top-1/2 -translate-y-1/2 w-7 h-7 flex items-center justify-center rounded-md text-[var(--color-text-subtle)] hover:text-[var(--color-text)] transition-colors"
+          title="显示密码"
+        >
+          <!-- Eye icon — closed -->
+          <svg id="eye-off" class="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={1.8} viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M3.98 8.223A10.477 10.477 0 001.934 12C3.226 16.338 7.244 19.5 12 19.5c.993 0 1.953-.138 2.863-.395M6.228 6.228A10.45 10.45 0 0112 4.5c4.756 0 8.773 3.162 10.065 7.498a10.523 10.523 0 01-4.293 5.774M6.228 6.228L3 3m3.228 3.228l3.65 3.65m7.894 7.894L21 21m-3.228-3.228l-3.65-3.65m0 0a3 3 0 10-4.243-4.243m4.242 4.242L9.88 9.88" />
+          </svg>
+          <!-- Eye icon — open -->
+          <svg id="eye-on" class="w-4 h-4 hidden" fill="none" stroke="currentColor" strokeWidth={1.8} viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M2.036 12.322a1.012 1.012 0 010-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178z" />
+            <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+          </svg>
+        </button>
+      </div>
+
+      <p id="error" class="text-xs text-red-500 text-center hidden"></p>
+      <button
+        type="submit"
+        id="submit-btn"
+        class="w-full py-3 text-sm font-semibold rounded-xl bg-[var(--color-accent)] text-white hover:bg-[var(--color-accent-hover)] transition-colors"
+      >
+        登录
+      </button>
+    </form>
+  </div>
+</Layout>
+
+<script>
+  const form = document.getElementById("login-form")!;
+  const error = document.getElementById("error")!;
+  const btn = document.getElementById("submit-btn")! as HTMLButtonElement;
+  const toggleBtn = document.getElementById("toggle-password")!;
+  const pwdInput = document.getElementById("password-input")! as HTMLInputElement;
+  const eyeOff = document.getElementById("eye-off")!;
+  const eyeOn = document.getElementById("eye-on")!;
+
+  // Toggle password visibility
+  toggleBtn.addEventListener("click", () => {
+    const show = pwdInput.type === "password";
+    pwdInput.type = show ? "text" : "password";
+    eyeOff.classList.toggle("hidden", show);
+    eyeOn.classList.toggle("hidden", !show);
+    toggleBtn.title = show ? "隐藏密码" : "显示密码";
+  });
+
+  form.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const account = (form.querySelector("[name='account']") as HTMLInputElement).value;
+    const password = pwdInput.value;
+    btn.textContent = "登录中…";
+    btn.disabled = true;
+    error.classList.add("hidden");
+
+    try {
+      const res = await fetch("/api/auth/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ account, password }),
+      });
+      const data = await res.json();
+      if (data.ok) {
+        window.location.href = "/";
+      } else {
+        error.textContent = data.error || "账号或密码错误";
+        error.classList.remove("hidden");
+      }
+    } catch {
+      error.textContent = "网络错误";
+      error.classList.remove("hidden");
+    } finally {
+      btn.textContent = "登录";
+      btn.disabled = false;
+    }
+  });
+</script>

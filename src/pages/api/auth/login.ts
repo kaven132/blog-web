@@ -1,50 +1,34 @@
 import type { APIRoute } from "astro";
-import { login } from "../../../lib/auth";
 
-/**
- * POST /api/auth/login
- *
- * Accepts: { username: string, password: string }
- * Returns: { token: string, username: string }
- * Also sets: httpOnly cookie `blog_session` (JWT)
- */
-export const POST: APIRoute = async ({ request }) => {
-  let body: { username?: string; password?: string };
+// Simple password — in production use env vars
+const ADMIN_ACCOUNT = "kavenyyds";
+const ADMIN_PASSWORD = "4399123456";
+
+export const POST: APIRoute = async ({ request, cookies }) => {
   try {
-    body = await request.json();
-  } catch {
-    return new Response(JSON.stringify({ error: "请求格式错误" }), {
-      status: 400,
-      headers: { "Content-Type": "application/json" },
-    });
-  }
+    const { account, password } = await request.json();
 
-  const { username, password } = body;
+    if (account === ADMIN_ACCOUNT && password === ADMIN_PASSWORD) {
+      cookies.set("auth", "true", {
+        httpOnly: true,
+        secure: false, // set true in production
+        sameSite: "lax",
+        path: "/",
+        maxAge: 60 * 60 * 24 * 7, // 7 days
+      });
+      return new Response(JSON.stringify({ ok: true }), {
+        headers: { "Content-Type": "application/json" },
+      });
+    }
 
-  if (!username || !password) {
-    return new Response(JSON.stringify({ error: "请输入账号和密码" }), {
-      status: 400,
-      headers: { "Content-Type": "application/json" },
-    });
-  }
-
-  const result = await login(username, password);
-
-  if (!result) {
-    return new Response(JSON.stringify({ error: "账号或密码错误" }), {
+    return new Response(JSON.stringify({ ok: false, error: "密码错误" }), {
       status: 401,
       headers: { "Content-Type": "application/json" },
     });
+  } catch {
+    return new Response(JSON.stringify({ error: "请求无效" }), {
+      status: 400,
+      headers: { "Content-Type": "application/json" },
+    });
   }
-
-  return new Response(
-    JSON.stringify({ token: result.token, username: result.username }),
-    {
-      status: 200,
-      headers: {
-        "Content-Type": "application/json",
-        "Set-Cookie": result.cookieHeader,
-      },
-    },
-  );
 };

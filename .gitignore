@@ -1,18 +1,5 @@
 node_modules/
-.env
-data.db
-data.db-shm
-data.db-wal
-uploads/*
-!uploads/.gitkeep
-backups/*
-!backups/.gitkeep
-.DS_Store
-.claude/
-# Astro
-.astro/
 dist/
-# Drizzle Kit
-drizzle/
-# Tests
-coverage/
+data/
+.env
+.DS_Store

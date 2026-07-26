@@ -1,0 +1,56 @@
+---
+import Layout from "../layouts/Layout.astro";
+---
+
+<Layout title="关于" description="关于 Blog3 — 技术栈、设计理念与功能特性">
+  <article class="max-w-3xl mx-auto py-12 md:py-16">
+    <div class="mb-12">
+      <p class="text-xs font-semibold tracking-[0.15em] uppercase text-[var(--color-text-subtle)] mb-3">About</p>
+      <h1 class="text-3xl md:text-4xl font-bold tracking-[-0.02em] mb-5">关于这个博客</h1>
+      <p class="text-base text-[var(--color-text-muted)] leading-relaxed font-serif max-w-xl">
+        Blog3 是一个使用现代前端技术栈构建的个人技术博客，也是探索最新 Web 开发实践的实验场。
+      </p>
+    </div>
+
+    <!-- Tech stack cards -->
+    <section class="mb-14">
+      <h2 class="text-sm font-semibold tracking-[0.12em] uppercase text-[var(--color-text-subtle)] mb-5">技术栈</h2>
+      <div class="grid gap-3 sm:grid-cols-2">
+        {[
+          { icon: "◆", title: "Astro SSR", desc: "服务端渲染，按需生成页面，极致的内容交付性能。" },
+          { icon: "◇", title: "React Islands", desc: "群岛架构 — 在静态 HTML 中嵌入交互式 React 组件。" },
+          { icon: "○", title: "Tailwind CSS v4", desc: "CSS 优先主题配置，oklch 色彩空间，容器查询。" },
+          { icon: "◉", title: "Drizzle ORM + SQLite", desc: "类型安全 ORM，零依赖的轻量数据库。" },
+        ].map((item) => (
+          <div class="group bg-[var(--color-surface)] border border-[var(--color-border)] hover:border-[var(--color-border-hover)] rounded-xl p-5 transition-all duration-300">
+            <span class="text-[var(--color-accent)] text-lg mb-3 block">{item.icon}</span>
+            <h3 class="font-semibold text-[var(--color-text)] mb-1.5">{item.title}</h3>
+            <p class="text-sm text-[var(--color-text-muted)] leading-relaxed">{item.desc}</p>
+          </div>
+        ))}
+      </div>
+    </section>
+
+    <!-- Features -->
+    <section>
+      <h2 class="text-sm font-semibold tracking-[0.12em] uppercase text-[var(--color-text-subtle)] mb-5">功能</h2>
+      <div class="grid gap-2 sm:grid-cols-2">
+        {[
+          "Markdown 风格文章排版",
+          "实时文章搜索",
+          "文章点赞功能",
+          "文章评论系统",
+          "文章标签分类",
+          "响应式设计",
+          "服务端渲染 · SEO 友好",
+          "阅读进度指示器",
+        ].map((feature) => (
+          <div class="flex items-center gap-3 text-sm text-[var(--color-text-muted)] py-2">
+            <span class="w-1 h-1 rounded-full bg-[var(--color-accent)] flex-shrink-0" />
+            {feature}
+          </div>
+        ))}
+      </div>
+    </section>
+  </article>
+</Layout>

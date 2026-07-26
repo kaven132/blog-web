@@ -1,0 +1,167 @@
+---
+import Layout from "../layouts/Layout.astro";
+
+// Require auth
+const authCookie = Astro.cookies.get("auth")?.value;
+if (authCookie !== "true") {
+  return Astro.redirect("/login");
+}
+---
+
+<Layout title="写文章">
+  <div class="max-w-3xl mx-auto py-8">
+    <h1 class="text-2xl font-bold tracking-[-0.01em] mb-8">写文章</h1>
+
+    <form id="write-form" class="space-y-5">
+      <div>
+        <label class="text-xs font-semibold text-[var(--color-text-subtle)] uppercase tracking-wider block mb-1.5">标题</label>
+        <input
+          type="text"
+          name="title"
+          placeholder="文章标题"
+          maxlength={120}
+          required
+          class="w-full px-4 py-2.5 text-sm rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] text-[var(--color-text)] placeholder:text-[var(--color-text-subtle)]/50 focus:outline-none focus:border-[var(--color-accent)] transition-all"
+        />
+      </div>
+
+      <div class="grid grid-cols-2 gap-4">
+        <div>
+          <label class="text-xs font-semibold text-[var(--color-text-subtle)] uppercase tracking-wider block mb-1.5">Slug（URL标识）</label>
+          <input
+            type="text"
+            name="slug"
+            placeholder="my-article-slug"
+            maxlength={100}
+            required
+            class="w-full px-4 py-2.5 text-sm rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] text-[var(--color-text)] placeholder:text-[var(--color-text-subtle)]/50 focus:outline-none focus:border-[var(--color-accent)] transition-all"
+          />
+        </div>
+        <div>
+          <label class="text-xs font-semibold text-[var(--color-text-subtle)] uppercase tracking-wider block mb-1.5">标签（逗号分隔）</label>
+          <input
+            type="text"
+            name="tags"
+            placeholder="前端, React, TypeScript"
+            maxlength={200}
+            class="w-full px-4 py-2.5 text-sm rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] text-[var(--color-text)] placeholder:text-[var(--color-text-subtle)]/50 focus:outline-none focus:border-[var(--color-accent)] transition-all"
+          />
+        </div>
+      </div>
+
+      <div>
+        <label class="text-xs font-semibold text-[var(--color-text-subtle)] uppercase tracking-wider block mb-1.5">摘要</label>
+        <textarea
+          name="excerpt"
+          placeholder="简短的文章摘要…"
+          maxlength={300}
+          rows={2}
+          class="w-full px-4 py-2.5 text-sm rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] text-[var(--color-text)] placeholder:text-[var(--color-text-subtle)]/50 focus:outline-none focus:border-[var(--color-accent)] transition-all resize-none"
+        ></textarea>
+      </div>
+
+      <div>
+        <label class="text-xs font-semibold text-[var(--color-text-subtle)] uppercase tracking-wider block mb-1.5">
+          内容（Markdown 格式）
+        </label>
+        <textarea
+          name="content"
+          placeholder="## 标题&#10;&#10;正文内容…&#10;&#10;- 列表项"
+          rows={16}
+          required
+          class="w-full px-4 py-2.5 text-sm rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] text-[var(--color-text)] placeholder:text-[var(--color-text-subtle)]/50 focus:outline-none focus:border-[var(--color-accent)] transition-all resize-y font-mono leading-relaxed"
+        ></textarea>
+      </div>
+
+      <div class="flex items-center gap-3 pt-2">
+        <button
+          type="submit"
+          id="submit-btn"
+          class="px-6 py-2.5 text-sm font-semibold rounded-xl bg-[var(--color-accent)] text-white hover:bg-[var(--color-accent-hover)] transition-colors"
+        >
+          发布文章
+        </button>
+        <a
+          href="/"
+          class="text-sm text-[var(--color-text-muted)] hover:text-[var(--color-text)] transition-colors"
+        >
+          取消
+        </a>
+        <p id="error" class="text-xs text-red-500 hidden ml-auto"></p>
+        <p id="success" class="text-xs text-green-600 hidden ml-auto"></p>
+      </div>
+    </form>
+  </div>
+</Layout>
+
+<script>
+  const form = document.getElementById("write-form")!;
+  const btn = document.getElementById("submit-btn")! as HTMLButtonElement;
+  const error = document.getElementById("error")!;
+  const success = document.getElementById("success")!;
+
+  // Auto-generate slug from title
+  const titleInput = form.querySelector("[name='title']") as HTMLInputElement;
+  const slugInput = form.querySelector("[name='slug']") as HTMLInputElement;
+  titleInput.addEventListener("input", () => {
+    if (!slugInput.dataset.manual) {
+      slugInput.value = titleInput.value
+        .toLowerCase()
+        .replace(/[^a-z0-9一-鿿]+/g, "-")
+        .replace(/^-|-$/g, "")
+        .slice(0, 80);
+    }
+  });
+  slugInput.addEventListener("input", () => {
+    slugInput.dataset.manual = "true";
+  });
+
+  form.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    btn.textContent = "发布中…";
+    btn.disabled = true;
+    error.classList.add("hidden");
+    success.classList.add("hidden");
+
+    const formData = new FormData(form);
+    const tags = formData.get("tags")?.toString() || "";
+    const tagArray = tags
+      .split(/[,，]/)
+      .map((t) => t.trim())
+      .filter(Boolean);
+
+    const body = {
+      title: formData.get("title"),
+      slug: formData.get("slug"),
+      excerpt: formData.get("excerpt"),
+      content: formData.get("content"),
+      tags: JSON.stringify(tagArray),
+    };
+
+    try {
+      const res = await fetch("/api/posts", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        success.textContent = "发布成功！即将跳转…";
+        success.classList.remove("hidden");
+        setTimeout(() => {
+          window.location.href = `/posts/${data.slug}`;
+        }, 800);
+      } else {
+        error.textContent = data.error || "发布失败";
+        error.classList.remove("hidden");
+        btn.textContent = "发布文章";
+        btn.disabled = false;
+      }
+    } catch {
+      error.textContent = "网络错误";
+      error.classList.remove("hidden");
+      btn.textContent = "发布文章";
+      btn.disabled = false;
+    }
+  });
+</script>

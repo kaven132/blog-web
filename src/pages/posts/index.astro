@@ -1,0 +1,87 @@
+---
+import Layout from "../../layouts/Layout.astro";
+import PostCard from "../../components/PostCard";
+import SearchBar from "../../components/SearchBar";
+import { db } from "../../db";
+import { posts } from "../../db/schema";
+import { eq, desc } from "drizzle-orm";
+
+const searchQuery = Astro.url.searchParams.get("search") || "";
+
+const allPosts = searchQuery
+  ? db
+      .select()
+      .from(posts)
+      .where(eq(posts.published, true))
+      .all()
+      .filter(
+        (p) =>
+          p.title.includes(searchQuery) ||
+          p.excerpt.includes(searchQuery) ||
+          p.tags.includes(searchQuery)
+      )
+  : db.select().from(posts).where(eq(posts.published, true)).orderBy(desc(posts.createdAt)).all();
+---
+
+<Layout title={searchQuery ? `搜索: ${searchQuery}` : "文章列表"} description="浏览所有博客文章">
+  <div class="py-8 md:py-12">
+    <!-- Header -->
+    <div class="flex flex-col sm:flex-row sm:items-end justify-between gap-5 mb-10">
+      <div>
+        <p class="text-xs font-semibold tracking-[0.15em] uppercase text-[var(--color-text-subtle)] mb-2">Articles</p>
+        <h1 class="text-3xl font-bold tracking-[-0.015em]">
+          {searchQuery ? `"${searchQuery}" 的搜索结果` : "所有文章"}
+        </h1>
+        {
+          searchQuery && (
+            <p class="text-sm text-[var(--color-text-muted)] mt-2 font-serif">
+              找到 {allPosts.length} 篇相关文章
+            </p>
+          )
+        }
+      </div>
+      <SearchBar client:load placeholder="搜索文章..." />
+    </div>
+
+    <!-- Clear search -->
+    {
+      searchQuery && (
+        <a
+          href="/posts"
+          class="inline-flex items-center gap-1 text-sm text-[var(--color-text-muted)] hover:text-[var(--color-accent)] transition-colors mb-8"
+        >
+          <span>←</span> 清除筛选
+        </a>
+      )
+    }
+
+    <!-- Post grid -->
+    {
+      allPosts.length === 0 ? (
+        <div class="text-center py-24">
+          <p class="text-[var(--color-text-muted)] text-base mb-3 font-serif">
+            {searchQuery ? `没有找到与 "${searchQuery}" 相关的文章` : "还没有文章"}
+          </p>
+          {!searchQuery && (
+            <p class="text-[var(--color-text-subtle)] text-sm">
+              运行 <code class="bg-[var(--color-border)] px-2 py-0.5 rounded text-xs font-mono">npm run db:seed</code> 填充示例数据
+            </p>
+          )}
+        </div>
+      ) : (
+        <div class="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+          {allPosts.map((post, i) => (
+            <PostCard
+              title={post.title}
+              slug={post.slug}
+              excerpt={post.excerpt}
+              tags={post.tags}
+              createdAt={post.createdAt}
+              index={i}
+            />
+          ))}
+        </div>
+      )
+    }
+  </div>
+</Layout>
