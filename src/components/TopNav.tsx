@@ -77,8 +77,8 @@ export default function TopNav({ onToggleSidebar, sidebarOpen }: TopNavProps) {
                 <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5" />
               </svg>
             </button>
-            <a href="/" className="text-base font-bold tracking-tight text-[var(--color-text)] hover:text-[var(--color-accent)] transition-colors flex-shrink-0">
-              kaven的个人网页
+            <a href="/" className="text-lg font-bold tracking-tight text-[var(--color-text)] hover:text-[var(--color-accent)] transition-colors flex-shrink-0">
+              Kaven的个人网页
             </a>
           </div>
 

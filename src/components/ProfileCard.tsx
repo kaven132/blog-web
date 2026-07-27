@@ -228,13 +228,13 @@ export default function ProfileCard() {
   const avatarSrc = editing ? form.avatar : profile.avatar;
   const initial = (editing ? form.name : profile.name)?.charAt(0)?.toUpperCase() || "?";
   const genderSvg = profile.gender === "male" ? (
-    <svg className="w-3.5 h-3.5 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+    <svg className="w-5 h-5 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
       <circle cx="10" cy="14" r="5" />
       <line x1="14" y1="10" x2="20" y2="4" />
       <polyline points="16 4 20 4 20 8" />
     </svg>
   ) : profile.gender === "female" ? (
-    <svg className="w-3.5 h-3.5 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+    <svg className="w-5 h-5 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
       <circle cx="12" cy="9" r="5" />
       <line x1="12" y1="14" x2="12" y2="22" />
       <line x1="9" y1="18" x2="15" y2="18" />
@@ -283,7 +283,7 @@ export default function ProfileCard() {
                 )}
               </div>
 
-              <h2 className="text-base font-bold text-[var(--color-text)] tracking-[-0.01em] flex items-center justify-center gap-1.5">
+              <h2 className="text-lg font-bold text-[var(--color-text)] tracking-[-0.01em] flex items-center justify-center gap-1.5">
                 {profile.name}
                 {genderSvg && (
                   <span className={profile.gender === "male" ? "text-[#4b9ce8]" : "text-[#e87aaa]"} title={profile.gender === "male" ? "男" : "女"}>

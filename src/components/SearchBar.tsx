@@ -19,7 +19,7 @@ export default function SearchBar({ placeholder = "搜索文章..." }: SearchBar
   );
 
   return (
-    <form onSubmit={handleSubmit} className="relative w-full max-w-sm">
+    <form onSubmit={handleSubmit} className="relative w-full max-w-xl">
       {/* Search icon */}
       <svg
         className={`absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 transition-colors duration-300 ${

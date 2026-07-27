@@ -11,7 +11,7 @@ const recentPosts = db
   .from(posts)
   .where(eq(posts.published, true))
   .orderBy(desc(posts.createdAt))
-  .limit(6)
+  .limit(3)
   .all();
 ---
 
