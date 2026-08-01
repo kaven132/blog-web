@@ -96,8 +96,8 @@ export default function TopNav({ onToggleSidebar, sidebarOpen }: TopNavProps) {
 
             {loggedIn ? (
               <div className="flex items-center gap-2">
-                <a href="/write" className="px-3 py-1.5 text-sm font-medium rounded-lg bg-[var(--color-accent)] text-white hover:bg-[var(--color-accent-hover)] transition-colors">
-                  写文章
+                <a href="/admin" className="px-3 py-1.5 text-sm font-medium rounded-lg bg-[var(--color-accent)] text-white hover:bg-[var(--color-accent-hover)] transition-colors">
+                  文章管理
                 </a>
                 <div className="relative" ref={dropdownRef}>
                   <button

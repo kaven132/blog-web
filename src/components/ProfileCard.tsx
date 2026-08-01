@@ -246,7 +246,7 @@ export default function ProfileCard() {
 
   return (
     <>
-      <div className="bg-[var(--color-surface)] border border-[var(--color-border)] rounded-2xl overflow-hidden sticky top-20">
+      <div className="bg-[var(--color-surface)] border border-[var(--color-border)] rounded-2xl overflow-hidden">
         {/* ── Display mode ── */}
         {!editing ? (
           <div className="relative">

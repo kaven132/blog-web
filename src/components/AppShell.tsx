@@ -1,6 +1,7 @@
 import { useState, type ReactNode } from "react";
 import TopNav from "./TopNav";
 import ProfileCard from "./ProfileCard";
+import NewsPanel from "./NewsPanel";
 
 interface AppShellProps {
   children: ReactNode;
@@ -21,7 +22,10 @@ export default function AppShell({ children }: AppShellProps) {
 
           {/* Desktop: inline ProfileCard (≥1280px) */}
           <aside className="hidden xl:block xl:w-60 xl:flex-shrink-0">
-            <ProfileCard />
+            <div className="xl:sticky xl:top-20 space-y-5">
+              <ProfileCard />
+              <NewsPanel />
+            </div>
           </aside>
 
           {/* Content */}
@@ -47,6 +51,7 @@ export default function AppShell({ children }: AppShellProps) {
               </button>
             </div>
             <ProfileCard />
+            <div className="p-3 pb-4"><NewsPanel /></div>
           </div>
         </div>
       )}
