@@ -16,9 +16,9 @@ const PER_CATEGORY = 5;
 const CACHE_TTL = 10 * 60 * 1000;
 
 const SOURCES: { id: string; name: string; source: string; url: string }[] = [
-  { id: "international", name: "国际", source: "俄罗斯卫星通讯社", url: "https://sputniknews.cn/export/rss2/archive/index.xml" },
-  { id: "tech", name: "科技", source: "IT之家", url: "https://www.ithome.com/rss/" },
-  { id: "games", name: "游戏", source: "机核", url: "https://www.gcores.com/rss/" },
+  { id: "domestic", name: "国内", source: "中国新闻网", url: "https://www.chinanews.com.cn/rss/scroll-news.xml" },
+  { id: "tech", name: "科技", source: "极客公园", url: "https://www.geekpark.net/rss" },
+  { id: "games", name: "游戏", source: "游戏茶馆", url: "https://www.youxichaguan.com/feed" },
 ];
 
 interface CacheEntry {

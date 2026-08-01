@@ -2,6 +2,18 @@ import type { APIRoute } from "astro";
 import { db } from "../../db";
 import { posts } from "../../db/schema";
 import { eq, sql } from "drizzle-orm";
+import { slugify } from "../../lib/slug";
+
+function resolveSlug(title: string, slug: string | undefined, excludeId?: number): string {
+  const clean = slug?.trim() || slugify(title) || `post-${Date.now()}`;
+  let candidate = clean;
+  let i = 2;
+  while (true) {
+    const rows = db.select({ id: posts.id }).from(posts).where(eq(posts.slug, candidate)).all();
+    if (rows.every((r) => r.id === excludeId)) return candidate;
+    candidate = `${clean}-${i++}`;
+  }
+}
 
 export const POST: APIRoute = async ({ request, cookies, redirect }) => {
   // Check auth
@@ -15,25 +27,28 @@ export const POST: APIRoute = async ({ request, cookies, redirect }) => {
 
   try {
     const body = await request.json();
-    const { title, slug, excerpt, content, tags } = body;
+    const { title, slug, excerpt, content, tags, coverImage } = body;
 
-    if (!title || !slug || !content) {
-      return new Response(JSON.stringify({ error: "标题、slug 和内容为必填" }), {
+    if (!title || !content) {
+      return new Response(JSON.stringify({ error: "标题和内容为必填" }), {
         status: 400,
         headers: { "Content-Type": "application/json" },
       });
     }
 
+    const finalSlug = resolveSlug(title, slug);
+
     db.insert(posts).values({
       title,
-      slug,
+      slug: finalSlug,
       excerpt: excerpt || "",
       content,
       tags: tags || "[]",
+      coverImage: coverImage || null,
       published: true,
     }).run();
 
-    return new Response(JSON.stringify({ ok: true, slug }), {
+    return new Response(JSON.stringify({ ok: true, slug: finalSlug }), {
       status: 201,
       headers: { "Content-Type": "application/json" },
     });
@@ -56,9 +71,9 @@ export const PUT: APIRoute = async ({ request, cookies }) => {
 
   try {
     const body = await request.json();
-    const { id, title, slug, excerpt, content, tags } = body;
+    const { id, title, slug, excerpt, content, tags, coverImage } = body;
 
-    if (!id || !title || !slug || !content) {
+    if (!id || !title || !content) {
       return new Response(JSON.stringify({ error: "参数不完整" }), {
         status: 400,
         headers: { "Content-Type": "application/json" },
@@ -73,19 +88,22 @@ export const PUT: APIRoute = async ({ request, cookies }) => {
       });
     }
 
+    const finalSlug = resolveSlug(title, slug, Number(id));
+
     db.update(posts)
       .set({
         title,
-        slug,
+        slug: finalSlug,
         excerpt: excerpt || "",
         content,
         tags: tags || "[]",
+        coverImage: coverImage || null,
         updatedAt: sql`(CURRENT_TIMESTAMP)`,
       })
       .where(eq(posts.id, Number(id)))
       .run();
 
-    return new Response(JSON.stringify({ ok: true, slug }), {
+    return new Response(JSON.stringify({ ok: true, slug: finalSlug }), {
       status: 200,
       headers: { "Content-Type": "application/json" },
     });

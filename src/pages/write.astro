@@ -3,6 +3,7 @@ import Layout from "../layouts/Layout.astro";
 import { db } from "../db";
 import { posts } from "../db/schema";
 import { eq } from "drizzle-orm";
+import { PARENT_TAGS, parseTags } from "../lib/tags";
 
 // Require auth
 const authCookie = Astro.cookies.get("auth")?.value;
@@ -18,14 +19,22 @@ if (editing && !post) {
   return Astro.redirect("/write");
 }
 
-const editTags = (() => {
-  if (!post) return "";
-  try {
-    return (JSON.parse(post.tags) as string[]).join(", ");
-  } catch {
-    return post.tags.replace(/[\[\]"]/g, "");
+// Existing tags (up to 3 layers) used to build the tag tree: { l1: { l2: [l3...] } }
+const allPosts = db.select({ tags: posts.tags }).from(posts).all();
+const tagTree: Record<string, Record<string, string[]>> = {};
+for (const p of allPosts) {
+  const [a, b, c] = parseTags(p.tags).slice(0, 3);
+  if (!a) continue;
+  if (!tagTree[a]) tagTree[a] = {};
+  if (b) {
+    if (!tagTree[a][b]) tagTree[a][b] = [];
+    if (c && !tagTree[a][b].includes(c)) tagTree[a][b].push(c);
   }
-})();
+}
+const tagTreeJson = JSON.stringify(tagTree);
+
+// Current tags of the post being edited
+const currentTags = post ? parseTags(post.tags).slice(0, 3) : [];
 
 const pageTitle = editing ? "编辑文章" : "写文章";
 ---
@@ -46,7 +55,7 @@ const pageTitle = editing ? "编辑文章" : "写文章";
 
     <h1 class="text-2xl font-bold tracking-[-0.01em] mb-8">{pageTitle}</h1>
 
-    <form id="write-form" class="space-y-5">
+    <form id="write-form" class="space-y-5" data-tag-tree={tagTreeJson}>
       <input type="hidden" name="id" value={post?.id ?? ""} />
       <div>
         <label class="text-xs font-semibold text-[var(--color-text-subtle)] uppercase tracking-wider block mb-1.5">标题</label>
@@ -61,29 +70,94 @@ const pageTitle = editing ? "编辑文章" : "写文章";
         />
       </div>
 
-      <div class="grid grid-cols-2 gap-4">
-        <div>
-          <label class="text-xs font-semibold text-[var(--color-text-subtle)] uppercase tracking-wider block mb-1.5">Slug（URL标识）</label>
-          <input
-            type="text"
-            name="slug"
-            placeholder="my-article-slug"
-            maxlength={100}
-            required
-            value={post?.slug ?? ""}
-            class="w-full px-4 py-2.5 text-sm rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] text-[var(--color-text)] placeholder:text-[var(--color-text-subtle)]/50 focus:outline-none focus:border-[var(--color-accent)] transition-all"
-          />
+      <div>
+        <label class="text-xs font-semibold text-[var(--color-text-subtle)] uppercase tracking-wider block mb-1.5">Slug（URL标识，留空自动生成）</label>
+        <input
+          type="text"
+          name="slug"
+          placeholder="留空则由标题自动生成"
+          maxlength={100}
+          value={post?.slug ?? ""}
+          class="w-full px-4 py-2.5 text-sm rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] text-[var(--color-text)] placeholder:text-[var(--color-text-subtle)]/50 focus:outline-none focus:border-[var(--color-accent)] transition-all"
+        />
+      </div>
+
+      <div>
+        <label class="text-xs font-semibold text-[var(--color-text-subtle)] uppercase tracking-wider block mb-1.5">封面图（可选）</label>
+        <input type="hidden" name="cover_image" id="cover-image-input" value={post?.coverImage ?? ""} />
+        <div class="flex items-center gap-4">
+          <div
+            id="cover-preview"
+            class="w-44 h-28 rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] overflow-hidden flex items-center justify-center text-xs text-[var(--color-text-subtle)]"
+          >
+            {
+              post?.coverImage ? (
+                <img src={post.coverImage} alt="封面预览" class="w-full h-full object-cover" />
+              ) : (
+                "暂无封面"
+              )
+            }
+          </div>
+          <div class="flex flex-col gap-2">
+            <button
+              type="button"
+              id="cover-upload-btn"
+              class="px-4 py-2 text-sm font-semibold rounded-xl bg-[var(--color-accent)] text-white hover:bg-[var(--color-accent-hover)] transition-colors"
+            >
+              上传封面
+            </button>
+            <button
+              type="button"
+              id="cover-remove-btn"
+              class="px-4 py-2 text-sm font-semibold rounded-xl border border-[var(--color-border)] text-[var(--color-text-muted)] hover:text-[var(--color-accent)] hover:border-[var(--color-accent)] transition-all"
+            >
+              移除封面
+            </button>
+          </div>
+          <input type="file" id="cover-file" accept="image/*" class="hidden" />
         </div>
-        <div>
-          <label class="text-xs font-semibold text-[var(--color-text-subtle)] uppercase tracking-wider block mb-1.5">标签（逗号分隔）</label>
+      </div>
+
+      <div>
+        <label class="text-xs font-semibold text-[var(--color-text-subtle)] uppercase tracking-wider block mb-1.5">标签（最多三级，一级必选）</label>
+        <div class="flex flex-col sm:flex-row gap-2.5">
+          <select
+            id="tag-l1"
+            name="tag_l1"
+            required
+            class="sm:w-36 flex-shrink-0 px-4 py-2.5 text-sm rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] text-[var(--color-text)] focus:outline-none focus:border-[var(--color-accent)] transition-all"
+          >
+            <option value="" disabled selected={!currentTags[0]}>一级</option>
+            {
+              PARENT_TAGS.map((t) => (
+                <option value={t} selected={currentTags[0] === t}>{t}</option>
+              ))
+            }
+          </select>
+
           <input
+            id="tag-l2"
+            name="tag_l2"
             type="text"
-            name="tags"
-            placeholder="前端, React, TypeScript"
-            maxlength={200}
-            value={editTags}
-            class="w-full px-4 py-2.5 text-sm rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] text-[var(--color-text)] placeholder:text-[var(--color-text-subtle)]/50 focus:outline-none focus:border-[var(--color-accent)] transition-all"
+            list="l2-list"
+            maxlength={20}
+            placeholder="二级标签（可选，可输入新值）"
+            value={currentTags[1] ?? ""}
+            class="flex-1 min-w-0 px-4 py-2.5 text-sm rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] text-[var(--color-text)] placeholder:text-[var(--color-text-subtle)]/50 focus:outline-none focus:border-[var(--color-accent)] transition-all"
           />
+          <datalist id="l2-list"></datalist>
+
+          <input
+            id="tag-l3"
+            name="tag_l3"
+            type="text"
+            list="l3-list"
+            maxlength={20}
+            placeholder="三级标签（可选，可输入新值）"
+            value={currentTags[2] ?? ""}
+            class="flex-1 min-w-0 px-4 py-2.5 text-sm rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] text-[var(--color-text)] placeholder:text-[var(--color-text-subtle)]/50 focus:outline-none focus:border-[var(--color-accent)] transition-all"
+          />
+          <datalist id="l3-list"></datalist>
         </div>
       </div>
 
@@ -99,16 +173,67 @@ const pageTitle = editing ? "编辑文章" : "写文章";
       </div>
 
       <div>
-        <label class="text-xs font-semibold text-[var(--color-text-subtle)] uppercase tracking-wider block mb-1.5">
-          内容（Markdown 格式）
-        </label>
-        <textarea
-          name="content"
-          placeholder="## 标题&#10;&#10;正文内容…&#10;&#10;- 列表项"
-          rows={16}
-          required
-          class="w-full px-4 py-2.5 text-sm rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] text-[var(--color-text)] placeholder:text-[var(--color-text-subtle)]/50 focus:outline-none focus:border-[var(--color-accent)] transition-all resize-y font-mono leading-relaxed"
-        >{post?.content ?? ""}</textarea>
+        <div class="flex items-center justify-between mb-1.5">
+          <label class="text-xs font-semibold text-[var(--color-text-subtle)] uppercase tracking-wider">
+            内容（Markdown 格式，支持 ![](图片链接)）
+          </label>
+          <span class="text-[11px] text-[var(--color-text-subtle)]/70 font-mono" id="content-meta"></span>
+        </div>
+
+        <div class="rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] overflow-hidden focus-within:border-[var(--color-accent)] transition-all">
+          <!-- Toolbar -->
+          <div class="flex items-center gap-0.5 flex-wrap px-2 py-1.5 border-b border-[var(--color-border)]">
+            <button type="button" data-md="bold" title="加粗 (Ctrl+B)"
+              class="w-7 h-7 inline-flex items-center justify-center text-xs font-bold rounded-md text-[var(--color-text-muted)] hover:bg-[var(--color-accent-muted)] hover:text-[var(--color-accent)] transition-all">B</button>
+            <button type="button" data-md="italic" title="斜体 (Ctrl+I)"
+              class="w-7 h-7 inline-flex items-center justify-center text-xs font-serif italic rounded-md text-[var(--color-text-muted)] hover:bg-[var(--color-accent-muted)] hover:text-[var(--color-accent)] transition-all">I</button>
+            <button type="button" data-md="h2" title="二级标题"
+              class="h-7 px-1.5 inline-flex items-center justify-center text-xs font-bold rounded-md text-[var(--color-text-muted)] hover:bg-[var(--color-accent-muted)] hover:text-[var(--color-accent)] transition-all">H2</button>
+            <button type="button" data-md="h3" title="三级标题"
+              class="h-7 px-1.5 inline-flex items-center justify-center text-xs font-bold rounded-md text-[var(--color-text-muted)] hover:bg-[var(--color-accent-muted)] hover:text-[var(--color-accent)] transition-all">H3</button>
+            <button type="button" data-md="quote" title="引用"
+              class="w-7 h-7 inline-flex items-center justify-center rounded-md text-[var(--color-text-muted)] hover:bg-[var(--color-accent-muted)] hover:text-[var(--color-accent)] transition-all">
+              <svg class="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 24 24"><path d="M4.5 6.5v5h3.6l-1.1 3.4a.4.4 0 01-.4.3H4.9a.9.9 0 00-.9.9V18c0 .5.4.9.9.9h2.7c2.2 0 3.4-1.4 3.4-3.7V6.5A1.5 1.5 0 009.5 5H6a1.5 1.5 0 00-1.5 1.5zm10 0v5h3.6l-1.1 3.4a.4.4 0 01-.4.3h-1.7a.9.9 0 00-.9.9V18c0 .5.4.9.9.9h2.7c2.2 0 3.4-1.4 3.4-3.7V6.5A1.5 1.5 0 0019.5 5H16a1.5 1.5 0 00-1.5 1.5z"/></svg>
+            </button>
+            <button type="button" data-md="code" title="行内代码"
+              class="h-7 px-1.5 inline-flex items-center justify-center text-xs font-mono font-semibold rounded-md text-[var(--color-text-muted)] hover:bg-[var(--color-accent-muted)] hover:text-[var(--color-accent)] transition-all">&lt;/&gt;</button>
+            <button type="button" data-md="codeblock" title="代码块"
+              class="h-7 px-1.5 inline-flex items-center justify-center text-xs font-mono font-semibold rounded-md text-[var(--color-text-muted)] hover:bg-[var(--color-accent-muted)] hover:text-[var(--color-accent)] transition-all">{"{ }"}</button>
+            <button type="button" data-md="link" title="链接 (Ctrl+K)"
+              class="w-7 h-7 inline-flex items-center justify-center rounded-md text-[var(--color-text-muted)] hover:bg-[var(--color-accent-muted)] hover:text-[var(--color-accent)] transition-all">
+              <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth={1.8} viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M13.19 8.688a4.5 4.5 0 011.242 7.244l-4.5 4.5a4.5 4.5 0 01-6.364-6.364l1.757-1.757m13.35-.622l1.757-1.757a4.5 4.5 0 00-6.364-6.364l-4.5 4.5a4.5 4.5 0 001.242 7.244"/></svg>
+            </button>
+            <button type="button" data-md="ul" title="无序列表"
+              class="h-7 px-1.5 inline-flex items-center justify-center text-xs rounded-md text-[var(--color-text-muted)] hover:bg-[var(--color-accent-muted)] hover:text-[var(--color-accent)] transition-all">• 列表</button>
+            <button type="button" data-md="ol" title="有序列表"
+              class="h-7 px-1.5 inline-flex items-center justify-center text-xs rounded-md text-[var(--color-text-muted)] hover:bg-[var(--color-accent-muted)] hover:text-[var(--color-accent)] transition-all">1. 列表</button>
+            <button type="button" id="content-img-btn" title="插入图片"
+              class="h-7 px-1.5 inline-flex items-center justify-center text-xs rounded-md text-[var(--color-text-muted)] hover:bg-[var(--color-accent-muted)] hover:text-[var(--color-accent)] transition-all">
+              <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth={1.8} viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M2.25 15.75l5.159-5.159a2.25 2.25 0 013.182 0l5.159 5.159m-1.5-1.5l1.409-1.409a2.25 2.25 0 013.182 0l2.909 2.909M3.75 21h16.5A1.5 1.5 0 0021.75 19.5V4.5A1.5 1.5 0 0020.25 3H3.75A1.5 1.5 0 002.25 4.5v15A1.5 1.5 0 003.75 21z"/></svg>
+              图片
+            </button>
+            <input type="file" id="content-img-file" accept="image/*" class="hidden" />
+
+            <span class="w-px h-4 bg-[var(--color-border)] mx-1" />
+
+            <!-- Mode toggle -->
+            <div class="flex items-center p-0.5 rounded-lg bg-[var(--color-bg)]">
+              <button type="button" id="mode-edit" class="px-2.5 h-6 text-xs font-semibold rounded-md transition-all bg-[var(--color-accent)] text-white">编辑</button>
+              <button type="button" id="mode-preview" class="px-2.5 h-6 text-xs font-semibold rounded-md transition-all">预览</button>
+            </div>
+          </div>
+
+          <textarea
+            name="content"
+            id="content-input"
+            placeholder="## 标题&#10;&#10;正文内容…&#10;&#10;- 列表项"
+            rows={16}
+            required
+            class="w-full px-4 py-3 text-sm bg-[var(--color-surface)] text-[var(--color-text)] placeholder:text-[var(--color-text-subtle)]/50 focus:outline-none transition-all resize-y font-mono leading-relaxed block"
+          >{post?.content ?? ""}</textarea>
+
+          <div id="content-preview" class="prose max-w-none px-5 py-4 min-h-[24rem] hidden"></div>
+        </div>
       </div>
 
       <div class="flex items-center gap-3 pt-2">
@@ -133,10 +258,216 @@ const pageTitle = editing ? "编辑文章" : "写文章";
 </Layout>
 
 <script>
+  import { renderMarkdown } from "../lib/markdown";
+
   const form = document.getElementById("write-form")!;
   const btn = document.getElementById("submit-btn")! as HTMLButtonElement;
   const error = document.getElementById("error")!;
   const success = document.getElementById("success")!;
+
+  const l1 = form.querySelector<HTMLSelectElement>("[name='tag_l1']")!;
+  const l2 = form.querySelector<HTMLInputElement>("[name='tag_l2']")!;
+  const l3 = form.querySelector<HTMLInputElement>("[name='tag_l3']")!;
+  const l2List = document.getElementById("l2-list") as HTMLDataListElement;
+  const l3List = document.getElementById("l3-list") as HTMLDataListElement;
+  const tree: Record<string, Record<string, string[]>> = JSON.parse(form.dataset.tagTree || "{}");
+
+  const fillList = (list: HTMLDataListElement, values: string[]) => {
+    list.innerHTML = "";
+    for (const v of values) {
+      const opt = document.createElement("option");
+      opt.value = v;
+      list.appendChild(opt);
+    }
+  };
+
+  const syncL3 = () => {
+    fillList(l3List, tree[l1.value]?.[l2.value.trim()] || []);
+  };
+
+  const syncL2 = () => {
+    fillList(l2List, Object.keys(tree[l1.value] || {}));
+    syncL3();
+  };
+
+  l1.addEventListener("change", () => {
+    l2.value = "";
+    l3.value = "";
+    syncL2();
+  });
+
+  l2.addEventListener("input", syncL3);
+
+  if (l1.value) syncL2();
+
+  // Image upload (shared)
+  const uploadFile = async (file: File): Promise<string> => {
+    const fd = new FormData();
+    fd.append("file", file);
+    const res = await fetch("/api/upload", { method: "POST", body: fd });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || "上传失败");
+    return data.url as string;
+  };
+
+  // Content image insert
+  const contentInput = form.querySelector("[name='content']") as HTMLTextAreaElement;
+  const contentImgBtn = document.getElementById("content-img-btn")!;
+  const contentImgFile = document.getElementById("content-img-file") as HTMLInputElement;
+  contentImgBtn.addEventListener("click", () => contentImgFile.click());
+  contentImgFile.addEventListener("change", async () => {
+    const f = contentImgFile.files?.[0];
+    if (!f) return;
+    try {
+      const url = await uploadFile(f);
+      const md = `![${f.name.replace(/\.[^.]+$/, "")}](${url})`;
+      const start = contentInput.selectionStart ?? contentInput.value.length;
+      const end = contentInput.selectionEnd ?? start;
+      contentInput.value = contentInput.value.slice(0, start) + md + contentInput.value.slice(end);
+      contentInput.focus();
+      contentInput.selectionStart = contentInput.selectionEnd = start + md.length;
+      updatePreview();
+      updateCount();
+    } catch (err) {
+      alert(err instanceof Error ? err.message : "上传失败");
+    } finally {
+      contentImgFile.value = "";
+    }
+  });
+
+  // ── Markdown toolbar & live preview ──
+  const preview = document.getElementById("content-preview")!;
+  const modeEditBtn = document.getElementById("mode-edit")!;
+  const modePreviewBtn = document.getElementById("mode-preview")!;
+  const meta = document.getElementById("content-meta")!;
+
+  const updatePreview = () => {
+    preview.innerHTML = contentInput.value.trim() ? renderMarkdown(contentInput.value) : `<p class="text-[var(--color-text-subtle)]">预览区 — 开始编写即可实时预览渲染效果</p>`;
+  };
+
+  const updateCount = () => {
+    const text = contentInput.value;
+    const chars = text.replace(/\s/g, "").length;
+    const words = text.trim() ? Math.max(1, Math.ceil(text.replace(/\s/g, "").length / 400)) : 0;
+    meta.textContent = words ? `${chars} 字 · 约 ${words} 分钟阅读` : `${chars} 字`;
+  };
+
+  const setMode = (mode: "edit" | "preview") => {
+    const editing = mode === "edit";
+    contentInput.classList.toggle("hidden", !editing);
+    preview.classList.toggle("hidden", editing);
+    modeEditBtn.classList.toggle("bg-[var(--color-accent)]", editing);
+    modeEditBtn.classList.toggle("text-white", editing);
+    modePreviewBtn.classList.toggle("bg-[var(--color-accent)]", !editing);
+    modePreviewBtn.classList.toggle("text-white", !editing);
+    if (!editing) updatePreview();
+    else contentInput.focus();
+  };
+  modeEditBtn.addEventListener("click", () => setMode("edit"));
+  modePreviewBtn.addEventListener("click", () => setMode("preview"));
+
+  contentInput.addEventListener("input", () => {
+    updateCount();
+    if (!preview.classList.contains("hidden")) updatePreview();
+  });
+  updateCount();
+
+  const wrapSelection = (before: string, after: string, placeholder = "文本") => {
+    const start = contentInput.selectionStart;
+    const end = contentInput.selectionEnd;
+    const selected = contentInput.value.slice(start, end) || placeholder;
+    contentInput.value = contentInput.value.slice(0, start) + before + selected + after + contentInput.value.slice(end);
+    contentInput.focus();
+    contentInput.selectionStart = start + before.length;
+    contentInput.selectionEnd = start + before.length + selected.length;
+    updatePreview();
+    updateCount();
+  };
+
+  const toggleLinePrefix = (prefix: string) => {
+    const start = contentInput.selectionStart;
+    const end = contentInput.selectionEnd;
+    const firstLine = contentInput.value.lastIndexOf("\n", start - 1) + 1;
+    let lastLine = contentInput.value.indexOf("\n", end);
+    if (lastLine === -1) lastLine = contentInput.value.length;
+    const block = contentInput.value.slice(firstLine, lastLine);
+    const lines = block.split("\n");
+    const hasAll = lines.every((l) => l.startsWith(prefix));
+    const next = lines.map((l) => (hasAll ? l.slice(prefix.length) : prefix + l)).join("\n");
+    contentInput.value = contentInput.value.slice(0, firstLine) + next + contentInput.value.slice(lastLine);
+    contentInput.focus();
+    updatePreview();
+    updateCount();
+  };
+
+  form.querySelectorAll<HTMLButtonElement>("[data-md]").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const action = btn.dataset.md;
+      if (action === "bold") wrapSelection("**", "**");
+      else if (action === "italic") wrapSelection("*", "*");
+      else if (action === "h2") toggleLinePrefix("## ");
+      else if (action === "h3") toggleLinePrefix("### ");
+      else if (action === "quote") toggleLinePrefix("> ");
+      else if (action === "code") wrapSelection("`", "`", "代码");
+      else if (action === "codeblock") wrapSelection("\n```\n", "\n```\n");
+      else if (action === "ul") toggleLinePrefix("- ");
+      else if (action === "ol") toggleLinePrefix("1. ");
+      else if (action === "link") {
+        const url = prompt("链接地址：", "https://");
+        if (!url) return;
+        const text = contentInput.value.slice(contentInput.selectionStart, contentInput.selectionEnd) || "链接文字";
+        wrapSelection(`[${text}](${url})`, "");
+      }
+    });
+  });
+
+  contentInput.addEventListener("keydown", (e) => {
+    if (!(e.ctrlKey || e.metaKey)) return;
+    const k = e.key.toLowerCase();
+    if (k === "b") {
+      e.preventDefault();
+      wrapSelection("**", "**");
+    } else if (k === "i") {
+      e.preventDefault();
+      wrapSelection("*", "*");
+    } else if (k === "k") {
+      e.preventDefault();
+      const url = prompt("链接地址：", "https://");
+      if (!url) return;
+      const text = contentInput.value.slice(contentInput.selectionStart, contentInput.selectionEnd) || "链接文字";
+      wrapSelection(`[${text}](${url})`, "");
+    }
+  });
+
+  // Cover image upload / remove
+  const coverInput = form.querySelector("[name='cover_image']") as HTMLInputElement;
+  const coverPreview = document.getElementById("cover-preview")!;
+  const coverUploadBtn = document.getElementById("cover-upload-btn")!;
+  const coverRemoveBtn = document.getElementById("cover-remove-btn")!;
+  const coverFile = document.getElementById("cover-file") as HTMLInputElement;
+  const renderCoverPreview = () => {
+    coverPreview.innerHTML = coverInput.value
+      ? `<img src="${coverInput.value}" alt="封面预览" class="w-full h-full object-cover" />`
+      : "暂无封面";
+  };
+  coverUploadBtn.addEventListener("click", () => coverFile.click());
+  coverFile.addEventListener("change", async () => {
+    const f = coverFile.files?.[0];
+    if (!f) return;
+    try {
+      const url = await uploadFile(f);
+      coverInput.value = url;
+      renderCoverPreview();
+    } catch (err) {
+      alert(err instanceof Error ? err.message : "上传失败");
+    } finally {
+      coverFile.value = "";
+    }
+  });
+  coverRemoveBtn.addEventListener("click", () => {
+    coverInput.value = "";
+    renderCoverPreview();
+  });
 
   // Auto-generate slug from title
   const titleInput = form.querySelector("[name='title']") as HTMLInputElement;
@@ -164,11 +495,7 @@ const pageTitle = editing ? "编辑文章" : "写文章";
     success.classList.add("hidden");
 
     const formData = new FormData(form);
-    const tags = formData.get("tags")?.toString() || "";
-    const tagArray = tags
-      .split(/[,，]/)
-      .map((t) => t.trim())
-      .filter(Boolean);
+    const tagArray = [l1.value, l2.value.trim(), l3.value.trim()].filter(Boolean).slice(0, 3);
 
     const body: Record<string, unknown> = {
       title: formData.get("title"),
@@ -176,6 +503,7 @@ const pageTitle = editing ? "编辑文章" : "写文章";
       excerpt: formData.get("excerpt"),
       content: formData.get("content"),
       tags: JSON.stringify(tagArray),
+      coverImage: (formData.get("cover_image") as string) || null,
     };
     if (editing) body.id = Number(postId);
 

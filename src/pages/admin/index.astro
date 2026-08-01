@@ -3,17 +3,72 @@ import Layout from "../../layouts/Layout.astro";
 import { db } from "../../db";
 import { posts } from "../../db/schema";
 import { desc } from "drizzle-orm";
+import { PARENT_TAGS, parseTags, getLayer2Options, getLayer3Options } from "../../lib/tags";
 
 const authCookie = Astro.cookies.get("auth")?.value;
 if (authCookie !== "true") {
   return Astro.redirect("/login");
 }
 
-const allPosts = db.select().from(posts).orderBy(desc(posts.createdAt)).all();
+const l1 = Astro.url.searchParams.get("l1") || "";
+const l2 = Astro.url.searchParams.get("l2") || "";
+const l3 = Astro.url.searchParams.get("l3") || "";
+
+const allPosts = db
+  .select()
+  .from(posts)
+  .orderBy(desc(posts.createdAt))
+  .all()
+  .map((p) => ({ ...p, tagList: parseTags(p.tags) }));
+
+const filtered = allPosts.filter((p) => {
+  if (l1 && p.tagList[0] !== l1) return false;
+  if (l2 && p.tagList[1] !== l2) return false;
+  if (l3 && p.tagList[2] !== l3) return false;
+  return true;
+});
+
+const tagLists = allPosts.map((p) => p.tagList);
+
+// Layer-1 counts
+const l1Counts: Record<string, number> = {};
+for (const p of allPosts) {
+  if (p.tagList[0]) l1Counts[p.tagList[0]] = (l1Counts[p.tagList[0]] || 0) + 1;
+}
+
+// Layer-2 options + counts (under selected layer-1)
+const l2Options = l1 ? getLayer2Options(tagLists, l1) : [];
+const l2Counts: Record<string, number> = {};
+for (const p of allPosts) {
+  if (p.tagList[0] === l1 && p.tagList[1]) {
+    l2Counts[p.tagList[1]] = (l2Counts[p.tagList[1]] || 0) + 1;
+  }
+}
+
+// Layer-3 options + counts (under selected layer-1 + layer-2)
+const l3Options = l1 && l2 ? getLayer3Options(tagLists, l1, l2) : [];
+const l3Counts: Record<string, number> = {};
+for (const p of allPosts) {
+  if (p.tagList[0] === l1 && p.tagList[1] === l2 && p.tagList[2]) {
+    l3Counts[p.tagList[2]] = (l3Counts[p.tagList[2]] || 0) + 1;
+  }
+}
+
+const linkTo = (v1: string, v2: string, v3: string) => {
+  const q = new URLSearchParams();
+  if (v1) q.set("l1", v1);
+  if (v2) q.set("l2", v2);
+  if (v3) q.set("l3", v3);
+  const qs = q.toString();
+  return qs ? `/admin?${qs}` : "/admin";
+};
+
+const isFiltering = Boolean(l1 || l2 || l3);
+const breadcrumb = [l1, l2, l3].filter(Boolean).join(" · ");
 ---
 
 <Layout title="文章管理">
-  <div class="max-w-3xl mx-auto py-8">
+  <div class="max-w-4xl mx-auto py-8">
     <!-- Header -->
     <div class="flex items-center justify-between mb-8">
       <div>
@@ -31,22 +86,114 @@ const allPosts = db.select().from(posts).orderBy(desc(posts.createdAt)).all();
       </a>
     </div>
 
+    <!-- Tag filter -->
+    <div class="mb-6">
+      <div class="flex flex-wrap items-center gap-2">
+        <span class="text-xs font-semibold tracking-wider uppercase text-[var(--color-text-subtle)] mr-1">分类</span>
+        {
+          PARENT_TAGS.map((tag) => (
+            <a
+              href={linkTo(tag, "", "")}
+              class={`inline-flex items-center gap-1.5 px-3.5 py-1.5 text-sm font-medium rounded-full border transition-all ${
+                l1 === tag
+                  ? "bg-[var(--color-accent)] text-white border-[var(--color-accent)]"
+                  : "bg-[var(--color-surface)] text-[var(--color-text-muted)] border-[var(--color-border)] hover:border-[var(--color-accent)] hover:text-[var(--color-accent)]"
+              }`}
+            >
+              {tag}
+              <span class={`text-[10px] font-semibold px-1.5 py-0.5 rounded-full ${l1 === tag ? "bg-white/20 text-white" : "bg-[var(--color-accent-muted)] text-[var(--color-accent)]"}`}>
+                {l1Counts[tag] || 0}
+              </span>
+            </a>
+          ))
+        }
+
+        {
+          l1 && l2Options.length > 0 && (
+            <>
+              <span class="text-[var(--color-text-subtle)] select-none">›</span>
+              <select
+                class="px-3 py-1.5 text-sm font-medium rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] text-[var(--color-text)] focus:outline-none focus:border-[var(--color-accent)] transition-all cursor-pointer"
+                onchange="if (this.value) location.href = this.value;"
+              >
+                <option value={linkTo(l1, "", "")}>全部</option>
+                {l2Options.map((tag) => (
+                  <option value={linkTo(l1, tag, "")} selected={l2 === tag}>{tag}（{l2Counts[tag] || 0}）</option>
+                ))}
+              </select>
+            </>
+          )
+        }
+
+        {
+          l1 && l2 && l3Options.length > 0 && (
+            <>
+              <span class="text-[var(--color-text-subtle)] select-none">›</span>
+              <select
+                class="px-3 py-1.5 text-sm font-medium rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] text-[var(--color-text)] focus:outline-none focus:border-[var(--color-accent)] transition-all cursor-pointer"
+                onchange="if (this.value) location.href = this.value;"
+              >
+                <option value={linkTo(l1, l2, "")}>全部</option>
+                {l3Options.map((tag) => (
+                  <option value={linkTo(l1, l2, tag)} selected={l3 === tag}>{tag}（{l3Counts[tag] || 0}）</option>
+                ))}
+              </select>
+            </>
+          )
+        }
+      </div>
+
+      <div class="flex items-center gap-3 mt-3">
+        {
+          isFiltering ? (
+            <a
+              href={linkTo("", "", "")}
+              class="inline-flex items-center gap-1 text-sm text-[var(--color-text-muted)] hover:text-[var(--color-accent)] transition-colors"
+            >
+              <span>←</span> 清除全部筛选
+            </a>
+          ) : (
+            <span class="text-xs text-[var(--color-text-subtle)] font-mono">{allPosts.length} 篇全部文章</span>
+          )
+        }
+        {isFiltering && (
+          <span class="text-xs text-[var(--color-text-subtle)] font-mono">{breadcrumb} · {filtered.length} 篇</span>
+        )}
+      </div>
+    </div>
+
     {
-      allPosts.length === 0 ? (
+      filtered.length === 0 ? (
         <div class="text-center py-24">
-          <p class="text-[var(--color-text-muted)] text-base mb-3 font-serif">还没有文章</p>
-          <p class="text-[var(--color-text-subtle)] text-sm">
-            点击右上角「写文章」发布你的第一篇内容
-          </p>
+          <p class="text-[var(--color-text-muted)] text-base mb-3 font-serif">没有符合条件的文章</p>
+          {isFiltering && (
+            <a href="/admin" class="text-sm text-[var(--color-accent)] hover:underline">清除筛选</a>
+          )}
         </div>
       ) : (
         <div class="space-y-3">
-          {allPosts.map((post, i) => (
+          {filtered.map((post, i) => (
             <article
               class="bg-[var(--color-surface)] border border-[var(--color-border)] rounded-2xl p-5 hover:border-[var(--color-border-hover)] transition-colors duration-200"
               style={{ animation: `slide-up 0.4s ease-out ${i * 0.05}s both` }}
             >
-              <div class="flex items-start justify-between gap-4">
+              <div class="flex items-start gap-4">
+                <!-- Cover thumbnail -->
+                <a
+                  href={`/posts/${post.slug}`}
+                  class="hidden sm:flex flex-shrink-0 w-32 h-20 rounded-xl overflow-hidden border border-[var(--color-border)] bg-[var(--color-bg)]"
+                >
+                  {post.coverImage ? (
+                    <img src={post.coverImage} alt={post.title} loading="lazy" class="w-full h-full object-cover" />
+                  ) : (
+                    <span class="w-full h-full flex items-center justify-center text-[var(--color-text-subtle)]/50">
+                      <svg class="w-6 h-6" fill="none" stroke="currentColor" strokeWidth={1.2} viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 15.75l5.159-5.159a2.25 2.25 0 013.182 0l5.159 5.159m-1.5-1.5l1.409-1.409a2.25 2.25 0 013.182 0l2.909 2.909M3.75 21h16.5A1.5 1.5 0 0021.75 19.5V4.5A1.5 1.5 0 0020.25 3H3.75A1.5 1.5 0 002.25 4.5v15A1.5 1.5 0 003.75 21z" />
+                      </svg>
+                    </span>
+                  )}
+                </a>
+
                 <div class="min-w-0 flex-1">
                   <div class="flex items-center gap-2 mb-1.5">
                     <h2 class="text-base font-semibold text-[var(--color-text)] tracking-[-0.01em] truncate">{post.title}</h2>
@@ -61,6 +208,22 @@ const allPosts = db.select().from(posts).orderBy(desc(posts.createdAt)).all();
                     )}
                   </div>
                   <p class="text-xs text-[var(--color-text-subtle)] font-mono mb-2">/posts/{post.slug}</p>
+                  {post.tagList.length > 0 && (
+                    <div class="flex flex-wrap items-center gap-1.5 mb-2">
+                      {post.tagList.map((tag, ti) => (
+                        <span
+                          key={`${post.id}-${ti}`}
+                          class={`text-[10px] font-medium px-2 py-0.5 rounded-md ${
+                            ti === 0
+                              ? "bg-[var(--color-accent)] text-white"
+                              : "bg-[var(--color-accent-muted)] text-[var(--color-accent)]"
+                          }`}
+                        >
+                          {tag}
+                        </span>
+                      ))}
+                    </div>
+                  )}
                   {post.excerpt && (
                     <p class="text-xs text-[var(--color-text-muted)] leading-relaxed line-clamp-2 font-serif">{post.excerpt}</p>
                   )}

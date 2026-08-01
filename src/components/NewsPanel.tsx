@@ -15,10 +15,16 @@ interface NewsCategory {
 }
 
 const TABS = [
-  { id: "international", label: "国际" },
+  { id: "domestic", label: "国内" },
   { id: "tech", label: "科技" },
   { id: "games", label: "游戏" },
 ];
+
+const CACHE_PREFIX = "news-panel-cache-";
+
+function cacheKey(): string {
+  return CACHE_PREFIX + new Date().toDateString();
+}
 
 function formatDate(raw: string): string {
   const d = new Date(raw);
@@ -40,13 +46,25 @@ function Skeleton() {
 }
 
 export default function NewsPanel() {
-  const [active, setActive] = useState("international");
+  const [active, setActive] = useState("domestic");
   const [data, setData] = useState<Record<string, NewsCategory>>({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
   const [pending, setPending] = useState<NewsItem | null>(null);
 
-  const load = useCallback(() => {
+  const load = useCallback((force = false) => {
+    if (!force) {
+      const cached = sessionStorage.getItem(cacheKey());
+      if (cached) {
+        try {
+          setData(JSON.parse(cached));
+          setLoading(false);
+          return;
+        } catch {
+          sessionStorage.removeItem(cacheKey());
+        }
+      }
+    }
     setLoading(true);
     setError(false);
     fetch("/api/news")
@@ -55,6 +73,7 @@ export default function NewsPanel() {
         const map: Record<string, NewsCategory> = {};
         d.forEach((c) => (map[c.id] = c));
         setData(map);
+        sessionStorage.setItem(cacheKey(), JSON.stringify(map));
       })
       .catch(() => setError(true))
       .finally(() => setLoading(false));
@@ -76,7 +95,7 @@ export default function NewsPanel() {
           <h2 className="text-sm font-bold tracking-[-0.01em] text-[var(--color-text)]">最新资讯</h2>
         </div>
         <button
-          onClick={load}
+          onClick={() => load(true)}
           disabled={loading}
           className="w-6 h-6 flex items-center justify-center rounded-md text-[var(--color-text-subtle)] hover:text-[var(--color-accent)] hover:bg-[var(--color-bg)] transition-all disabled:opacity-40"
           title="刷新"

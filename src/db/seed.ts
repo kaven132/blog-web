@@ -118,7 +118,7 @@ Vite 8（基于 Rolldown）、Next.js（基于 Turbopack）、Biome（替代 ESL
 - **CSS-in-JS**：与 Server Components 不兼容
     `.trim(),
     coverImage: null,
-    tags: JSON.stringify(["前端", "React", "TypeScript"]),
+    tags: JSON.stringify(["技术", "前端", "React"]),
     published: true,
   },
   {
@@ -189,7 +189,7 @@ shadcn/ui 的核心理念是**直接拥有源码**。它不是通过 npm 安装�
 - 避免任何 **运行时 CSS-in-JS**
     `.trim(),
     coverImage: null,
-    tags: JSON.stringify(["CSS", "Tailwind", "前端"]),
+    tags: JSON.stringify(["技术", "前端", "CSS"]),
     published: true,
   },
   {
@@ -250,7 +250,7 @@ shadcn/ui 的核心理念是**直接拥有源码**。它不是通过 npm 安装�
 > 联动福利力度空前，无论新老玩家都是入坑/回坑的最佳时机。
     `.trim(),
     coverImage: null,
-    tags: JSON.stringify(["崩坏星穹铁道", "Fate", "游戏"]),
+    tags: JSON.stringify(["游戏", "崩坏星穹铁道", "Fate"]),
     published: true,
   },
   {
@@ -305,7 +305,7 @@ shadcn/ui 的核心理念是**直接拥有源码**。它不是通过 npm 安装�
 随着 4.4 版本主线完结，翁法罗斯篇正式落幕。4.5 及后续版本将开启**全新星球的探索旅程**，江户星、机械帝国等新地图已在预告中出现。
     `.trim(),
     coverImage: null,
-    tags: JSON.stringify(["崩坏星穹铁道", "翁法罗斯", "游戏"]),
+    tags: JSON.stringify(["游戏", "崩坏星穹铁道", "翁法罗斯"]),
     published: true,
   },
 ];

@@ -5,64 +5,162 @@ import SearchBar from "../../components/SearchBar";
 import { db } from "../../db";
 import { posts } from "../../db/schema";
 import { eq, desc } from "drizzle-orm";
+import { PARENT_TAGS, parseTags, getLayer2Options, getLayer3Options } from "../../lib/tags";
 
 const searchQuery = Astro.url.searchParams.get("search") || "";
+const l1 = Astro.url.searchParams.get("l1") || "";
+const l2 = Astro.url.searchParams.get("l2") || "";
+const l3 = Astro.url.searchParams.get("l3") || "";
 
-const allPosts = searchQuery
-  ? db
-      .select()
-      .from(posts)
-      .where(eq(posts.published, true))
-      .all()
-      .filter(
-        (p) =>
-          p.title.includes(searchQuery) ||
-          p.excerpt.includes(searchQuery) ||
-          p.tags.includes(searchQuery)
-      )
-  : db.select().from(posts).where(eq(posts.published, true)).orderBy(desc(posts.createdAt)).all();
+const allPosts = db
+  .select()
+  .from(posts)
+  .where(eq(posts.published, true))
+  .orderBy(desc(posts.createdAt))
+  .all()
+  .map((p) => ({ ...p, tagList: parseTags(p.tags) }));
+
+const filtered = allPosts.filter((p) => {
+  if (searchQuery && !(p.title.includes(searchQuery) || p.excerpt.includes(searchQuery) || p.tags.includes(searchQuery))) {
+    return false;
+  }
+  if (l1 && p.tagList[0] !== l1) return false;
+  if (l2 && p.tagList[1] !== l2) return false;
+  if (l3 && p.tagList[2] !== l3) return false;
+  return true;
+});
+
+const tagLists = allPosts.map((p) => p.tagList);
+
+// Layer-1 counts
+const l1Counts: Record<string, number> = {};
+for (const p of allPosts) {
+  if (p.tagList[0]) l1Counts[p.tagList[0]] = (l1Counts[p.tagList[0]] || 0) + 1;
+}
+
+// Layer-2 options + counts (under selected layer-1)
+const l2Options = l1 ? getLayer2Options(tagLists, l1) : [];
+const l2Counts: Record<string, number> = {};
+for (const p of allPosts) {
+  if (p.tagList[0] === l1 && p.tagList[1]) {
+    l2Counts[p.tagList[1]] = (l2Counts[p.tagList[1]] || 0) + 1;
+  }
+}
+
+// Layer-3 options + counts (under selected layer-1 + layer-2)
+const l3Options = l1 && l2 ? getLayer3Options(tagLists, l1, l2) : [];
+const l3Counts: Record<string, number> = {};
+for (const p of allPosts) {
+  if (p.tagList[0] === l1 && p.tagList[1] === l2 && p.tagList[2]) {
+    l3Counts[p.tagList[2]] = (l3Counts[p.tagList[2]] || 0) + 1;
+  }
+}
+
+const linkTo = (v1: string, v2: string, v3: string) => {
+  const q = new URLSearchParams();
+  if (searchQuery) q.set("search", searchQuery);
+  if (v1) q.set("l1", v1);
+  if (v2) q.set("l2", v2);
+  if (v3) q.set("l3", v3);
+  const qs = q.toString();
+  return qs ? `/posts?${qs}` : "/posts";
+};
+
+const isFiltering = Boolean(searchQuery || l1 || l2 || l3);
+const breadcrumb = [l1, l2, l3].filter(Boolean).join(" · ");
+const pageTitle = breadcrumb || (searchQuery ? `搜索: ${searchQuery}` : "文章列表");
 ---
 
-<Layout title={searchQuery ? `搜索: ${searchQuery}` : "文章列表"} description="浏览所有博客文章">
+<Layout title={pageTitle} description="浏览所有博客文章">
   <div class="py-8 md:py-12">
     <!-- Header -->
-    <div class="flex flex-col sm:flex-row sm:items-end justify-between gap-5 mb-10">
+    <div class="flex flex-col sm:flex-row sm:items-end justify-between gap-5 mb-8">
       <div>
         <p class="text-xs font-semibold tracking-[0.15em] uppercase text-[var(--color-text-subtle)] mb-2">Articles</p>
         <h1 class="text-3xl font-bold tracking-[-0.015em]">
-          {searchQuery ? `"${searchQuery}" 的搜索结果` : "所有文章"}
+          {searchQuery ? `"${searchQuery}" 的搜索结果` : breadcrumb || "所有文章"}
         </h1>
-        {
-          searchQuery && (
-            <p class="text-sm text-[var(--color-text-muted)] mt-2 font-serif">
-              找到 {allPosts.length} 篇相关文章
-            </p>
-          )
-        }
+        <p class="text-sm text-[var(--color-text-muted)] mt-2 font-serif">共 {filtered.length} 篇文章</p>
       </div>
       <SearchBar client:load placeholder="搜索文章..." />
     </div>
 
-    <!-- Clear search -->
+    <!-- Clear filters -->
     {
-      searchQuery && (
+      isFiltering && (
         <a
-          href="/posts"
-          class="inline-flex items-center gap-1 text-sm text-[var(--color-text-muted)] hover:text-[var(--color-accent)] transition-colors mb-8"
+          href={linkTo("", "", "")}
+          class="inline-flex items-center gap-1 text-sm text-[var(--color-text-muted)] hover:text-[var(--color-accent)] transition-colors mb-6"
         >
-          <span>←</span> 清除筛选
+          <span>←</span> 清除全部筛选
         </a>
       )
     }
 
+    <!-- Category filter (progressive breadcrumb) -->
+    <div class="flex flex-wrap items-center gap-2 mb-6">
+      <span class="text-xs font-semibold tracking-wider uppercase text-[var(--color-text-subtle)] mr-1">分类</span>
+      {
+        PARENT_TAGS.map((tag) => (
+          <a
+            href={linkTo(tag, "", "")}
+            class={`inline-flex items-center gap-1.5 px-3.5 py-1.5 text-sm font-medium rounded-full border transition-all ${
+              l1 === tag
+                ? "bg-[var(--color-accent)] text-white border-[var(--color-accent)]"
+                : "bg-[var(--color-surface)] text-[var(--color-text-muted)] border-[var(--color-border)] hover:border-[var(--color-accent)] hover:text-[var(--color-accent)]"
+            }`}
+          >
+            {tag}
+            <span class={`text-[10px] font-semibold px-1.5 py-0.5 rounded-full ${l1 === tag ? "bg-white/20 text-white" : "bg-[var(--color-accent-muted)] text-[var(--color-accent)]"}`}>
+              {l1Counts[tag] || 0}
+            </span>
+          </a>
+        ))
+      }
+
+      {
+        l1 && l2Options.length > 0 && (
+          <>
+            <span class="text-[var(--color-text-subtle)] select-none">›</span>
+            <select
+              class="px-3 py-1.5 text-sm font-medium rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] text-[var(--color-text)] focus:outline-none focus:border-[var(--color-accent)] transition-all cursor-pointer"
+              onchange="if (this.value) location.href = this.value;"
+            >
+              <option value={linkTo(l1, "", "")}>全部</option>
+              {l2Options.map((tag) => (
+                <option value={linkTo(l1, tag, "")} selected={l2 === tag}>{tag}</option>
+              ))}
+            </select>
+          </>
+        )
+      }
+
+      {
+        l1 && l2 && l3Options.length > 0 && (
+          <>
+            <span class="text-[var(--color-text-subtle)] select-none">›</span>
+            <select
+              class="px-3 py-1.5 text-sm font-medium rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] text-[var(--color-text)] focus:outline-none focus:border-[var(--color-accent)] transition-all cursor-pointer"
+              onchange="if (this.value) location.href = this.value;"
+            >
+              <option value={linkTo(l1, l2, "")}>全部</option>
+              {l3Options.map((tag) => (
+                <option value={linkTo(l1, l2, tag)} selected={l3 === tag}>{tag}</option>
+              ))}
+            </select>
+          </>
+        )
+      }
+    </div>
+
     <!-- Post grid -->
     {
-      allPosts.length === 0 ? (
+      filtered.length === 0 ? (
         <div class="text-center py-24">
           <p class="text-[var(--color-text-muted)] text-base mb-3 font-serif">
-            {searchQuery ? `没有找到与 "${searchQuery}" 相关的文章` : "还没有文章"}
+            {searchQuery ? `没有找到与 "${searchQuery}" 相关的文章` : "没有找到符合条件的文章"}
           </p>
-          {!searchQuery && (
+          {!isFiltering && (
             <p class="text-[var(--color-text-subtle)] text-sm">
               运行 <code class="bg-[var(--color-border)] px-2 py-0.5 rounded text-xs font-mono">npm run db:seed</code> 填充示例数据
             </p>
@@ -70,12 +168,13 @@ const allPosts = searchQuery
         </div>
       ) : (
         <div class="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
-          {allPosts.map((post, i) => (
+          {filtered.map((post, i) => (
             <PostCard
               title={post.title}
               slug={post.slug}
               excerpt={post.excerpt}
               tags={post.tags}
+              coverImage={post.coverImage ?? undefined}
               createdAt={post.createdAt}
               index={i}
             />
