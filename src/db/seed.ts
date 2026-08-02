@@ -2,6 +2,8 @@ import Database from "better-sqlite3";
 import { drizzle } from "drizzle-orm/better-sqlite3";
 import { eq } from "drizzle-orm";
 import { posts, comments, likes, profile } from "./schema";
+import { endfieldPosts } from "./endfield-posts";
+import { readingPosts } from "./reading-posts";
 
 const sqlite = new Database("./data/blog.db");
 sqlite.pragma("journal_mode = WAL");
@@ -308,6 +310,8 @@ shadcn/ui 的核心理念是**直接拥有源码**。它不是通过 npm 安装�
     tags: JSON.stringify(["游戏", "崩坏星穹铁道", "翁法罗斯"]),
     published: true,
   },
+  ...endfieldPosts,
+  ...readingPosts,
 ];
 
 const inserted = db.insert(posts).values(seedPosts).returning().all();
@@ -349,6 +353,41 @@ db.insert(comments)
       postId: inserted[3].id,
       author: "回合制爱好者",
       content: "绝灭大君三阶段战的设计很用心，需要合理配队才能过。4.4 的星启模式也很有挑战性。",
+    },
+    {
+      postId: inserted[4].id,
+      author: "管理员本人",
+      content: "李织烟在 1.4 的弧光真的顶，跟陈千语那段对手戏看得起鸡皮疙瘩。",
+    },
+    {
+      postId: inserted[5].id,
+      author: "开荒人",
+      content: "从零号委托一路玩到向渊行，每个版本都能看到明显的进步，1.4 电荷机制让输出舒服太多了。",
+    },
+    {
+      postId: inserted[6].id,
+      author: "物理队玩家",
+      content: "弥弗的清波三艺拉扯聚怪是真的丝滑，配合破防辅助一套连招伤害拉满。",
+    },
+    {
+      postId: inserted[6].id,
+      author: "火队厨",
+      content: "卡缪 1.3 补强后吸火效率起飞，莱万汀+卡缪的双火轴打起来很解压。",
+    },
+    {
+      postId: inserted[7].id,
+      author: "书友",
+      content: "活着这本书读完心情沉重了很久，但福贵的那份平静又让人莫名获得了力量。",
+    },
+    {
+      postId: inserted[8].id,
+      author: "文学爱好者",
+      content: "范晔译本真的很流畅，开篇那句「多年以后」直接把人拉进马孔多的雨里。",
+    },
+    {
+      postId: inserted[9].id,
+      author: "老读者",
+      content: "小王子是每年都会重读一遍的书，「驯养」那章每次读都有新的感触。",
     },
   ])
   .run();
