@@ -1,4 +1,49 @@
 {
-  "books": ["活着", "小王子"],
-  "skills": ["subagent", "hook", "skill 开发", "CLAUDE.md 记忆", "自定义 slash command"]
+  "books": [
+    "活着",
+    "小王子",
+    "局外人",
+    "我与地坛",
+    "呼兰河传",
+    "城南旧事",
+    "围城",
+    "百年孤独",
+    "撒哈拉的故事",
+    "瓦尔登湖",
+    "追风筝的人",
+    "麦田里的守望者",
+    "平凡的世界",
+    "边城",
+    "你当像鸟飞往你的山"
+  ],
+  "skills": [
+    "subagent",
+    "hook",
+    "skill 开发",
+    "CLAUDE.md 记忆",
+    "自定义 slash command",
+    "MCP",
+    "计划模式 plan mode",
+    "headless 无头模式 claude -p",
+    "Claude Agent SDK",
+    "/compact 上下文压缩",
+    "权限模型 settings.json 权限配置",
+    "后台任务 background tasks",
+    "会话续接 resume session",
+    "Claude Code @ 引用（@-mentions 文件/目录/行号/MCP 资源）",
+    "Claude Code /code-review 代码审查命令",
+    "Claude Code /simplify 命令",
+    "/security-review 安全审查命令",
+    "Claude Code /init 命令"
+  ],
+  "cities": [
+    "里斯本",
+    "成都",
+    "京都",
+    "西安",
+    "布拉格",
+    "杭州",
+    "布达佩斯",
+    "重庆"
+  ]
 }
