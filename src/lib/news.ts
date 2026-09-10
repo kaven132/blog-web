@@ -83,10 +83,17 @@ function parseRss(xml: string): NewsItem[] {
   return items;
 }
 
-async function fetchCategory(source: (typeof SOURCES)[number]): Promise<NewsCategory> {
+function buildCategory(source: (typeof SOURCES)[number], items: NewsItem[]): NewsCategory {
+  return { id: source.id, name: source.name, source: source.source, items };
+}
+
+async function fetchCategory(
+  source: (typeof SOURCES)[number],
+  force = false
+): Promise<NewsCategory> {
   const cached = cache.get(source.id);
-  if (cached && Date.now() - cached.fetchedAt < CACHE_TTL) {
-    return { id: source.id, name: source.name, source: source.source, items: cached.items };
+  if (!force && cached && Date.now() - cached.fetchedAt < CACHE_TTL) {
+    return buildCategory(source, cached.items);
   }
 
   const controller = new AbortController();
@@ -101,18 +108,20 @@ async function fetchCategory(source: (typeof SOURCES)[number]): Promise<NewsCate
     const xml = await res.text();
     const items = parseRss(xml).slice(0, PER_CATEGORY);
     cache.set(source.id, { items, fetchedAt: Date.now() });
-    return { id: source.id, name: source.name, source: source.source, items };
+    return buildCategory(source, items);
+  } catch (err) {
+    // 强制刷新失败时退回上一次缓存，避免「刷新」把已有内容清空
+    if (cached) return buildCategory(source, cached.items);
+    throw err;
   } finally {
     clearTimeout(timer);
   }
 }
 
-export async function getNews(): Promise<NewsCategory[]> {
-  const results = await Promise.allSettled(SOURCES.map(fetchCategory));
+export async function getNews(force = false): Promise<NewsCategory[]> {
+  const results = await Promise.allSettled(SOURCES.map((s) => fetchCategory(s, force)));
   return SOURCES.map((source, i) => {
     const r = results[i];
-    return r.status === "fulfilled"
-      ? r.value
-      : { id: source.id, name: source.name, source: source.source, items: [] };
+    return r.status === "fulfilled" ? r.value : buildCategory(source, []);
   });
 }

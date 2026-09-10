@@ -13,10 +13,12 @@
   --color-border: oklch(88% 0.008 95);
   --color-border-hover: oklch(78% 0.01 260);
 
-  /* ── Typography ── */
-  --font-family-sans: "DM Sans", "Noto Sans SC", ui-sans-serif, system-ui, sans-serif;
-  --font-family-serif: "Noto Serif SC", "Source Serif 4", Georgia, serif;
-  --font-family-mono: "JetBrains Mono", "Fira Code", ui-monospace, monospace;
+  /* ── Typography ──
+     Tailwind v4 的字体命名空间是 --font-*，写成 --font-family-* 不会生成
+     .font-serif / .font-mono 工具类（工具类会落到 Tailwind 默认字体）。 */
+  --font-sans: "DM Sans", "Noto Sans SC", ui-sans-serif, system-ui, sans-serif;
+  --font-serif: "Noto Serif SC", "Source Serif 4", Georgia, serif;
+  --font-mono: "JetBrains Mono", "Fira Code", ui-monospace, monospace;
   --spacing-container: 72rem;
 
   /* ── Animation ── */
@@ -54,7 +56,7 @@
 body {
   background-color: var(--color-bg);
   color: var(--color-text);
-  font-family: var(--font-family-sans);
+  font-family: var(--font-sans);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
@@ -92,13 +94,13 @@ body {
 
 /* ── Prose (article content) ── */
 .prose {
-  font-family: var(--font-family-serif);
+  font-family: var(--font-serif);
   line-height: 1.85;
   color: var(--color-text);
 }
 
 .prose h2 {
-  font-family: var(--font-family-sans);
+  font-family: var(--font-sans);
   font-size: 1.5rem;
   font-weight: 700;
   letter-spacing: -0.02em;
@@ -108,7 +110,7 @@ body {
 }
 
 .prose h3 {
-  font-family: var(--font-family-sans);
+  font-family: var(--font-sans);
   font-size: 1.2rem;
   font-weight: 600;
   letter-spacing: -0.01em;
@@ -142,7 +144,7 @@ body {
   padding: 0.15em 0.4em;
   border-radius: 0.25rem;
   font-size: 0.88em;
-  font-family: var(--font-family-mono);
+  font-family: var(--font-mono);
   font-weight: 500;
 }
 

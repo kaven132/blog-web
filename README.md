@@ -18,7 +18,7 @@
 
 ```bash
 npm install
-npm run db:seed    # 初始化数据库和示例数据
+npm run db:seed    # 空库初始化（已有数据时不会改动任何内容）
 npm run dev        # http://localhost:4321
 ```
 
@@ -57,7 +57,7 @@ src/
 ├── db/
 │   ├── schema.ts            #   Drizzle 表定义（posts / comments / likes / profile）
 │   ├── index.ts             #   数据库连接
-│   └── seed.ts              #   种子数据（4 篇文章 + 评论 + 个人信息）
+│   └── seed.ts              #   空库初始化种子数据（清空重建需 npm run db:reset）
 ├── layouts/
 │   └── Layout.astro         #   HTML 外壳 + Google Fonts
 └── styles/
@@ -94,10 +94,15 @@ src/
 ## 数据库
 
 ```bash
-npm run db:seed       # 重建数据库并填充种子数据
+npm run db:seed       # 空库初始化：仅当没有任何文章时写入示例数据（安全，可重复执行）
+npm run db:reset      # ⚠️ 清空 posts/comments/likes/profile 并重建示例数据（会先自动备份到 data/backups/）
 npm run db:generate   # 生成 Drizzle 迁移
 npm run db:push       # 推送 schema 到数据库
 ```
+
+> ⚠️ `data/blog.db` 是全站唯一数据源（文章、评论、点赞、个人信息、头像都在里面），
+> 且没有版本管理。`db:seed` 不会删除任何数据；只有 `db:reset` 会清空，
+> 它在清空前会把库物理备份到 `data/backups/blog-<时间戳>.db`，需要回滚时直接把备份覆盖回 `data/blog.db` 即可。
 
 ## 构建部署
 

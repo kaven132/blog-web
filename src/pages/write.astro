@@ -415,8 +415,9 @@ const pageTitle = editing ? "编辑文章" : "写文章";
       else if (action === "link") {
         const url = prompt("链接地址：", "https://");
         if (!url) return;
-        const text = contentInput.value.slice(contentInput.selectionStart, contentInput.selectionEnd) || "链接文字";
-        wrapSelection(`[${text}](${url})`, "");
+        // before 只放 "["，after 放 "](url)"：wrapSelection 本身会插入选中文本，
+        // 若把 [文本](url) 整个塞进 before，选中内容会被拼两遍 → [文本](url)文本
+        wrapSelection("[", `](${url})`);
       }
     });
   });
@@ -434,8 +435,7 @@ const pageTitle = editing ? "编辑文章" : "写文章";
       e.preventDefault();
       const url = prompt("链接地址：", "https://");
       if (!url) return;
-      const text = contentInput.value.slice(contentInput.selectionStart, contentInput.selectionEnd) || "链接文字";
-      wrapSelection(`[${text}](${url})`, "");
+      wrapSelection("[", `](${url})`);
     }
   });
 

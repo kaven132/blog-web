@@ -75,7 +75,7 @@ export default function PostCard({ title, slug, excerpt, tags, createdAt, coverI
               day: "numeric",
             })}
           </time>
-          <span className="text-xs text-[var(--color-accent)] font-medium opacity-0 group-hover:opacity-100 transition-opacity duration-300 translate-x-0 group-hover:translate-x-1 transition-transform">
+          <span className="text-xs text-[var(--color-accent)] font-medium opacity-0 group-hover:opacity-100 translate-x-0 group-hover:translate-x-1 transition duration-300">
             阅读 →
           </span>
         </div>

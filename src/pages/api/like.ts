@@ -1,7 +1,7 @@
 import type { APIRoute } from "astro";
 import { db } from "../../db";
 import { likes } from "../../db/schema";
-import { eq, sql } from "drizzle-orm";
+import { sql } from "drizzle-orm";
 
 export const POST: APIRoute = async ({ request }) => {
   try {
@@ -14,21 +14,21 @@ export const POST: APIRoute = async ({ request }) => {
       });
     }
 
-    // Upsert: increment count
-    const existing = db.select().from(likes).where(eq(likes.postId, postId)).get();
+    // 单条原子语句完成累加：并发请求不会产生重复行，
+    // 也不会出现「读-改-写」丢更新（依赖 likes.post_id 上的唯一索引）
+    const rows = db
+      .insert(likes)
+      .values({ postId, count: 1 })
+      .onConflictDoUpdate({
+        target: likes.postId,
+        set: { count: sql`${likes.count} + 1` },
+      })
+      .returning()
+      .all();
 
-    if (existing) {
-      db.update(likes)
-        .set({ count: existing.count + 1 })
-        .where(eq(likes.postId, postId))
-        .run();
-    } else {
-      db.insert(likes).values({ postId, count: 1 }).run();
-    }
+    const count = rows[0]?.count ?? 1;
 
-    const updated = db.select().from(likes).where(eq(likes.postId, postId)).get();
-
-    return new Response(JSON.stringify({ count: updated?.count || 1 }), {
+    return new Response(JSON.stringify({ count }), {
       status: 200,
       headers: { "Content-Type": "application/json" },
     });

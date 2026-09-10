@@ -32,9 +32,43 @@ function readFileAsDataURL(file: File): Promise<string> {
   });
 }
 
-// Final crop: render the positioned/scaled image into a square canvas
+// 读取图片原始像素尺寸
+function readImageSize(src: string): Promise<{ w: number; h: number }> {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.onload = () => resolve({ w: img.naturalWidth, h: img.naturalHeight });
+    img.onerror = reject;
+    img.src = src;
+  });
+}
+
+// 图片在裁切框里「铺满」时的基准显示尺寸：短边对齐 CROP_SIZE
+// （原实现把宽固定成 CROP_SIZE，横图会出现上下留白、圆形头像里能看到空档）
+function baseSizeOf(natW: number, natH: number) {
+  const cover = CROP_SIZE / Math.max(1, Math.min(natW, natH));
+  return { w: natW * cover, h: natH * cover };
+}
+
+// 平移上限：放大后的图片超出裁切框的那部分
+function panLimitOf(natW: number, natH: number, scale: number) {
+  const base = baseSizeOf(natW, natH);
+  return {
+    x: Math.max(0, base.w * scale - CROP_SIZE),
+    y: Math.max(0, base.h * scale - CROP_SIZE),
+  };
+}
+
+// Final crop: 把裁切框里的可见区域原样画到方形 canvas
+//
+// 预览用的 transform 是 `translate(-x, -y) scale(s)` 且 origin 为 top-left，
+// 即图片局部坐标 p 显示在 s*p - (x, y) 处。反解裁切框坐标 d 对应的原图坐标：
+//   src = (d + 平移量) / (cover * scale)
+// 旧实现写成 sx = -x * ratio，负号与漏掉的 scale 会让「放大 + 拖动」后
+// 导出的区域和预览里看到的完全不是同一块。
 function cropToAvatar(
   imgSrc: string,
+  natW: number,
+  natH: number,
   scale: number,
   x: number,
   y: number,
@@ -48,12 +82,14 @@ function cropToAvatar(
       canvas.height = outSize;
       const ctx = canvas.getContext("2d")!;
 
-      // Map from crop-area coords to source-image coords
-      const ratio = img.naturalWidth / CROP_SIZE;
-      const sx = -x * ratio;
-      const sy = -y * ratio;
-      const sw = (CROP_SIZE / scale) * ratio;
-      const sh = (CROP_SIZE / scale) * ratio;
+      // 1 个裁切框像素对应多少原图像素
+      const cover = CROP_SIZE / Math.max(1, Math.min(natW, natH));
+      const unit = 1 / (cover * scale);
+
+      const sx = x * unit;
+      const sy = y * unit;
+      const sw = CROP_SIZE * unit;
+      const sh = CROP_SIZE * unit;
 
       ctx.drawImage(img, sx, sy, sw, sh, 0, 0, outSize, outSize);
       resolve(canvas.toDataURL("image/jpeg", 0.85));
@@ -74,11 +110,15 @@ export default function ProfileCard() {
 
   // ── Crop modal state ──
   const [cropSrc, setCropSrc] = useState<string | null>(null);
+  const [cropNat, setCropNat] = useState({ w: CROP_SIZE, h: CROP_SIZE });
   const [cropScale, setCropScale] = useState(1);
   const [cropX, setCropX] = useState(0);
   const [cropY, setCropY] = useState(0);
   const [dragging, setDragging] = useState(false);
   const dragStart = useRef({ x: 0, y: 0, cx: 0, cy: 0 });
+
+  // 裁切框内图片的基准显示尺寸（依赖原图宽高比）
+  const cropBase = baseSizeOf(cropNat.w, cropNat.h);
 
   // Load profile + check auth
   useEffect(() => {
@@ -128,24 +168,31 @@ export default function ProfileCard() {
   }, [form]);
 
   // ── File picked → open crop modal ──
-  const openCropper = useCallback(async (file: File) => {
-    if (!file.type.startsWith("image/")) return;
-    try {
-      const dataUrl = await readFileAsDataURL(file);
-      setCropSrc(dataUrl);
-      setCropScale(1);
-      setCropX(0);
-      setCropY(0);
-    } catch {
-      // ignore
-    }
-  }, []);
+  const openCropper = useCallback(
+    async (file: File) => {
+      // 未登录直接忽略：PUT /api/profile 会 401，静默失败反而让人以为是 bug
+      if (!loggedIn) return;
+      if (!file.type.startsWith("image/")) return;
+      try {
+        const dataUrl = await readFileAsDataURL(file);
+        const { w, h } = await readImageSize(dataUrl);
+        setCropSrc(dataUrl);
+        setCropNat({ w, h });
+        setCropScale(1);
+        setCropX(0);
+        setCropY(0);
+      } catch {
+        // ignore
+      }
+    },
+    [loggedIn]
+  );
 
   // ── Confirm crop ──
   const confirmCrop = useCallback(async () => {
     if (!cropSrc) return;
     try {
-      const avatar = await cropToAvatar(cropSrc, cropScale, cropX, cropY, 200);
+      const avatar = await cropToAvatar(cropSrc, cropNat.w, cropNat.h, cropScale, cropX, cropY, 200);
       if (editing) {
         setForm((f) => ({ ...f, avatar }));
       } else {
@@ -163,7 +210,7 @@ export default function ProfileCard() {
       // ignore
     }
     setCropSrc(null);
-  }, [cropSrc, cropScale, cropX, cropY, editing, profile]);
+  }, [cropSrc, cropNat, cropScale, cropX, cropY, editing, profile]);
 
   const cancelCrop = useCallback(() => setCropSrc(null), []);
 
@@ -202,28 +249,38 @@ export default function ProfileCard() {
       if (!dragging) return;
       const dx = e.clientX - dragStart.current.x;
       const dy = e.clientY - dragStart.current.y;
-      // Clamp pan within the scaled image
-      const maxPan = (CROP_SIZE * (cropScale - 1)) / cropScale;
-      setCropX(clamp(dragStart.current.cx + dx, 0, maxPan));
-      setCropY(clamp(dragStart.current.cy + dy, 0, maxPan));
+      // 拖图手感：鼠标往右拖，图片跟着往右走（露出更靠左的部分），平移量取负。
+      // 旧实现用 +dx，方向是反的，像在拖取景框而不是拖图；且 maxPan 公式少乘了一个 scale。
+      const limit = panLimitOf(cropNat.w, cropNat.h, cropScale);
+      setCropX(clamp(dragStart.current.cx - dx, 0, limit.x));
+      setCropY(clamp(dragStart.current.cy - dy, 0, limit.y));
     },
-    [dragging, cropScale]
+    [dragging, cropScale, cropNat]
   );
 
   const cropMouseUp = useCallback(() => setDragging(false), []);
 
-  const cropWheel = useCallback((e: WheelEvent) => {
-    e.preventDefault();
-    const delta = e.deltaY > 0 ? -0.1 : 0.1;
-    setCropScale((s) => {
-      const next = clamp(s + delta, 1, 3);
-      // Re-clamp position after scale change
-      const maxPan = (CROP_SIZE * (next - 1)) / next;
-      setCropX((x) => clamp(x, 0, maxPan));
-      setCropY((y) => clamp(y, 0, maxPan));
-      return next;
-    });
-  }, []);
+  // 缩放到指定倍数，并以裁切框中心为锚点重新夹取平移量
+  const zoomTo = useCallback(
+    (next: number) => {
+      const scale = clamp(next, 1, 3);
+      if (scale === cropScale) return;
+      const k = scale / cropScale;
+      const limit = panLimitOf(cropNat.w, cropNat.h, scale);
+      setCropX((x) => clamp((x + CROP_SIZE / 2) * k - CROP_SIZE / 2, 0, limit.x));
+      setCropY((y) => clamp((y + CROP_SIZE / 2) * k - CROP_SIZE / 2, 0, limit.y));
+      setCropScale(scale);
+    },
+    [cropScale, cropNat]
+  );
+
+  const cropWheel = useCallback(
+    (e: WheelEvent) => {
+      e.preventDefault();
+      zoomTo(cropScale + (e.deltaY > 0 ? -0.1 : 0.1));
+    },
+    [cropScale, zoomTo]
+  );
 
   const avatarSrc = editing ? form.avatar : profile.avatar;
   const initial = (editing ? form.name : profile.name)?.charAt(0)?.toUpperCase() || "?";
@@ -265,14 +322,14 @@ export default function ProfileCard() {
 
             <div className="pt-8 pb-4 px-4 flex flex-col items-center">
               <div
-                className={`relative size-20 rounded-full mb-3 ring-2 ring-[var(--color-border)] overflow-hidden cursor-pointer group ${
-                  dragOver ? "ring-[var(--color-accent)]" : ""
-                }`}
+                className={`relative size-20 rounded-full mb-3 ring-2 ring-[var(--color-border)] overflow-hidden group ${
+                  loggedIn ? "cursor-pointer" : "cursor-default"
+                } ${dragOver ? "ring-[var(--color-accent)]" : ""}`}
                 onDrop={onDrop}
                 onDragOver={onDragOverHandler}
                 onDragLeave={onDragLeaveHandler}
                 onClick={() => fileInputRef.current?.click()}
-                title="拖拽或点击更换头像"
+                title={loggedIn ? "拖拽或点击更换头像" : undefined}
               >
                 {avatarSrc ? (
                   <img src={avatarSrc} alt="头像" className="w-full h-full object-cover" />
@@ -371,9 +428,6 @@ export default function ProfileCard() {
               <p className="text-[10px] text-[var(--color-text-subtle)]">拖拽或点击更换</p>
             </div>
 
-            <input ref={fileInputRef} type="file" accept="image/*" className="hidden"
-              onChange={(e) => { const f = e.target.files?.[0]; if (f) openCropper(f); }} />
-
             {/* Name + City */}
             <div className="grid grid-cols-2 gap-2.5">
               <div>
@@ -432,6 +486,11 @@ export default function ProfileCard() {
         )}
       </div>
 
+      {/* 隐藏的 file input：必须放在编辑/展示两个分支之外。
+          旧实现只在编辑模式渲染，导致展示模式下 fileInputRef 恒为 null，点击头像毫无反应 */}
+      <input ref={fileInputRef} type="file" accept="image/*" className="hidden"
+        onChange={(e) => { const f = e.target.files?.[0]; if (f) openCropper(f); }} />
+
       {/* ── Crop modal ── */}
       {cropSrc && (
         <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4"
@@ -463,10 +522,10 @@ export default function ProfileCard() {
                   src={cropSrc}
                   alt="裁切"
                   draggable={false}
-                  className="absolute origin-top-left"
+                  className="absolute origin-top-left max-w-none"
                   style={{
-                    width: CROP_SIZE,
-                    height: "auto",
+                    width: cropBase.w,
+                    height: cropBase.h,
                     transform: `${imgTranslateStr} ${imgScaleStr}`,
                   }}
                 />
@@ -483,13 +542,7 @@ export default function ProfileCard() {
                   max="3"
                   step="0.01"
                   value={cropScale}
-                  onChange={(e) => {
-                    const s = parseFloat(e.target.value);
-                    setCropScale(s);
-                    const maxPan = (CROP_SIZE * (s - 1)) / s;
-                    setCropX((x) => clamp(x, 0, maxPan));
-                    setCropY((y) => clamp(y, 0, maxPan));
-                  }}
+                  onChange={(e) => zoomTo(parseFloat(e.target.value))}
                   className="flex-1 h-1.5 rounded-full appearance-none bg-[var(--color-border)] accent-[var(--color-accent)] cursor-pointer"
                 />
                 <svg className="w-4 h-4 text-[var(--color-text-subtle)] flex-shrink-0" fill="none" stroke="currentColor" strokeWidth={1.5} viewBox="0 0 24 24">

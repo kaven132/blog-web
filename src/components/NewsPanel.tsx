@@ -11,6 +11,7 @@ interface NewsItem {
 interface NewsCategory {
   id: string;
   name: string;
+  source: string;
   items: NewsItem[];
 }
 
@@ -67,7 +68,8 @@ export default function NewsPanel() {
     }
     setLoading(true);
     setError(false);
-    fetch("/api/news")
+    // force 时带 fresh=1 穿透服务端缓存，否则 10 分钟内点刷新拿到的还是同一批数据
+    fetch(force ? "/api/news?fresh=1" : "/api/news")
       .then((r) => (r.ok ? r.json() : Promise.reject()))
       .then((d: NewsCategory[]) => {
         const map: Record<string, NewsCategory> = {};
@@ -135,7 +137,7 @@ export default function NewsPanel() {
         <div className="p-6 text-center">
           <p className="text-xs text-[var(--color-text-subtle)] mb-3">资讯加载失败</p>
           <button
-            onClick={load}
+            onClick={() => load(true)}
             className="px-3 py-1.5 text-xs font-medium rounded-lg border border-[var(--color-border)] text-[var(--color-text-muted)] hover:text-[var(--color-text)] hover:border-[var(--color-border-hover)] transition-all"
           >
             重试

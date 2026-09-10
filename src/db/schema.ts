@@ -34,6 +34,7 @@ export const likes = sqliteTable("likes", {
   id: integer("id").primaryKey({ autoIncrement: true }),
   postId: integer("post_id")
     .notNull()
+    .unique()
     .references(() => posts.id, { onDelete: "cascade" }),
   count: integer("count").notNull().default(0),
 });
