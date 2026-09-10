@@ -14,7 +14,26 @@
     "麦田里的守望者",
     "平凡的世界",
     "边城",
-    "你当像鸟飞往你的山"
+    "你当像鸟飞往你的山",
+    "老人与海",
+    "一九八四",
+    "骆驼祥子",
+    "三体",
+    "万历十五年",
+    "白鹿原",
+    "解忧杂货店",
+    "人类简史",
+    "乡土中国"
+  ],
+  "plugins": [
+    "DeepSeek Harness (dsh) — https://github.com/deepseek-ai/deepseek-harness",
+    "Cline — https://github.com/cline/cline",
+    "OpenHands — https://github.com/OpenHands/OpenHands",
+    "Aider — https://github.com/Aider-AI/aider",
+    "Continue — https://github.com/continuedev/continue",
+    "Open WebUI — https://github.com/open-webui/open-webui",
+    "OpenManus — https://github.com/FoundationAgents/OpenManus",
+    "Roo Code — https://github.com/RooCodeInc/Roo-Code"
   ],
   "skills": [
     "subagent",
@@ -34,7 +53,8 @@
     "Claude Code /code-review 代码审查命令",
     "Claude Code /simplify 命令",
     "/security-review 安全审查命令",
-    "Claude Code /init 命令"
+    "Claude Code /init 命令",
+    "Claude Code Git 集成（/commit、/pr、/commit-push-pr）"
   ],
   "cities": [
     "里斯本",
@@ -44,6 +64,17 @@
     "布拉格",
     "杭州",
     "布达佩斯",
-    "重庆"
+    "重庆",
+    "清迈",
+    "厦门",
+    "伊斯坦布尔",
+    "青岛",
+    "墨西哥城",
+    "长沙",
+    "马拉喀什",
+    "喀什",
+    "第比利斯",
+    "延吉",
+    "开普敦"
   ]
 }
