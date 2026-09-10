@@ -11,6 +11,8 @@
 - 跑脚本：仓库根目录执行 `E:/devtools/nodejs/node.exe node_modules/tsx/dist/cli.mjs <script>`（`src/db/index.ts` 用相对路径 `./data/blog.db`）。
 - **沙箱会注入 `NODE_OPTIONS=--require=...genie-safe-delete.cjs`**（安全删除 shim），拦截 Node 内删除操作导致超时。agent 跑 npm install/rebuild/起 dev 前先 `export NODE_OPTIONS=`；用户侧 vite/删除类报错也先查这个变量。
 - `better-sqlite3` 再报 `NODE_MODULE_VERSION`：升到带目标 Node 预编译包的最新版，用目标 Node + 清空 NODE_OPTIONS 跑 `npm install`。
+- **git 推送（2026-09-10 实测）**：WorkBuddy 用的是自带 PortableGit（`C:/Users/kaven/.workbuddy/binaries/PortableGit/...`），其 `credential.helper=helper-selector` 在无 TTY 下必失败（`fatal: could not read Username for 'https://github.com': terminal prompts disabled`，沙箱内外同样报错）。Windows 凭据管理器里**已存有** `git:https://github.com`（用户 kaven132），改用 GCM 即可推送：`GCM_INTERACTIVE=never GIT_TERMINAL_PROMPT=0 git -c credential.helper= -c credential.helper=manager push origin main`（GCM 在 `<PortableGit>/mingw64/bin/git-credential-manager`）。不要用 `dangerouslyDisableSandbox`，无用。
+- **`.gitignore` 里有 `.astro/`、`.workbuddy/`，但这两个目录已被 git 跟踪**（历史遗留），所以 `git status` 会看到它们；`git add .astro/...` 反而报 ignored 失败，改动它们要用 `git add -u`（或 `-f`）。
 
 ## 本机 curl 的坑（2026-09-03）
 - **绝不用 `curl -o /dev/null`**：Git Bash 下 exit 23、`%{size_download}` 恒 0、HTTP 码 000。一律写真实文件再 `ls -l`。
