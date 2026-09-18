@@ -196,13 +196,22 @@ body {
   color: var(--color-text);
 }
 
+/* 正文插图：统一高度，宽度按原始比例自适应（不裁切、不拉伸） */
 .prose img {
   display: block;
+  height: 25rem;
+  width: auto;
   max-width: 100%;
-  height: auto;
+  object-fit: contain;
   border-radius: 0.75rem;
   border: 1px solid var(--color-border);
   margin: 2rem auto;
+}
+
+@media (max-width: 640px) {
+  .prose img {
+    height: 14rem;
+  }
 }
 
 /* ── Skeleton loading ── */
