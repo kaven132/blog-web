@@ -8,11 +8,25 @@ interface NewsItem {
   date: string;
 }
 
+interface NewsSibling {
+  id: string;
+  label: string;
+}
+
 interface NewsCategory {
   id: string;
+  group: string;
   name: string;
   source: string;
   items: NewsItem[];
+  siblings: NewsSibling[];
+}
+
+/** 面板缓存的整体形态：按来源 id 存分类、每个 tab 的默认来源、以及用户手动切过的来源 */
+interface NewsStore {
+  categories: Record<string, NewsCategory>;
+  defaults: Record<string, string>;
+  picked: Record<string, string>;
 }
 
 const TABS = [
@@ -21,7 +35,9 @@ const TABS = [
   { id: "games", label: "游戏" },
 ];
 
-const CACHE_PREFIX = "news-panel-cache-";
+// v3：科技栏新增「IT 之家」来源。缓存里的 siblings 是随分类一起下发的旧快照，
+// 只有极客公园一个，切换按钮不会出现，故升前缀让当天已浏览过的用户重新拉一次
+const CACHE_PREFIX = "news-panel-cache-v3-";
 
 function cacheKey(): string {
   return CACHE_PREFIX + new Date().toDateString();
@@ -31,6 +47,27 @@ function formatDate(raw: string): string {
   const d = new Date(raw);
   if (isNaN(d.getTime())) return "";
   return d.toLocaleDateString("zh-CN", { month: "short", day: "numeric" });
+}
+
+/** 写回 sessionStorage 后返回同一个对象，方便在 setState 里链式使用 */
+function saveStore(next: NewsStore): NewsStore {
+  try {
+    sessionStorage.setItem(cacheKey(), JSON.stringify(next));
+  } catch {
+    // 超出配额就算了，不影响渲染
+  }
+  return next;
+}
+
+/** 把新拿到的分类并进 store（换来源后回填，保留用户已切过的来源选择） */
+function mergeCategories(prev: NewsStore, incoming: NewsCategory[]): NewsStore {
+  const categories = { ...prev.categories };
+  const defaults = { ...prev.defaults };
+  incoming.forEach((c) => {
+    categories[c.id] = c;
+    if (!defaults[c.group]) defaults[c.group] = c.id;
+  });
+  return saveStore({ ...prev, categories, defaults });
 }
 
 function Skeleton() {
@@ -48,9 +85,11 @@ function Skeleton() {
 
 export default function NewsPanel() {
   const [active, setActive] = useState("domestic");
-  const [data, setData] = useState<Record<string, NewsCategory>>({});
+  const [store, setStore] = useState<NewsStore>({ categories: {}, defaults: {}, picked: {} });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
+  const [switching, setSwitching] = useState<string | null>(null);
+  const [switchError, setSwitchError] = useState<string | null>(null);
   const [pending, setPending] = useState<NewsItem | null>(null);
 
   const load = useCallback((force = false) => {
@@ -58,25 +97,25 @@ export default function NewsPanel() {
       const cached = sessionStorage.getItem(cacheKey());
       if (cached) {
         try {
-          setData(JSON.parse(cached));
-          setLoading(false);
-          return;
+          const parsed = JSON.parse(cached) as NewsStore;
+          if (parsed?.categories && parsed?.defaults) {
+            setStore({ ...parsed, picked: parsed.picked ?? {} });
+            setLoading(false);
+            return;
+          }
         } catch {
-          sessionStorage.removeItem(cacheKey());
+          // 缓存坏了就重新拉
         }
+        sessionStorage.removeItem(cacheKey());
       }
     }
     setLoading(true);
     setError(false);
+    setSwitchError(null);
     // force 时带 fresh=1 穿透服务端缓存，否则 10 分钟内点刷新拿到的还是同一批数据
     fetch(force ? "/api/news?fresh=1" : "/api/news")
       .then((r) => (r.ok ? r.json() : Promise.reject()))
-      .then((d: NewsCategory[]) => {
-        const map: Record<string, NewsCategory> = {};
-        d.forEach((c) => (map[c.id] = c));
-        setData(map);
-        sessionStorage.setItem(cacheKey(), JSON.stringify(map));
-      })
+      .then((d: NewsCategory[]) => setStore((prev) => mergeCategories(prev, d)))
       .catch(() => setError(true))
       .finally(() => setLoading(false));
   }, []);
@@ -85,8 +124,47 @@ export default function NewsPanel() {
     load();
   }, [load]);
 
-  const category = data[active];
+  // 切换失败提示 4 秒后自动收起
+  useEffect(() => {
+    if (!switchError) return;
+    const t = setTimeout(() => setSwitchError(null), 4000);
+    return () => clearTimeout(t);
+  }, [switchError]);
+
+  const selectedId = store.picked[active] ?? store.defaults[active];
+  const category = selectedId ? store.categories[selectedId] : undefined;
   const items = category?.items || [];
+
+  const siblings = category?.siblings ?? [];
+  const siblingIdx = siblings.findIndex((s) => s.id === category?.id);
+  const nextSource =
+    siblings.length > 1 ? siblings[(siblingIdx + 1) % siblings.length] : null;
+
+  const switchTo = useCallback(
+    (id: string) => {
+      if (id === selectedId) return;
+      setSwitchError(null);
+      // 记住这次选择，同一次会话内切页面回来仍然停留在这个来源
+      const remember = (prev: NewsStore): NewsStore =>
+        saveStore({ ...prev, picked: { ...prev.picked, [active]: id } });
+
+      // 已经拉过就直接切，不再请求
+      if (store.categories[id]) {
+        setStore(remember);
+        return;
+      }
+      setSwitching(id);
+      fetch(`/api/news?sources=${encodeURIComponent(id)}`)
+        .then((r) => (r.ok ? r.json() : Promise.reject(new Error("bad status"))))
+        .then((d: NewsCategory[]) => {
+          if (!Array.isArray(d) || d.length === 0) throw new Error("empty");
+          setStore((prev) => remember(mergeCategories(prev, d)));
+        })
+        .catch(() => setSwitchError("来源切换失败"))
+        .finally(() => setSwitching(null));
+    },
+    [active, selectedId, store.categories]
+  );
 
   return (
     <div className="bg-[var(--color-surface)] border border-[var(--color-border)] rounded-2xl overflow-hidden">
@@ -146,9 +224,17 @@ export default function NewsPanel() {
       ) : items.length === 0 ? (
         <p className="p-6 text-center text-xs text-[var(--color-text-subtle)] font-serif">暂无资讯</p>
       ) : (
-        <ul className="divide-y divide-[var(--color-border)]">
+        <ul
+          className={`divide-y divide-[var(--color-border)] transition-opacity duration-200 ${
+            switching ? "opacity-40" : ""
+          }`}
+        >
           {items.map((item, i) => (
-            <li key={`${active}-${i}`} className="group animate-[fade-in_0.4s_ease-out_both]" style={{ animationDelay: `${i * 0.05}s` }}>
+            <li
+              key={`${category?.id}-${i}`}
+              className="group animate-[fade-in_0.4s_ease-out_both]"
+              style={{ animationDelay: `${i * 0.05}s` }}
+            >
               <a
                 href={item.link || undefined}
                 target="_blank"
@@ -179,10 +265,35 @@ export default function NewsPanel() {
       {/* Source footer */}
       {!loading && !error && category?.source && (
         <div className="px-4 py-2.5 border-t border-[var(--color-border)] flex items-center gap-1.5">
-          <svg className="w-3 h-3 text-[var(--color-text-subtle)]" fill="none" stroke="currentColor" strokeWidth={1.8} viewBox="0 0 24 24">
+          <svg className="w-3 h-3 flex-shrink-0 text-[var(--color-text-subtle)]" fill="none" stroke="currentColor" strokeWidth={1.8} viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" d="M12 7.5h1.5m-1.5 3h1.5m-7.5 3h7.5m-7.5 3h7.5m3-9h3.375c.621 0 1.125.504 1.125 1.125V18a2.25 2.25 0 01-2.25 2.25M16.5 7.5V18a2.25 2.25 0 002.25 2.25M16.5 7.5V4.875c0-.621-.504-1.125-1.125-1.125H4.125C3.504 3.75 3 4.254 3 4.875V18a2.25 2.25 0 002.25 2.25h13.5A2.25 2.25 0 0018 18" />
           </svg>
-          <span className="text-[10px] text-[var(--color-text-subtle)]">来源：{category.source}</span>
+          <span
+            className={`text-[10px] truncate ${
+              switchError ? "text-[var(--color-accent)]" : "text-[var(--color-text-subtle)]"
+            }`}
+          >
+            {switchError ?? `来源：${category.source}`}
+          </span>
+
+          {/* 同分类多来源时，切换按钮 */}
+          {siblings.length > 1 && nextSource && (
+            <button
+              type="button"
+              onClick={() => switchTo(nextSource.id)}
+              disabled={Boolean(switching)}
+              title={`切换来源：${category.source} → ${nextSource.label}（共 ${siblings.length} 个）`}
+              aria-label={`切换资讯来源，当前 ${category.source}`}
+              className="ml-0.5 w-5 h-5 flex-shrink-0 flex items-center justify-center rounded-md text-[var(--color-text-subtle)] hover:text-[var(--color-accent)] hover:bg-[var(--color-bg)] transition-all disabled:opacity-40"
+            >
+              <svg
+                className={`w-3 h-3 ${switching ? "animate-spin" : ""}`}
+                fill="none" stroke="currentColor" strokeWidth={1.8} viewBox="0 0 24 24"
+              >
+                <path strokeLinecap="round" strokeLinejoin="round" d="M7.5 21L3 16.5m0 0L7.5 12M3 16.5h13.5m0-13.5L21 7.5m0 0L16.5 12M21 7.5H7.5" />
+              </svg>
+            </button>
+          )}
         </div>
       )}
 
