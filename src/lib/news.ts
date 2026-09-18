@@ -36,6 +36,8 @@ interface NewsSource {
 
 const SOURCES: NewsSource[] = [
   { id: "domestic", group: "domestic", name: "国内", source: "中国新闻网", url: "https://www.chinanews.com.cn/rss/scroll-news.xml" },
+  { id: "world", group: "world", name: "国外", source: "中新网·国际", url: "https://www.chinanews.com.cn/rss/world.xml" },
+  { id: "world-un", group: "world", name: "国外", source: "联合国新闻", url: "https://news.un.org/feed/subscribe/zh/news/all/rss.xml" },
   { id: "tech", group: "tech", name: "科技", source: "极客公园", url: "https://www.geekpark.net/rss" },
   { id: "tech-ithome", group: "tech", name: "科技", source: "IT 之家", url: "https://www.ithome.com/rss/" },
   { id: "games", group: "games", name: "游戏", source: "游戏茶馆", url: "https://www.youxichaguan.com/feed" },

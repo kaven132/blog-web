@@ -31,12 +31,13 @@ interface NewsStore {
 
 const TABS = [
   { id: "domestic", label: "国内" },
+  { id: "world", label: "国外" },
   { id: "tech", label: "科技" },
   { id: "games", label: "游戏" },
 ];
 
-// v3：科技栏新增「IT 之家」来源。缓存里的 siblings 是随分类一起下发的旧快照，
-// 只有极客公园一个，切换按钮不会出现，故升前缀让当天已浏览过的用户重新拉一次
+// v3：当初是为「科技栏新增 IT 之家」升的一次。现在新增栏目/来源**不需要再动这个前缀**：
+// load() 会校验每个 tab 在缓存里都有默认来源（不完整就整份弃用），且命中缓存后仍会静默请求一次做校正。
 const CACHE_PREFIX = "news-panel-cache-v3-";
 
 function cacheKey(): string {
@@ -93,31 +94,53 @@ export default function NewsPanel() {
   const [pending, setPending] = useState<NewsItem | null>(null);
 
   const load = useCallback((force = false) => {
+    // 缓存里存着服务端下发的「分类集合 + 每类的来源名单（siblings）」，这两样都是服务端配置。
+    // 服务端改了配置（加来源、换 feed、删栏目）缓存不会自己失效，所以命中缓存只能算「先有东西看」，
+    // 随后必须再静默请求一次做校正，否则会出现「服务端明明有 2 个来源，界面却不显示切换按钮」。
+    let hydrated = false;
     if (!force) {
       const cached = sessionStorage.getItem(cacheKey());
       if (cached) {
         try {
           const parsed = JSON.parse(cached) as NewsStore;
-          if (parsed?.categories && parsed?.defaults) {
-            setStore({ ...parsed, picked: parsed.picked ?? {} });
+          // 每个 tab 都必须在缓存里有默认来源，否则新加的栏目在缓存里没有归属，
+          // 首屏会先渲染成「暂无资讯」再被请求结果补上（肉眼可见地闪一下）。
+          // 判为不完整就整份弃用，直接走「首屏加载」那条路。
+          const complete = TABS.every((t) => parsed?.defaults?.[t.id]);
+          if (parsed?.categories && parsed?.defaults && complete) {
+            // 丢掉当前 tab 结构里已不存在的分组，避免历史缓存把删掉的栏目带回来
+            const live = new Set(TABS.map((t) => t.id));
+            const categories = Object.fromEntries(
+              Object.entries(parsed.categories).filter(([, c]) => live.has(c.group))
+            );
+            setStore({ ...parsed, categories, picked: parsed.picked ?? {} });
             setLoading(false);
-            return;
+            hydrated = true;
           }
         } catch {
           // 缓存坏了就重新拉
         }
-        sessionStorage.removeItem(cacheKey());
+        if (!hydrated) sessionStorage.removeItem(cacheKey());
       }
     }
-    setLoading(true);
-    setError(false);
-    setSwitchError(null);
+
+    if (!hydrated) {
+      setLoading(true);
+      setError(false);
+      setSwitchError(null);
+    }
+
     // force 时带 fresh=1 穿透服务端缓存，否则 10 分钟内点刷新拿到的还是同一批数据
     fetch(force ? "/api/news?fresh=1" : "/api/news")
       .then((r) => (r.ok ? r.json() : Promise.reject()))
       .then((d: NewsCategory[]) => setStore((prev) => mergeCategories(prev, d)))
-      .catch(() => setError(true))
-      .finally(() => setLoading(false));
+      .catch(() => {
+        // 已有缓存可看时静默失败，别把能看的内容换成错误态
+        if (!hydrated) setError(true);
+      })
+      .finally(() => {
+        if (!hydrated) setLoading(false);
+      });
   }, []);
 
   useEffect(() => {
