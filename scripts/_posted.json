@@ -23,7 +23,14 @@
     "白鹿原",
     "解忧杂货店",
     "人类简史",
-    "乡土中国"
+    "乡土中国",
+    "枪炮、病菌与钢铁",
+    "献给阿尔吉侬的花束",
+    "了不起的盖茨比",
+    "埃涅阿斯纪",
+    "杀死一只知更鸟",
+    "一句顶一万句",
+    "罪与罚"
   ],
   "plugins": [
     "DeepSeek Harness (dsh) — https://github.com/deepseek-ai/deepseek-harness",
@@ -33,7 +40,14 @@
     "Continue — https://github.com/continuedev/continue",
     "Open WebUI — https://github.com/open-webui/open-webui",
     "OpenManus — https://github.com/FoundationAgents/OpenManus",
-    "Roo Code — https://github.com/RooCodeInc/Roo-Code"
+    "Roo Code — https://github.com/RooCodeInc/Roo-Code",
+    "LiteLLM — https://github.com/BerriAI/litellm",
+    "Open Interpreter — https://github.com/OpenInterpreter/open-interpreter",
+    "Cherry Studio — https://github.com/CherryHQ/cherry-studio",
+    "Vercel AI SDK — https://github.com/vercel/ai",
+    "smolagents — https://github.com/huggingface/smolagents",
+    "Browser Use — https://github.com/browser-use/browser-use",
+    "opencode — https://github.com/anomalyco/opencode"
   ],
   "skills": [
     "subagent",
@@ -56,25 +70,5 @@
     "Claude Code /init 命令",
     "Claude Code Git 集成（/commit、/pr、/commit-push-pr）"
   ],
-  "cities": [
-    "里斯本",
-    "成都",
-    "京都",
-    "西安",
-    "布拉格",
-    "杭州",
-    "布达佩斯",
-    "重庆",
-    "清迈",
-    "厦门",
-    "伊斯坦布尔",
-    "青岛",
-    "墨西哥城",
-    "长沙",
-    "马拉喀什",
-    "喀什",
-    "第比利斯",
-    "延吉",
-    "开普敦"
-  ]
+  "_note": "本文件现在只归书籍线（automation 5cff0944）使用：books + plugins 是它的去重键。旅游线的城市去重与类别台账已迁到 scripts/_travel-state.json，不要在本文件里再维护 cities；两线同时改同一个文件会丢更新。skills 是 2026-08-19 前的旧键，保留仅作存档，不要再追加。"
 }
