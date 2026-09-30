@@ -1,0 +1,48 @@
+---
+/**
+ * 分页条（上一页 / 页码 / 下一页），posts 列表页与 admin 管理页共用。
+ * pageUrl 由调用方传入（两页的查询参数不同）。
+ */
+interface Props {
+  page: number;
+  totalPages: number;
+  total: number;
+  pageUrl: (p: number) => string;
+}
+
+const { page, totalPages, total, pageUrl } = Astro.props;
+---
+
+{
+  totalPages > 1 && (
+    <div class="flex items-center justify-center gap-4 mt-10">
+      {page > 1 ? (
+        <a
+          href={pageUrl(page - 1)}
+          class="inline-flex items-center gap-1 px-4 py-2 text-sm font-medium rounded-full border border-[var(--color-border)] bg-[var(--color-surface)] text-[var(--color-text-muted)] hover:border-[var(--color-accent)] hover:text-[var(--color-accent)] transition-all"
+        >
+          ← 上一页
+        </a>
+      ) : (
+        <span class="px-4 py-2 text-sm font-medium rounded-full border border-[var(--color-border)] opacity-40 select-none">
+          ← 上一页
+        </span>
+      )}
+      <span class="text-xs text-[var(--color-text-subtle)] font-mono">
+        第 {page} / {totalPages} 页 · 共 {total} 篇
+      </span>
+      {page < totalPages ? (
+        <a
+          href={pageUrl(page + 1)}
+          class="inline-flex items-center gap-1 px-4 py-2 text-sm font-medium rounded-full border border-[var(--color-border)] bg-[var(--color-surface)] text-[var(--color-text-muted)] hover:border-[var(--color-accent)] hover:text-[var(--color-accent)] transition-all"
+        >
+          下一页 →
+        </a>
+      ) : (
+        <span class="px-4 py-2 text-sm font-medium rounded-full border border-[var(--color-border)] opacity-40 select-none">
+          下一页 →
+        </span>
+      )}
+    </div>
+  )
+}

@@ -1,0 +1,91 @@
+---
+/**
+ * 三层分类筛选（分类 chips + 二/三级下拉），posts 列表页与 admin 管理页共用。
+ * 计数与候选由 lib/tags 的 buildTagFacets 算好传入。
+ */
+import { PARENT_TAGS } from "../lib/tags";
+
+interface Props {
+  /** 链接基底：/posts 或 /admin */
+  base: string;
+  l1: string;
+  l2: string;
+  l3: string;
+  facets: {
+    l1Counts: Record<string, number>;
+    l2Options: string[];
+    l2Counts: Record<string, number>;
+    l3Options: string[];
+    l3Counts: Record<string, number>;
+  };
+  /** /posts 的搜索词要在筛选链接里透传 */
+  searchQuery?: string;
+}
+
+const { base, l1, l2, l3, facets, searchQuery = "" } = Astro.props;
+
+const linkTo = (v1: string, v2: string, v3: string) => {
+  const q = new URLSearchParams();
+  if (searchQuery) q.set("search", searchQuery);
+  if (v1) q.set("l1", v1);
+  if (v2) q.set("l2", v2);
+  if (v3) q.set("l3", v3);
+  const qs = q.toString();
+  return qs ? `${base}?${qs}` : base;
+};
+---
+
+<div class="flex flex-wrap items-center gap-2 mb-6">
+  <span class="text-xs font-semibold tracking-wider uppercase text-[var(--color-text-subtle)] mr-1">分类</span>
+  {
+    PARENT_TAGS.map((tag) => (
+      <a
+        href={linkTo(tag, "", "")}
+        class={`inline-flex items-center gap-1.5 px-3.5 py-1.5 text-sm font-medium rounded-full border transition-all ${
+          l1 === tag
+            ? "bg-[var(--color-accent)] text-white border-[var(--color-accent)]"
+            : "bg-[var(--color-surface)] text-[var(--color-text-muted)] border-[var(--color-border)] hover:border-[var(--color-accent)] hover:text-[var(--color-accent)]"
+        }`}
+      >
+        {tag}
+        <span class={`text-[10px] font-semibold px-1.5 py-0.5 rounded-full ${l1 === tag ? "bg-white/20 text-white" : "bg-[var(--color-accent-muted)] text-[var(--color-accent)]"}`}>
+          {facets.l1Counts[tag] || 0}
+        </span>
+      </a>
+    ))
+  }
+
+  {
+    l1 && facets.l2Options.length > 0 && (
+      <>
+        <span class="text-[var(--color-text-subtle)] select-none">›</span>
+        <select
+          class="px-3 py-1.5 text-sm font-medium rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] text-[var(--color-text)] focus:outline-none focus:border-[var(--color-accent)] transition-all cursor-pointer"
+          onchange="if (this.value) location.href = this.value;"
+        >
+          <option value={linkTo(l1, "", "")}>全部</option>
+          {facets.l2Options.map((tag) => (
+            <option value={linkTo(l1, tag, "")} selected={l2 === tag}>{tag}（{facets.l2Counts[tag] || 0}）</option>
+          ))}
+        </select>
+      </>
+    )
+  }
+
+  {
+    l1 && l2 && facets.l3Options.length > 0 && (
+      <>
+        <span class="text-[var(--color-text-subtle)] select-none">›</span>
+        <select
+          class="px-3 py-1.5 text-sm font-medium rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] text-[var(--color-text)] focus:outline-none focus:border-[var(--color-accent)] transition-all cursor-pointer"
+          onchange="if (this.value) location.href = this.value;"
+        >
+          <option value={linkTo(l1, l2, "")}>全部</option>
+          {facets.l3Options.map((tag) => (
+            <option value={linkTo(l1, l2, tag)} selected={l3 === tag}>{tag}（{facets.l3Counts[tag] || 0}）</option>
+          ))}
+        </select>
+      </>
+    )
+  }
+</div>

@@ -24,6 +24,11 @@ export interface NewsCategory {
 const PER_CATEGORY = 5;
 const CACHE_TTL = 10 * 60 * 1000;
 
+export interface NewsTab {
+  id: string;
+  label: string;
+}
+
 interface NewsSource {
   id: string;
   group: string;
@@ -51,6 +56,12 @@ const SOURCES: NewsSource[] = [
     exclude: "/radios/",
   },
 ];
+
+/** 栏目（tab）结构由服务端下发：新增/删除栏目不再需要改 NewsPanel 前端代码 */
+export const NEWS_TABS: NewsTab[] = [...new Set(SOURCES.map((s) => s.group))].map((g) => ({
+  id: g,
+  label: SOURCES.find((s) => s.group === g)!.name,
+}));
 
 /** 每个分类的默认来源：SOURCES 里该 group 的第一条 */
 const DEFAULT_IDS = [...new Set(SOURCES.map((s) => s.group))].map(

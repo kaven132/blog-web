@@ -13,6 +13,12 @@ interface NewsSibling {
   label: string;
 }
 
+/** 栏目（tab）结构由 /api/news 响应下发，前端不再硬编码 TABS */
+interface NewsTab {
+  id: string;
+  label: string;
+}
+
 interface NewsCategory {
   id: string;
   group: string;
@@ -22,23 +28,17 @@ interface NewsCategory {
   siblings: NewsSibling[];
 }
 
-/** 面板缓存的整体形态：按来源 id 存分类、每个 tab 的默认来源、以及用户手动切过的来源 */
+/** 面板缓存的整体形态：服务端下发的 tabs、按来源 id 存分类、每个 tab 的默认来源、以及用户手动切过的来源 */
 interface NewsStore {
+  tabs: NewsTab[];
   categories: Record<string, NewsCategory>;
   defaults: Record<string, string>;
   picked: Record<string, string>;
 }
 
-const TABS = [
-  { id: "domestic", label: "国内" },
-  { id: "world", label: "国外" },
-  { id: "tech", label: "科技" },
-  { id: "games", label: "游戏" },
-];
-
-// v3：当初是为「科技栏新增 IT 之家」升的一次。现在新增栏目/来源**不需要再动这个前缀**：
+// v4：tabs 改由服务端下发（v3 缓存里没有 tabs 字段，直接整份弃用一次）。
 // load() 会校验每个 tab 在缓存里都有默认来源（不完整就整份弃用），且命中缓存后仍会静默请求一次做校正。
-const CACHE_PREFIX = "news-panel-cache-v3-";
+const CACHE_PREFIX = "news-panel-cache-v4-";
 
 function cacheKey(): string {
   return CACHE_PREFIX + new Date().toDateString();
@@ -60,15 +60,15 @@ function saveStore(next: NewsStore): NewsStore {
   return next;
 }
 
-/** 把新拿到的分类并进 store（换来源后回填，保留用户已切过的来源选择） */
-function mergeCategories(prev: NewsStore, incoming: NewsCategory[]): NewsStore {
+/** 把新拿到的响应并进 store（tabs 以服务端为唯一事实来源整份覆盖；换来源后回填，保留用户已切过的来源选择） */
+function mergeResponse(prev: NewsStore, tabs: NewsTab[], incoming: NewsCategory[]): NewsStore {
   const categories = { ...prev.categories };
   const defaults = { ...prev.defaults };
   incoming.forEach((c) => {
     categories[c.id] = c;
     if (!defaults[c.group]) defaults[c.group] = c.id;
   });
-  return saveStore({ ...prev, categories, defaults });
+  return saveStore({ tabs, categories, defaults, picked: prev.picked });
 }
 
 function Skeleton() {
@@ -86,7 +86,7 @@ function Skeleton() {
 
 export default function NewsPanel() {
   const [active, setActive] = useState("domestic");
-  const [store, setStore] = useState<NewsStore>({ categories: {}, defaults: {}, picked: {} });
+  const [store, setStore] = useState<NewsStore>({ tabs: [], categories: {}, defaults: {}, picked: {} });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
   const [switching, setSwitching] = useState<string | null>(null);
@@ -98,13 +98,13 @@ export default function NewsPanel() {
   storeRef.current = store;
 
   const hasAnyData = (s: NewsStore) =>
-    TABS.some((t) => {
+    s.tabs.some((t) => {
       const id = s.picked[t.id] ?? s.defaults[t.id];
       return Boolean(id && s.categories[id]?.items?.length);
     });
 
   const load = useCallback((force = false) => {
-    // 缓存里存着服务端下发的「分类集合 + 每类的来源名单（siblings）」，这两样都是服务端配置。
+    // 缓存里存着服务端下发的「tabs + 分类集合 + 每类的来源名单（siblings）」，都是服务端配置。
     // 服务端改了配置（加来源、换 feed、删栏目）缓存不会自己失效，所以命中缓存只能算「先有东西看」，
     // 随后必须再静默请求一次做校正，否则会出现「服务端明明有 2 个来源，界面却不显示切换按钮」。
     let hydrated = false;
@@ -116,14 +116,14 @@ export default function NewsPanel() {
           // 每个 tab 都必须在缓存里有默认来源，否则新加的栏目在缓存里没有归属，
           // 首屏会先渲染成「暂无资讯」再被请求结果补上（肉眼可见地闪一下）。
           // 判为不完整就整份弃用，直接走「首屏加载」那条路。
-          const complete = TABS.every((t) => parsed?.defaults?.[t.id]);
-          if (parsed?.categories && parsed?.defaults && complete) {
-            // 丢掉当前 tab 结构里已不存在的分组，避免历史缓存把删掉的栏目带回来
-            const live = new Set(TABS.map((t) => t.id));
+          const tabsOk = Boolean(parsed?.tabs?.length) && parsed.tabs.every((t) => parsed?.defaults?.[t.id]);
+          if (parsed?.categories && parsed?.defaults && tabsOk) {
+            // 丢掉当前 tabs 结构里已不存在的分组，避免历史缓存把删掉的栏目带回来
+            const live = new Set(parsed.tabs.map((t) => t.id));
             const categories = Object.fromEntries(
               Object.entries(parsed.categories).filter(([, c]) => live.has(c.group))
             );
-            setStore({ ...parsed, categories, picked: parsed.picked ?? {} });
+            setStore({ ...parsed, categories });
             setLoading(false);
             hydrated = true;
           }
@@ -145,7 +145,8 @@ export default function NewsPanel() {
     // force 时带 fresh=1 穿透服务端缓存，否则 10 分钟内点刷新拿到的还是同一批数据
     fetch(force ? "/api/news?fresh=1" : "/api/news")
       .then((r) => (r.ok ? r.json() : Promise.reject()))
-      .then((d: NewsCategory[]) => setStore((prev) => mergeCategories(prev, d)))
+      .then((d: { tabs: NewsTab[]; categories: NewsCategory[] }) =>
+        setStore((prev) => mergeResponse(prev, d.tabs ?? [], Array.isArray(d.categories) ? d.categories : [])))
       .catch(() => {
         // 与服务端 news.ts 的回退策略对齐：手上还有内容就静默失败，
         // 只有当前一个条目都没有时才进入错误态，不让「刷新失败」清空能看的内容
@@ -167,7 +168,10 @@ export default function NewsPanel() {
     return () => clearTimeout(t);
   }, [switchError]);
 
-  const selectedId = store.picked[active] ?? store.defaults[active];
+  const tabs = store.tabs;
+  // 服务端删掉当前 tab（或首屏还没拿到 tabs）时回退
+  const activeTab = tabs.some((t) => t.id === active) ? active : tabs[0]?.id ?? "";
+  const selectedId = store.picked[activeTab] ?? store.defaults[activeTab];
   const category = selectedId ? store.categories[selectedId] : undefined;
   const items = category?.items || [];
 
@@ -182,7 +186,7 @@ export default function NewsPanel() {
       setSwitchError(null);
       // 记住这次选择，同一次会话内切页面回来仍然停留在这个来源
       const remember = (prev: NewsStore): NewsStore =>
-        saveStore({ ...prev, picked: { ...prev.picked, [active]: id } });
+        saveStore({ ...prev, picked: { ...prev.picked, [activeTab]: id } });
 
       // 已经拉过就直接切，不再请求
       if (store.categories[id]) {
@@ -192,14 +196,14 @@ export default function NewsPanel() {
       setSwitching(id);
       fetch(`/api/news?sources=${encodeURIComponent(id)}`)
         .then((r) => (r.ok ? r.json() : Promise.reject(new Error("bad status"))))
-        .then((d: NewsCategory[]) => {
-          if (!Array.isArray(d) || d.length === 0) throw new Error("empty");
-          setStore((prev) => remember(mergeCategories(prev, d)));
+        .then((d: { tabs: NewsTab[]; categories: NewsCategory[] }) => {
+          if (!Array.isArray(d?.categories) || d.categories.length === 0) throw new Error("empty");
+          setStore((prev) => remember(mergeResponse(prev, d.tabs ?? prev.tabs, d.categories)));
         })
         .catch(() => setSwitchError("来源切换失败"))
         .finally(() => setSwitching(null));
     },
-    [active, selectedId, store.categories]
+    [activeTab, selectedId, store.categories]
   );
 
   return (
@@ -228,16 +232,16 @@ export default function NewsPanel() {
 
       {/* Tabs */}
       <div className="flex px-4 gap-4 border-b border-[var(--color-border)]">
-        {TABS.map((tab) => (
+        {tabs.map((tab) => (
           <button
             key={tab.id}
             onClick={() => setActive(tab.id)}
             className={`relative pb-2 text-xs font-semibold tracking-wide transition-colors ${
-              active === tab.id ? "text-[var(--color-accent)]" : "text-[var(--color-text-subtle)] hover:text-[var(--color-text)]"
+              activeTab === tab.id ? "text-[var(--color-accent)]" : "text-[var(--color-text-subtle)] hover:text-[var(--color-text)]"
             }`}
           >
             {tab.label}
-            {active === tab.id && (
+            {activeTab === tab.id && (
               <span className="absolute inset-x-0 -bottom-px h-0.5 rounded-full bg-[var(--color-accent)]" />
             )}
           </button>

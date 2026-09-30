@@ -103,6 +103,7 @@ src/
 npm run db:seed       # 空库初始化：仅当没有任何文章时写入示例数据（安全，可重复执行）
 npm run db:reset      # ⚠️ 清空 posts/comments/likes/profile 并重建示例数据（会先自动备份到 data/backups/）
 npm run db:backup     # 在线备份到 data/backups/blog-auto-<时间戳>.db（默认保留 30 份，--keep=N 可调）
+npm run uploads:clean # 孤儿图兜底清理（默认 dry-run，--apply 移动到 data/backups/；删文/换封面时已自动清理）
 npm run db:generate   # 生成 Drizzle 迁移
 npm run db:push       # 推送 schema 到数据库
 ```

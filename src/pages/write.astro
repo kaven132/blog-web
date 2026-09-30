@@ -6,9 +6,9 @@ import { eq } from "drizzle-orm";
 import { PARENT_TAGS, parseTags } from "../lib/tags";
 import { AUTH_COOKIE, isAuthed } from "../lib/auth";
 
-// Require auth
+// Require auth（带 ?next 让 /login 登录成功后回到当前编辑页）
 if (!isAuthed(Astro.cookies.get(AUTH_COOKIE)?.value)) {
-  return Astro.redirect("/login");
+  return Astro.redirect(`/login?next=${encodeURIComponent(Astro.url.pathname + Astro.url.search)}`);
 }
 
 // Edit mode: /write?edit=<slug>
@@ -259,6 +259,7 @@ const pageTitle = editing ? "编辑文章" : "写文章";
 
 <script>
   import { renderMarkdown } from "../lib/markdown";
+  import { slugify } from "../lib/slug";
 
   const form = document.getElementById("write-form")!;
   const btn = document.getElementById("submit-btn")! as HTMLButtonElement;
@@ -469,16 +470,12 @@ const pageTitle = editing ? "编辑文章" : "写文章";
     renderCoverPreview();
   });
 
-  // Auto-generate slug from title
+  // Auto-generate slug from title（与 api/posts.ts 的 lib/slug 同一实现，不再内联手抄）
   const titleInput = form.querySelector("[name='title']") as HTMLInputElement;
   const slugInput = form.querySelector("[name='slug']") as HTMLInputElement;
   titleInput.addEventListener("input", () => {
     if (!slugInput.dataset.manual) {
-      slugInput.value = titleInput.value
-        .toLowerCase()
-        .replace(/[^a-z0-9一-鿿]+/g, "-")
-        .replace(/^-|-$/g, "")
-        .slice(0, 80);
+      slugInput.value = slugify(titleInput.value);
     }
   });
   slugInput.addEventListener("input", () => {

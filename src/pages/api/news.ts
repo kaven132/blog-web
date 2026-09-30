@@ -1,5 +1,5 @@
 import type { APIRoute } from "astro";
-import { getNews } from "../../lib/news";
+import { getNews, NEWS_TABS } from "../../lib/news";
 
 /**
  * fresh=1（穿透服务端 10 分钟缓存）按 IP 限流：每分钟最多 6 次。
@@ -51,7 +51,8 @@ export const GET: APIRoute = async ({ url, clientAddress }) => {
       });
     }
 
-    return new Response(JSON.stringify(data), {
+    // 响应带上 tabs：栏目结构以服务端为唯一事实来源，前端不再硬编码
+    return new Response(JSON.stringify({ tabs: NEWS_TABS, categories: data }), {
       status: 200,
       headers: {
         "Content-Type": "application/json; charset=utf-8",

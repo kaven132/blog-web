@@ -1,12 +1,17 @@
 import { useState, useEffect, useRef } from "react";
+import { loginRequest } from "../lib/auth-client";
 
 interface LoginModalProps {
   open: boolean;
   onClose: () => void;
-  onSuccess: () => void;
+  onSuccess?: () => void;
+  /** 登录成功后的站内跳转地址（/login 页复用本组件时传 ?next 解析值）；不传则回调 onSuccess */
+  redirect?: string;
+  /** 关闭时跳转的地址（/login 页用于「取消即回首页」）；不传则只回调 onClose */
+  closeRedirect?: string;
 }
 
-export default function LoginModal({ open, onClose, onSuccess }: LoginModalProps) {
+export default function LoginModal({ open, onClose, onSuccess, redirect, closeRedirect }: LoginModalProps) {
   const [account, setAccount] = useState("");
   const [password, setPassword] = useState("");
   const [showPwd, setShowPwd] = useState(false);
@@ -24,14 +29,20 @@ export default function LoginModal({ open, onClose, onSuccess }: LoginModalProps
     }
   }, [open]);
 
+  const handleClose = () => {
+    if (closeRedirect) window.location.href = closeRedirect;
+    onClose();
+  };
+
   useEffect(() => {
     if (!open) return;
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onClose();
+      if (e.key === "Escape") handleClose();
     };
     document.addEventListener("keydown", onKey);
     return () => document.removeEventListener("keydown", onKey);
-  }, [open, onClose]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, closeRedirect, onClose]);
 
   if (!open) return null;
 
@@ -39,29 +50,23 @@ export default function LoginModal({ open, onClose, onSuccess }: LoginModalProps
     e.preventDefault();
     setError("");
     setLoading(true);
-    try {
-      const res = await fetch("/api/auth/login", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ account, password }),
-      });
-      const data = await res.json();
-      if (data.ok) {
-        onSuccess();
-      } else {
-        setError(data.error || "账号或密码错误");
+    const result = await loginRequest(account, password);
+    if (result.ok) {
+      if (redirect) {
+        window.location.href = redirect;
+        return; // 正在跳转，不再复位 loading
       }
-    } catch {
-      setError("网络错误，请重试");
-    } finally {
-      setLoading(false);
+      onSuccess?.();
+    } else {
+      setError(result.error || "账号或密码错误");
     }
+    setLoading(false);
   };
 
   return (
     <div
       className="fixed inset-0 z-[200] flex items-center justify-center bg-black/40 backdrop-blur-sm p-4"
-      onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
+      onClick={(e) => { if (e.target === e.currentTarget) handleClose(); }}
     >
       <div
         role="dialog"
@@ -85,7 +90,7 @@ export default function LoginModal({ open, onClose, onSuccess }: LoginModalProps
 
         {/* Close button */}
         <button
-          onClick={onClose}
+          onClick={handleClose}
           className="absolute top-4 right-4 w-8 h-8 flex items-center justify-center rounded-lg text-[var(--color-text-subtle)] hover:text-[var(--color-text)] hover:bg-[var(--color-bg)] transition-all"
           aria-label="关闭"
         >

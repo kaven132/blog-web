@@ -13,6 +13,7 @@
     "db:seed": "tsx src/db/seed.ts",
     "db:reset": "tsx src/db/seed.ts --force",
     "db:backup": "node scripts/backup-db.mjs",
+    "uploads:clean": "tsx scripts/clean-uploads.ts",
     "db:studio": "drizzle-kit studio"
   },
   "dependencies": {

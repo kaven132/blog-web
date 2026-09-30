@@ -2,26 +2,9 @@ import type { APIRoute } from "astro";
 import { db } from "../../db";
 import { posts } from "../../db/schema";
 import { eq, sql } from "drizzle-orm";
-import { sanitizeSlug, slugify } from "../../lib/slug";
+import { resolveSlug, normalizeTags } from "../../lib/posts";
+import { extractUploadNames, removeUnreferenced } from "../../lib/uploads";
 import { AUTH_COOKIE, isAuthed } from "../../lib/auth";
-
-function resolveSlug(title: string, slug: string | undefined, excludeId?: number): string {
-  // 手输 slug 也要清洗：只保留字母/数字/中文/连字符，防止空格、?、# 生成坏链接
-  const clean = sanitizeSlug(slug?.trim() || "") || slugify(title) || `post-${Date.now()}`;
-  let candidate = clean;
-  let i = 2;
-  while (true) {
-    const rows = db.select({ id: posts.id }).from(posts).where(eq(posts.slug, candidate)).all();
-    if (rows.every((r) => r.id === excludeId)) return candidate;
-    candidate = `${clean}-${i++}`;
-  }
-}
-
-/** tags 兼容：字符串原样用，数组（误传）序列化，其他一律空数组 */
-function normalizeTags(tags: unknown): string {
-  if (typeof tags === "string") return tags;
-  return JSON.stringify(Array.isArray(tags) ? tags : []);
-}
 
 export const POST: APIRoute = async ({ request, cookies, redirect }) => {
   // Check auth
@@ -96,6 +79,9 @@ export const PUT: APIRoute = async ({ request, cookies }) => {
 
     const finalSlug = resolveSlug(title, slug, Number(id));
 
+    // 旧封面是本地 /uploads/ 文件且本次被换掉时，更新后若无引用则删掉，防孤儿
+    const oldCoverNames = extractUploadNames(existing.coverImage);
+
     db.update(posts)
       .set({
         title,
@@ -109,7 +95,9 @@ export const PUT: APIRoute = async ({ request, cookies }) => {
       .where(eq(posts.id, Number(id)))
       .run();
 
-    return new Response(JSON.stringify({ ok: true, slug: finalSlug }), {
+    const removedImages = removeUnreferenced(oldCoverNames);
+
+    return new Response(JSON.stringify({ ok: true, slug: finalSlug, removedImages: removedImages.length }), {
       status: 200,
       headers: { "Content-Type": "application/json" },
     });
@@ -120,7 +108,6 @@ export const PUT: APIRoute = async ({ request, cookies }) => {
     });
   }
 };
-
 export const DELETE: APIRoute = async ({ url, cookies }) => {
   if (!isAuthed(cookies.get(AUTH_COOKIE)?.value)) {
     return new Response(JSON.stringify({ error: "请先登录" }), {
@@ -145,9 +132,12 @@ export const DELETE: APIRoute = async ({ url, cookies }) => {
     });
   }
 
+  // 孤儿图根治：这篇删掉后，本地图（封面 + 正文插图）若无人再引用则一并删除
+  const deletedNames = extractUploadNames(existing.coverImage, existing.content, existing.excerpt);
   db.delete(posts).where(eq(posts.id, id)).run();
+  const removedImages = removeUnreferenced(deletedNames);
 
-  return new Response(JSON.stringify({ ok: true }), {
+  return new Response(JSON.stringify({ ok: true, removedImages: removedImages.length }), {
     status: 200,
     headers: { "Content-Type": "application/json" },
   });

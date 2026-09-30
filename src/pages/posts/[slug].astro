@@ -5,7 +5,7 @@ import ReadingProgress from "../../components/ReadingProgress";
 import { db } from "../../db";
 import { posts, comments, likes } from "../../db/schema";
 import { eq } from "drizzle-orm";
-import { getParentTag, getChildTags } from "../../lib/tags";
+import { parseTags, getParentTag, getChildTags } from "../../lib/tags";
 import { renderMarkdown } from "../../lib/markdown";
 import { formatDateCN, dbDateToISO } from "../../lib/datetime";
 
@@ -26,13 +26,7 @@ const postComments = db
   .orderBy(comments.createdAt)
   .all();
 
-const tagList: string[] = (() => {
-  try {
-    return JSON.parse(post.tags);
-  } catch {
-    return [];
-  }
-})();
+const tagList = parseTags(post.tags);
 
 const parentTag = getParentTag(tagList);
 const childTags = getChildTags(tagList);

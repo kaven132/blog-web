@@ -14,11 +14,11 @@
  * 必须在该仓库根目录（含 ./data 与 ./node_modules）下运行。
  */
 
-import { readFileSync, copyFileSync, existsSync, mkdirSync } from "node:fs";
-import { extname, join } from "node:path";
+import { readFileSync, copyFileSync, existsSync, mkdirSync, unlinkSync } from "node:fs";
+import { extname, join, resolve, sep } from "node:path";
 import { db } from "../src/db";
 import { posts } from "../src/db/schema";
-import { slugify, sanitizeSlug } from "../src/lib/slug";
+import { resolveSlug } from "../src/lib/posts";
 import { eq } from "drizzle-orm";
 
 interface Article {
@@ -30,27 +30,12 @@ interface Article {
   coverImage?: string;
 }
 
-/** 与 src/pages/api/posts.ts 的 resolveSlug 保持一致：手输 slug 清洗 + 自动去重 */
-function resolveSlug(title: string, slug: string | undefined, excludeId?: number): string {
-  const clean = sanitizeSlug(slug?.trim() || "") || slugify(title) || `post-${Date.now()}`;
-  let candidate = clean;
-  let i = 2;
-  while (true) {
-    const rows = db
-      .select({ id: posts.id })
-      .from(posts)
-      .where(eq(posts.slug, candidate))
-      .all();
-    if (rows.every((r) => r.id === excludeId)) return candidate;
-    candidate = `${clean}-${i++}`;
-  }
-}
-
 /**
  * 处理封面图：
  *  - http(s) 外链 → 原样使用（兼容之前的 Unsplash 方案）
  *  - 本地文件路径 → 拷入 data/uploads/ 并重命名为 <slug>.<ext>，返回 /uploads/<slug>.<ext>
  *    供博客的 uploads/[...file].ts 路由直接服务（无需登录）
+ *  - 源文件若位于 data/uploads 内（fetch-images 的 _cover-tmp-* 中间产物），拷完即删，不留孤儿
  */
 function resolveCover(cover: string | undefined, slug: string): string | null {
   if (!cover) return null;
@@ -63,8 +48,16 @@ function resolveCover(cover: string | undefined, slug: string): string | null {
   mkdirSync(uploadDir, { recursive: true });
   const ext = extname(cover).toLowerCase() || ".png";
   const destName = `${slug}${ext}`;
-  copyFileSync(cover, join(uploadDir, destName));
+  const dest = join(uploadDir, destName);
+  copyFileSync(cover, dest);
   console.log(`🖼️  封面已本地化：/uploads/${destName}`);
+
+  const uploadRoot = resolve(uploadDir);
+  const srcAbs = resolve(cover);
+  if (srcAbs !== resolve(dest) && srcAbs.startsWith(uploadRoot + sep)) {
+    unlinkSync(srcAbs);
+    console.log(`🧹 已清理中间产物：${srcAbs}`);
+  }
   return `/uploads/${destName}`;
 }
 

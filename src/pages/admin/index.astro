@@ -1,14 +1,16 @@
 ---
 import Layout from "../../layouts/Layout.astro";
+import TagFilter from "../../components/TagFilter.astro";
+import Pagination from "../../components/Pagination.astro";
 import { db } from "../../db";
 import { posts } from "../../db/schema";
 import { desc } from "drizzle-orm";
-import { PARENT_TAGS, parseTags, getLayer2Options, getLayer3Options } from "../../lib/tags";
+import { parseTags, buildTagFacets } from "../../lib/tags";
 import { AUTH_COOKIE, isAuthed } from "../../lib/auth";
 import { formatDateCN } from "../../lib/datetime";
 
 if (!isAuthed(Astro.cookies.get(AUTH_COOKIE)?.value)) {
-  return Astro.redirect("/login");
+  return Astro.redirect(`/login?next=${encodeURIComponent(Astro.url.pathname)}`);
 }
 
 const l1 = Astro.url.searchParams.get("l1") || "";
@@ -55,43 +57,9 @@ const pageUrl = (p: number) => {
   return qs ? `/admin?${qs}` : "/admin";
 };
 
-const tagLists = allPosts.map((p) => p.tagList);
-
-// Layer-1 counts
-const l1Counts: Record<string, number> = {};
-for (const p of allPosts) {
-  if (p.tagList[0]) l1Counts[p.tagList[0]] = (l1Counts[p.tagList[0]] || 0) + 1;
-}
-
-// Layer-2 options + counts (under selected layer-1)
-const l2Options = l1 ? getLayer2Options(tagLists, l1) : [];
-const l2Counts: Record<string, number> = {};
-for (const p of allPosts) {
-  if (p.tagList[0] === l1 && p.tagList[1]) {
-    l2Counts[p.tagList[1]] = (l2Counts[p.tagList[1]] || 0) + 1;
-  }
-}
-
-// Layer-3 options + counts (under selected layer-1 + layer-2)
-const l3Options = l1 && l2 ? getLayer3Options(tagLists, l1, l2) : [];
-const l3Counts: Record<string, number> = {};
-for (const p of allPosts) {
-  if (p.tagList[0] === l1 && p.tagList[1] === l2 && p.tagList[2]) {
-    l3Counts[p.tagList[2]] = (l3Counts[p.tagList[2]] || 0) + 1;
-  }
-}
-
-const linkTo = (v1: string, v2: string, v3: string) => {
-  const q = new URLSearchParams();
-  if (v1) q.set("l1", v1);
-  if (v2) q.set("l2", v2);
-  if (v3) q.set("l3", v3);
-  const qs = q.toString();
-  return qs ? `/admin?${qs}` : "/admin";
-};
-
 const isFiltering = Boolean(l1 || l2 || l3);
 const breadcrumb = [l1, l2, l3].filter(Boolean).join(" · ");
+const facets = buildTagFacets(allPosts.map((p) => p.tagList), l1, l2);
 ---
 
 <Layout title="文章管理">
@@ -115,66 +83,13 @@ const breadcrumb = [l1, l2, l3].filter(Boolean).join(" · ");
 
     <!-- Tag filter -->
     <div class="mb-6">
-      <div class="flex flex-wrap items-center gap-2">
-        <span class="text-xs font-semibold tracking-wider uppercase text-[var(--color-text-subtle)] mr-1">分类</span>
-        {
-          PARENT_TAGS.map((tag) => (
-            <a
-              href={linkTo(tag, "", "")}
-              class={`inline-flex items-center gap-1.5 px-3.5 py-1.5 text-sm font-medium rounded-full border transition-all ${
-                l1 === tag
-                  ? "bg-[var(--color-accent)] text-white border-[var(--color-accent)]"
-                  : "bg-[var(--color-surface)] text-[var(--color-text-muted)] border-[var(--color-border)] hover:border-[var(--color-accent)] hover:text-[var(--color-accent)]"
-              }`}
-            >
-              {tag}
-              <span class={`text-[10px] font-semibold px-1.5 py-0.5 rounded-full ${l1 === tag ? "bg-white/20 text-white" : "bg-[var(--color-accent-muted)] text-[var(--color-accent)]"}`}>
-                {l1Counts[tag] || 0}
-              </span>
-            </a>
-          ))
-        }
-
-        {
-          l1 && l2Options.length > 0 && (
-            <>
-              <span class="text-[var(--color-text-subtle)] select-none">›</span>
-              <select
-                class="px-3 py-1.5 text-sm font-medium rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] text-[var(--color-text)] focus:outline-none focus:border-[var(--color-accent)] transition-all cursor-pointer"
-                onchange="if (this.value) location.href = this.value;"
-              >
-                <option value={linkTo(l1, "", "")}>全部</option>
-                {l2Options.map((tag) => (
-                  <option value={linkTo(l1, tag, "")} selected={l2 === tag}>{tag}（{l2Counts[tag] || 0}）</option>
-                ))}
-              </select>
-            </>
-          )
-        }
-
-        {
-          l1 && l2 && l3Options.length > 0 && (
-            <>
-              <span class="text-[var(--color-text-subtle)] select-none">›</span>
-              <select
-                class="px-3 py-1.5 text-sm font-medium rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] text-[var(--color-text)] focus:outline-none focus:border-[var(--color-accent)] transition-all cursor-pointer"
-                onchange="if (this.value) location.href = this.value;"
-              >
-                <option value={linkTo(l1, l2, "")}>全部</option>
-                {l3Options.map((tag) => (
-                  <option value={linkTo(l1, l2, tag)} selected={l3 === tag}>{tag}（{l3Counts[tag] || 0}）</option>
-                ))}
-              </select>
-            </>
-          )
-        }
-      </div>
+      <TagFilter base="/admin" l1={l1} l2={l2} l3={l3} facets={facets} />
 
       <div class="flex items-center gap-3 mt-3">
         {
           isFiltering ? (
             <a
-              href={linkTo("", "", "")}
+              href="/admin"
               class="inline-flex items-center gap-1 text-sm text-[var(--color-text-muted)] hover:text-[var(--color-accent)] transition-colors"
             >
               <span>←</span> 清除全部筛选
@@ -289,39 +204,7 @@ const breadcrumb = [l1, l2, l3].filter(Boolean).join(" · ");
     }
 
     <!-- Pagination -->
-    {
-      totalPages > 1 && (
-        <div class="flex items-center justify-center gap-4 mt-10">
-          {page > 1 ? (
-            <a
-              href={pageUrl(page - 1)}
-              class="inline-flex items-center gap-1 px-4 py-2 text-sm font-medium rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] text-[var(--color-text-muted)] hover:border-[var(--color-accent)] hover:text-[var(--color-accent)] transition-all"
-            >
-              ← 上一页
-            </a>
-          ) : (
-            <span class="px-4 py-2 text-sm font-medium rounded-xl border border-[var(--color-border)] opacity-40 select-none">
-              ← 上一页
-            </span>
-          )}
-          <span class="text-xs text-[var(--color-text-subtle)] font-mono">
-            第 {page} / {totalPages} 页 · 共 {filtered.length} 篇
-          </span>
-          {page < totalPages ? (
-            <a
-              href={pageUrl(page + 1)}
-              class="inline-flex items-center gap-1 px-4 py-2 text-sm font-medium rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] text-[var(--color-text-muted)] hover:border-[var(--color-accent)] hover:text-[var(--color-accent)] transition-all"
-            >
-              下一页 →
-            </a>
-          ) : (
-            <span class="px-4 py-2 text-sm font-medium rounded-xl border border-[var(--color-border)] opacity-40 select-none">
-              下一页 →
-            </span>
-          )}
-        </div>
-      )
-    }
+    <Pagination page={page} totalPages={totalPages} total={filtered.length} pageUrl={pageUrl} />
   </div>
 
   <!-- Delete confirm modal -->
