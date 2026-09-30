@@ -69,10 +69,10 @@ src/
 | 页面 | 功能 |
 |------|------|
 | 首页 | 搜索框 + 最新文章卡片（序列入场动画） |
-| 文章列表 | 搜索过滤，卡片网格展示 |
-| 文章详情 | Markdown 渲染、阅读进度条、点赞、评论区 |
+| 文章列表 | 搜索过滤（标题/摘要/标签，忽略大小写），分类筛选，每页 24 篇分页 |
+| 文章详情 | Markdown 渲染、阅读进度条、点赞（localStorage 记忆）、评论区 |
 | 关于 | 技术栈卡片 + 功能列表 |
-| 写文章 | 标题自动生成 slug、Markdown 编辑器（需登录） |
+| 写文章 | 标题自动生成 slug、Markdown 编辑器（需登录；手输 slug 会被清洗） |
 
 ## 个人信息卡片
 
@@ -85,17 +85,24 @@ src/
 
 | 项目 | 值 |
 |------|-----|
-| 账号 | `kavenyyds` |
-| 密码 | `4399123456` |
-| 有效期 | 7 天（Cookie Session） |
+| 账号 | `ADMIN_ACCOUNT` 环境变量，默认 `kavenyyds` |
+| 密码 | `ADMIN_PASSWORD` 环境变量，默认 `4399123456` |
+| 有效期 | 7 天（HMAC 签名 Cookie，不可伪造） |
 
-登录后顶部导航显示「写文章」和「退出」按钮，个人信息卡片显示编辑图标。
+- Cookie 的值不再是明文 `auth=true`（旧版任何人 curl 带上这个头就能绕过登录），
+  而是服务端用密钥签发的 HMAC token；换用 `AUTH_SECRET` 环境变量可独立于密码控制会话失效。
+- 登录失败限流：同一 IP 10 分钟内失败 5 次锁定 10 分钟。
+- 上 HTTPS 后设置 `COOKIE_SECURE=1` 让 Cookie 仅走加密连接。
+- **改动后旧会话全部失效，需要重新登录一次。**
+
+登录后顶部导航显示「文章管理」和「退出」按钮，个人信息卡片显示编辑图标。
 
 ## 数据库
 
 ```bash
 npm run db:seed       # 空库初始化：仅当没有任何文章时写入示例数据（安全，可重复执行）
 npm run db:reset      # ⚠️ 清空 posts/comments/likes/profile 并重建示例数据（会先自动备份到 data/backups/）
+npm run db:backup     # 在线备份到 data/backups/blog-auto-<时间戳>.db（默认保留 30 份，--keep=N 可调）
 npm run db:generate   # 生成 Drizzle 迁移
 npm run db:push       # 推送 schema 到数据库
 ```
@@ -103,6 +110,7 @@ npm run db:push       # 推送 schema 到数据库
 > ⚠️ `data/blog.db` 是全站唯一数据源（文章、评论、点赞、个人信息、头像都在里面），
 > 且没有版本管理。`db:seed` 不会删除任何数据；只有 `db:reset` 会清空，
 > 它在清空前会把库物理备份到 `data/backups/blog-<时间戳>.db`，需要回滚时直接把备份覆盖回 `data/blog.db` 即可。
+> 建议把 `npm run db:backup` 挂到定时任务或自动发文流水线末尾，每天异地/另盘留一份。
 
 ## 构建部署
 

@@ -4,13 +4,21 @@ export default function ReadingProgress() {
   const [progress, setProgress] = useState(0);
 
   useEffect(() => {
+    let raf = 0;
     const onScroll = () => {
-      const scrollTop = window.scrollY;
-      const docHeight = document.documentElement.scrollHeight - window.innerHeight;
-      setProgress(docHeight > 0 ? Math.min((scrollTop / docHeight) * 100, 100) : 0);
+      if (raf) return; // 滚动事件高频触发，合成帧级别更新即可
+      raf = requestAnimationFrame(() => {
+        raf = 0;
+        const scrollTop = window.scrollY;
+        const docHeight = document.documentElement.scrollHeight - window.innerHeight;
+        setProgress(docHeight > 0 ? Math.min((scrollTop / docHeight) * 100, 100) : 0);
+      });
     };
     window.addEventListener("scroll", onScroll, { passive: true });
-    return () => window.removeEventListener("scroll", onScroll);
+    return () => {
+      window.removeEventListener("scroll", onScroll);
+      if (raf) cancelAnimationFrame(raf);
+    };
   }, []);
 
   if (progress < 0.5) return null;

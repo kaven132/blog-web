@@ -4,10 +4,10 @@ import { db } from "../db";
 import { posts } from "../db/schema";
 import { eq } from "drizzle-orm";
 import { PARENT_TAGS, parseTags } from "../lib/tags";
+import { AUTH_COOKIE, isAuthed } from "../lib/auth";
 
 // Require auth
-const authCookie = Astro.cookies.get("auth")?.value;
-if (authCookie !== "true") {
+if (!isAuthed(Astro.cookies.get(AUTH_COOKIE)?.value)) {
   return Astro.redirect("/login");
 }
 

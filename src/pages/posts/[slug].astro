@@ -7,6 +7,7 @@ import { posts, comments, likes } from "../../db/schema";
 import { eq } from "drizzle-orm";
 import { getParentTag, getChildTags } from "../../lib/tags";
 import { renderMarkdown } from "../../lib/markdown";
+import { formatDateCN, dbDateToISO } from "../../lib/datetime";
 
 export const prerender = false;
 
@@ -36,11 +37,8 @@ const tagList: string[] = (() => {
 const parentTag = getParentTag(tagList);
 const childTags = getChildTags(tagList);
 
-const formattedDate = new Date(post.createdAt).toLocaleDateString("zh-CN", {
-  year: "numeric",
-  month: "long",
-  day: "numeric",
-});
+// createdAt 是 UTC 时间串，formatDateCN 内部会补时区再格式化
+const formattedDate = formatDateCN(post.createdAt);
 ---
 
 <Layout title={post.title} description={post.excerpt}>
@@ -83,12 +81,12 @@ const formattedDate = new Date(post.createdAt).toLocaleDateString("zh-CN", {
 
       <!-- Meta -->
       <div class="flex items-center gap-3 text-sm text-[var(--color-text-subtle)] font-medium">
-        <time datetime={post.createdAt}>{formattedDate}</time>
+        <time datetime={dbDateToISO(post.createdAt)}>{formattedDate}</time>
         {
           post.updatedAt !== post.createdAt && (
             <>
               <span class="w-1 h-1 rounded-full bg-[var(--color-text-subtle)]" />
-              <span>更新于 {new Date(post.updatedAt).toLocaleDateString("zh-CN")}</span>
+              <span>更新于 {formatDateCN(post.updatedAt, { year: "numeric", month: "long", day: "numeric" })}</span>
             </>
           )
         }

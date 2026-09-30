@@ -9,3 +9,4 @@ uploads/
 .env
 .DS_Store
 .workbuddy/
+.mimosa/

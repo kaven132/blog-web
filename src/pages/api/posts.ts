@@ -2,10 +2,12 @@ import type { APIRoute } from "astro";
 import { db } from "../../db";
 import { posts } from "../../db/schema";
 import { eq, sql } from "drizzle-orm";
-import { slugify } from "../../lib/slug";
+import { sanitizeSlug, slugify } from "../../lib/slug";
+import { AUTH_COOKIE, isAuthed } from "../../lib/auth";
 
 function resolveSlug(title: string, slug: string | undefined, excludeId?: number): string {
-  const clean = slug?.trim() || slugify(title) || `post-${Date.now()}`;
+  // 手输 slug 也要清洗：只保留字母/数字/中文/连字符，防止空格、?、# 生成坏链接
+  const clean = sanitizeSlug(slug?.trim() || "") || slugify(title) || `post-${Date.now()}`;
   let candidate = clean;
   let i = 2;
   while (true) {
@@ -15,10 +17,15 @@ function resolveSlug(title: string, slug: string | undefined, excludeId?: number
   }
 }
 
+/** tags 兼容：字符串原样用，数组（误传）序列化，其他一律空数组 */
+function normalizeTags(tags: unknown): string {
+  if (typeof tags === "string") return tags;
+  return JSON.stringify(Array.isArray(tags) ? tags : []);
+}
+
 export const POST: APIRoute = async ({ request, cookies, redirect }) => {
   // Check auth
-  const authed = cookies.get("auth")?.value === "true";
-  if (!authed) {
+  if (!isAuthed(cookies.get(AUTH_COOKIE)?.value)) {
     return new Response(JSON.stringify({ error: "请先登录" }), {
       status: 401,
       headers: { "Content-Type": "application/json" },
@@ -29,7 +36,7 @@ export const POST: APIRoute = async ({ request, cookies, redirect }) => {
     const body = await request.json();
     const { title, slug, excerpt, content, tags, coverImage } = body;
 
-    if (!title || !content) {
+    if (!title || !content || typeof content !== "string") {
       return new Response(JSON.stringify({ error: "标题和内容为必填" }), {
         status: 400,
         headers: { "Content-Type": "application/json" },
@@ -43,7 +50,7 @@ export const POST: APIRoute = async ({ request, cookies, redirect }) => {
       slug: finalSlug,
       excerpt: excerpt || "",
       content,
-      tags: tags || "[]",
+      tags: normalizeTags(tags),
       coverImage: coverImage || null,
       published: true,
     }).run();
@@ -61,8 +68,7 @@ export const POST: APIRoute = async ({ request, cookies, redirect }) => {
 };
 
 export const PUT: APIRoute = async ({ request, cookies }) => {
-  const authed = cookies.get("auth")?.value === "true";
-  if (!authed) {
+  if (!isAuthed(cookies.get(AUTH_COOKIE)?.value)) {
     return new Response(JSON.stringify({ error: "请先登录" }), {
       status: 401,
       headers: { "Content-Type": "application/json" },
@@ -73,7 +79,7 @@ export const PUT: APIRoute = async ({ request, cookies }) => {
     const body = await request.json();
     const { id, title, slug, excerpt, content, tags, coverImage } = body;
 
-    if (!id || !title || !content) {
+    if (!id || !title || !content || typeof content !== "string") {
       return new Response(JSON.stringify({ error: "参数不完整" }), {
         status: 400,
         headers: { "Content-Type": "application/json" },
@@ -96,7 +102,7 @@ export const PUT: APIRoute = async ({ request, cookies }) => {
         slug: finalSlug,
         excerpt: excerpt || "",
         content,
-        tags: tags || "[]",
+        tags: normalizeTags(tags),
         coverImage: coverImage || null,
         updatedAt: sql`(CURRENT_TIMESTAMP)`,
       })
@@ -116,8 +122,7 @@ export const PUT: APIRoute = async ({ request, cookies }) => {
 };
 
 export const DELETE: APIRoute = async ({ url, cookies }) => {
-  const authed = cookies.get("auth")?.value === "true";
-  if (!authed) {
+  if (!isAuthed(cookies.get(AUTH_COOKIE)?.value)) {
     return new Response(JSON.stringify({ error: "请先登录" }), {
       status: 401,
       headers: { "Content-Type": "application/json" },

@@ -4,9 +4,10 @@ import { db } from "../../db";
 import { posts } from "../../db/schema";
 import { desc } from "drizzle-orm";
 import { PARENT_TAGS, parseTags, getLayer2Options, getLayer3Options } from "../../lib/tags";
+import { AUTH_COOKIE, isAuthed } from "../../lib/auth";
+import { formatDateCN } from "../../lib/datetime";
 
-const authCookie = Astro.cookies.get("auth")?.value;
-if (authCookie !== "true") {
+if (!isAuthed(Astro.cookies.get(AUTH_COOKIE)?.value)) {
   return Astro.redirect("/login");
 }
 
@@ -14,8 +15,18 @@ const l1 = Astro.url.searchParams.get("l1") || "";
 const l2 = Astro.url.searchParams.get("l2") || "";
 const l3 = Astro.url.searchParams.get("l3") || "";
 
+// 管理列表只取元数据，不带 content 大字段
 const allPosts = db
-  .select()
+  .select({
+    id: posts.id,
+    title: posts.title,
+    slug: posts.slug,
+    excerpt: posts.excerpt,
+    tags: posts.tags,
+    coverImage: posts.coverImage,
+    published: posts.published,
+    createdAt: posts.createdAt,
+  })
   .from(posts)
   .orderBy(desc(posts.createdAt))
   .all()
@@ -27,6 +38,22 @@ const filtered = allPosts.filter((p) => {
   if (l3 && p.tagList[2] !== l3) return false;
   return true;
 });
+
+// 分页：计数（l1Counts 等）始终基于全量，只有渲染的列表按页切片
+const PAGE_SIZE = 30;
+const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+const page = Math.min(totalPages, Math.max(1, Number(Astro.url.searchParams.get("page")) || 1));
+const pageItems = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+
+const pageUrl = (p: number) => {
+  const q = new URLSearchParams();
+  if (l1) q.set("l1", l1);
+  if (l2) q.set("l2", l2);
+  if (l3) q.set("l3", l3);
+  if (p > 1) q.set("page", String(p));
+  const qs = q.toString();
+  return qs ? `/admin?${qs}` : "/admin";
+};
 
 const tagLists = allPosts.map((p) => p.tagList);
 
@@ -172,7 +199,7 @@ const breadcrumb = [l1, l2, l3].filter(Boolean).join(" · ");
         </div>
       ) : (
         <div class="space-y-3">
-          {filtered.map((post, i) => (
+          {pageItems.map((post, i) => (
             <article
               class="bg-[var(--color-surface)] border border-[var(--color-border)] rounded-2xl p-5 hover:border-[var(--color-border-hover)] transition-colors duration-200"
               style={{ animation: `slide-up 0.4s ease-out ${i * 0.05}s both` }}
@@ -228,11 +255,7 @@ const breadcrumb = [l1, l2, l3].filter(Boolean).join(" · ");
                     <p class="text-xs text-[var(--color-text-muted)] leading-relaxed line-clamp-2 font-serif">{post.excerpt}</p>
                   )}
                   <time class="text-[11px] text-[var(--color-text-subtle)]/70 mt-2 block">
-                    {new Date(post.createdAt).toLocaleDateString("zh-CN", {
-                      year: "numeric",
-                      month: "long",
-                      day: "numeric",
-                    })}
+                    {formatDateCN(post.createdAt)}
                   </time>
                 </div>
 
@@ -261,6 +284,41 @@ const breadcrumb = [l1, l2, l3].filter(Boolean).join(" · ");
               </div>
             </article>
           ))}
+        </div>
+      )
+    }
+
+    <!-- Pagination -->
+    {
+      totalPages > 1 && (
+        <div class="flex items-center justify-center gap-4 mt-10">
+          {page > 1 ? (
+            <a
+              href={pageUrl(page - 1)}
+              class="inline-flex items-center gap-1 px-4 py-2 text-sm font-medium rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] text-[var(--color-text-muted)] hover:border-[var(--color-accent)] hover:text-[var(--color-accent)] transition-all"
+            >
+              ← 上一页
+            </a>
+          ) : (
+            <span class="px-4 py-2 text-sm font-medium rounded-xl border border-[var(--color-border)] opacity-40 select-none">
+              ← 上一页
+            </span>
+          )}
+          <span class="text-xs text-[var(--color-text-subtle)] font-mono">
+            第 {page} / {totalPages} 页 · 共 {filtered.length} 篇
+          </span>
+          {page < totalPages ? (
+            <a
+              href={pageUrl(page + 1)}
+              class="inline-flex items-center gap-1 px-4 py-2 text-sm font-medium rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] text-[var(--color-text-muted)] hover:border-[var(--color-accent)] hover:text-[var(--color-accent)] transition-all"
+            >
+              下一页 →
+            </a>
+          ) : (
+            <span class="px-4 py-2 text-sm font-medium rounded-xl border border-[var(--color-border)] opacity-40 select-none">
+              下一页 →
+            </span>
+          )}
         </div>
       )
     }

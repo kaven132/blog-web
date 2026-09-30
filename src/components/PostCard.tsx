@@ -9,6 +9,7 @@ interface PostCardProps {
 }
 
 import { getParentTag, getChildTags } from "../lib/tags";
+import { formatDateCN, dbDateToISO } from "../lib/datetime";
 
 export default function PostCard({ title, slug, excerpt, tags, createdAt, coverImage, index = 0 }: PostCardProps) {
   const tagList: string[] = (() => {
@@ -68,12 +69,8 @@ export default function PostCard({ title, slug, excerpt, tags, createdAt, coverI
 
         {/* Meta row */}
         <div className="flex items-center justify-between">
-          <time className="text-xs text-[var(--color-text-subtle)] font-medium tracking-wide uppercase" dateTime={createdAt}>
-            {new Date(createdAt).toLocaleDateString("zh-CN", {
-              year: "numeric",
-              month: "long",
-              day: "numeric",
-            })}
+          <time className="text-xs text-[var(--color-text-subtle)] font-medium tracking-wide uppercase" dateTime={dbDateToISO(createdAt)}>
+            {formatDateCN(createdAt)}
           </time>
           <span className="text-xs text-[var(--color-accent)] font-medium opacity-0 group-hover:opacity-100 translate-x-0 group-hover:translate-x-1 transition duration-300">
             阅读 →

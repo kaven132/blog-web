@@ -14,11 +14,15 @@ function inline(md: string): string {
     return `\u0000${codes.length - 1}\u0000`;
   });
 
+  // 链接只放行 http(s)、协议相对地址和 mailto，防 javascript: 伪协议 XSS
+  const SAFE_URL = /^(https?:\/\/|\/\/|mailto:)/i;
   s = s
     .replace(/!\[([^\]]*)\]\(([^)\s]+)\)/g, (_, alt: string, url: string) => `<img src="${url}" alt="${alt}" loading="lazy" />`)
     .replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>")
     .replace(/\*([^*]+)\*/g, "<em>$1</em>")
-    .replace(/\[([^\]]+)\]\(([^)\s]+)\)/g, '<a href="$2" target="_blank" rel="noopener">$1</a>');
+    .replace(/\[([^\]]+)\]\(([^)\s]+)\)/g, (m, text: string, url: string) =>
+      SAFE_URL.test(url) ? `<a href="${url}" target="_blank" rel="noopener">${text}</a>` : m
+    );
 
   return s.replace(/\u0000(\d+)\u0000/g, (_, i: string) => `<code>${codes[Number(i)]}</code>`);
 }

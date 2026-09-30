@@ -2,6 +2,7 @@ import type { APIRoute } from "astro";
 import { db } from "../../db";
 import { profile } from "../../db/schema";
 import { eq } from "drizzle-orm";
+import { AUTH_COOKIE, isAuthed } from "../../lib/auth";
 
 const DEFAULTS = {
   name: "kaven",
@@ -28,8 +29,7 @@ export const GET: APIRoute = async () => {
 
 // PUT — update profile (auth required)
 export const PUT: APIRoute = async ({ request, cookies }) => {
-  const authed = cookies.get("auth")?.value === "true";
-  if (!authed) {
+  if (!isAuthed(cookies.get(AUTH_COOKIE)?.value)) {
     return new Response(JSON.stringify({ error: "请先登录" }), {
       status: 401,
       headers: { "Content-Type": "application/json" },

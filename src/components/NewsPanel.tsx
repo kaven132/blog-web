@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 
 interface NewsItem {
@@ -93,6 +93,16 @@ export default function NewsPanel() {
   const [switchError, setSwitchError] = useState<string | null>(null);
   const [pending, setPending] = useState<NewsItem | null>(null);
 
+  // load() 依赖为空，拿不到最新 store —— 用 ref 读当前值判断「是否已有内容可展示」
+  const storeRef = useRef(store);
+  storeRef.current = store;
+
+  const hasAnyData = (s: NewsStore) =>
+    TABS.some((t) => {
+      const id = s.picked[t.id] ?? s.defaults[t.id];
+      return Boolean(id && s.categories[id]?.items?.length);
+    });
+
   const load = useCallback((force = false) => {
     // 缓存里存着服务端下发的「分类集合 + 每类的来源名单（siblings）」，这两样都是服务端配置。
     // 服务端改了配置（加来源、换 feed、删栏目）缓存不会自己失效，所以命中缓存只能算「先有东西看」，
@@ -124,7 +134,9 @@ export default function NewsPanel() {
       }
     }
 
-    if (!hydrated) {
+    // 已有内容可看时（强制刷新/静默校正）不切骨架屏、不清错误态，保持原内容原样可见
+    const canShow = hasAnyData(storeRef.current);
+    if (!hydrated && !canShow) {
       setLoading(true);
       setError(false);
       setSwitchError(null);
@@ -135,8 +147,9 @@ export default function NewsPanel() {
       .then((r) => (r.ok ? r.json() : Promise.reject()))
       .then((d: NewsCategory[]) => setStore((prev) => mergeCategories(prev, d)))
       .catch(() => {
-        // 已有缓存可看时静默失败，别把能看的内容换成错误态
-        if (!hydrated) setError(true);
+        // 与服务端 news.ts 的回退策略对齐：手上还有内容就静默失败，
+        // 只有当前一个条目都没有时才进入错误态，不让「刷新失败」清空能看的内容
+        if (!hydrated && !hasAnyData(storeRef.current)) setError(true);
       })
       .finally(() => {
         if (!hydrated) setLoading(false);

@@ -99,13 +99,24 @@ function cropToAvatar(
   });
 }
 
-export default function ProfileCard() {
+// 裁切结果上传成文件（浏览器可缓存），返回 /uploads/xxx；失败时调用方退回 dataURL
+async function uploadImageFile(dataUrl: string): Promise<string> {
+  const blob = await (await fetch(dataUrl)).blob();
+  const fd = new FormData();
+  fd.append("file", blob, "avatar.jpg");
+  const res = await fetch("/api/upload", { method: "POST", body: fd });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data?.error || "上传失败");
+  return data.url as string;
+}
+
+export default function ProfileCard({ authed }: { authed: boolean }) {
   const [profile, setProfile] = useState<ProfileData>(DEFAULTS);
   const [editing, setEditing] = useState(false);
   const [form, setForm] = useState<ProfileData>(DEFAULTS);
   const [saving, setSaving] = useState(false);
   const [dragOver, setDragOver] = useState(false);
-  const [loggedIn, setLoggedIn] = useState(false);
+  const [loggedIn, setLoggedIn] = useState(authed);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // ── Crop modal state ──
@@ -130,10 +141,6 @@ export default function ProfileCard() {
           setForm({ ...DEFAULTS, ...data });
         }
       })
-      .catch(() => {});
-    fetch("/api/auth/me")
-      .then((r) => r.json())
-      .then((d) => setLoggedIn(d.loggedIn))
       .catch(() => {});
   }, []);
 
@@ -192,7 +199,14 @@ export default function ProfileCard() {
   const confirmCrop = useCallback(async () => {
     if (!cropSrc) return;
     try {
-      const avatar = await cropToAvatar(cropSrc, cropNat.w, cropNat.h, cropScale, cropX, cropY, 200);
+      const dataUrl = await cropToAvatar(cropSrc, cropNat.w, cropNat.h, cropScale, cropX, cropY, 200);
+      // 优先上传成文件存 URL（浏览器可缓存、响应体小）；上传失败退回 base64，保证流程不死胡同
+      let avatar: string;
+      try {
+        avatar = await uploadImageFile(dataUrl);
+      } catch {
+        avatar = dataUrl;
+      }
       if (editing) {
         setForm((f) => ({ ...f, avatar }));
       } else {

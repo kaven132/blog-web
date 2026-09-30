@@ -18,7 +18,7 @@ import { readFileSync, copyFileSync, existsSync, mkdirSync } from "node:fs";
 import { extname, join } from "node:path";
 import { db } from "../src/db";
 import { posts } from "../src/db/schema";
-import { slugify } from "../src/lib/slug";
+import { slugify, sanitizeSlug } from "../src/lib/slug";
 import { eq } from "drizzle-orm";
 
 interface Article {
@@ -30,9 +30,9 @@ interface Article {
   coverImage?: string;
 }
 
-/** 与 src/pages/api/posts.ts 的 resolveSlug 保持一致：自动去重 */
+/** 与 src/pages/api/posts.ts 的 resolveSlug 保持一致：手输 slug 清洗 + 自动去重 */
 function resolveSlug(title: string, slug: string | undefined, excludeId?: number): string {
-  const clean = slug?.trim() || slugify(title) || `post-${Date.now()}`;
+  const clean = sanitizeSlug(slug?.trim() || "") || slugify(title) || `post-${Date.now()}`;
   let candidate = clean;
   let i = 2;
   while (true) {

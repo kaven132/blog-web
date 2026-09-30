@@ -15,12 +15,22 @@ import sqlite3
 import random
 import sys
 import datetime
+from pathlib import Path
 
 DB = "data/blog.db"
 MANIFEST = "scripts/_demo-comments.json"  # 记录本脚本插入的评论 id，便于回滚
-SEED = 20260918  # 固定随机种子，便于复现
+SEED = 20260918  # 固定随机种子，便于复现（仅用于挑选演示评论，非安全用途）
 
 rng = random.Random(SEED)
+
+
+def _safe_manifest_path():
+    """清单路径固定在 scripts/ 下：resolve 后校验仍落在该目录内，杜绝路径拼接逃逸"""
+    root = os.path.dirname(os.path.abspath(__file__))
+    target = os.path.abspath(MANIFEST)
+    if os.path.commonpath([root, target]) != root:
+        raise ValueError("MANIFEST 必须位于 scripts/ 目录内: %s" % target)
+    return target
 
 # ── 针对具体城市的评论（最近 8 篇旅游文）────────────────────────────────
 TAILORED = {
@@ -113,7 +123,7 @@ def main():
         if not os.path.exists(MANIFEST):
             print("找不到清单 %s，无法回滚" % MANIFEST)
             return
-        ids = json.load(open(MANIFEST, encoding="utf-8"))["ids"]
+        ids = json.load(open(_safe_manifest_path(), encoding="utf-8"))["ids"]
         conn = sqlite3.connect(DB)
         before = conn.execute("select count(*) from comments").fetchone()[0]
         conn.execute(
@@ -183,8 +193,13 @@ def main():
     conn.commit()
     ids = [r[0] for r in conn.execute(
         "select id from comments order by id desc limit ?", (len(plan),))]
-    json.dump({"created_at": NOW.strftime("%Y-%m-%d %H:%M:%S"), "ids": sorted(ids)},
-              open(MANIFEST, "w", encoding="utf-8"), ensure_ascii=False, indent=2)
+    # 写清单：resolve(__file__) 锚定在 scripts/ 目录内，无 ../，不存在路径逃逸
+    manifest = Path(__file__).resolve().parent / "_demo-comments.json"
+    manifest.write_text(
+        json.dumps({"created_at": NOW.strftime("%Y-%m-%d %H:%M:%S"), "ids": sorted(ids)},
+                   ensure_ascii=False, indent=2),
+        encoding="utf-8",
+    )
     print("已写入 %d 条（清单 -> %s）；comments 总数 = %d" % (
         len(plan), MANIFEST,
         conn.execute("select count(*) from comments").fetchone()[0]))

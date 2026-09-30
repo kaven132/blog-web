@@ -12,23 +12,54 @@ const l1 = Astro.url.searchParams.get("l1") || "";
 const l2 = Astro.url.searchParams.get("l2") || "";
 const l3 = Astro.url.searchParams.get("l3") || "";
 
+// 列表只取元数据，不带 content 大字段
 const allPosts = db
-  .select()
+  .select({
+    title: posts.title,
+    slug: posts.slug,
+    excerpt: posts.excerpt,
+    tags: posts.tags,
+    coverImage: posts.coverImage,
+    createdAt: posts.createdAt,
+  })
   .from(posts)
   .where(eq(posts.published, true))
   .orderBy(desc(posts.createdAt))
   .all()
   .map((p) => ({ ...p, tagList: parseTags(p.tags) }));
 
+// 搜索：标题/摘要/标签，忽略大小写。注意 tags 要先 parse，
+// 对 JSON 原文 includes 会把引号、方括号也算进匹配
+const q = searchQuery.trim().toLowerCase();
 const filtered = allPosts.filter((p) => {
-  if (searchQuery && !(p.title.includes(searchQuery) || p.excerpt.includes(searchQuery) || p.tags.includes(searchQuery))) {
-    return false;
+  if (q) {
+    const inTags = p.tagList.some((t) => t.toLowerCase().includes(q));
+    if (!(p.title.toLowerCase().includes(q) || p.excerpt.toLowerCase().includes(q) || inTags)) {
+      return false;
+    }
   }
   if (l1 && p.tagList[0] !== l1) return false;
   if (l2 && p.tagList[1] !== l2) return false;
   if (l3 && p.tagList[2] !== l3) return false;
   return true;
 });
+
+// 分页：计数与筛选基于全量，渲染按页切片
+const PAGE_SIZE = 24;
+const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+const page = Math.min(totalPages, Math.max(1, Number(Astro.url.searchParams.get("page")) || 1));
+const pageItems = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+
+const pageUrl = (p: number) => {
+  const params = new URLSearchParams();
+  if (searchQuery) params.set("search", searchQuery);
+  if (l1) params.set("l1", l1);
+  if (l2) params.set("l2", l2);
+  if (l3) params.set("l3", l3);
+  if (p > 1) params.set("page", String(p));
+  const qs = params.toString();
+  return qs ? `/posts?${qs}` : "/posts";
+};
 
 const tagLists = allPosts.map((p) => p.tagList);
 
@@ -168,7 +199,7 @@ const pageTitle = breadcrumb || (searchQuery ? `搜索: ${searchQuery}` : "文�
         </div>
       ) : (
         <div class="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
-          {filtered.map((post, i) => (
+          {pageItems.map((post, i) => (
             <PostCard
               title={post.title}
               slug={post.slug}
@@ -179,6 +210,41 @@ const pageTitle = breadcrumb || (searchQuery ? `搜索: ${searchQuery}` : "文�
               index={i}
             />
           ))}
+        </div>
+      )
+    }
+
+    <!-- Pagination -->
+    {
+      totalPages > 1 && (
+        <div class="flex items-center justify-center gap-4 mt-12">
+          {page > 1 ? (
+            <a
+              href={pageUrl(page - 1)}
+              class="inline-flex items-center gap-1 px-4 py-2 text-sm font-medium rounded-full border border-[var(--color-border)] bg-[var(--color-surface)] text-[var(--color-text-muted)] hover:border-[var(--color-accent)] hover:text-[var(--color-accent)] transition-all"
+            >
+              ← 上一页
+            </a>
+          ) : (
+            <span class="px-4 py-2 text-sm font-medium rounded-full border border-[var(--color-border)] opacity-40 select-none">
+              ← 上一页
+            </span>
+          )}
+          <span class="text-xs text-[var(--color-text-subtle)] font-mono">
+            第 {page} / {totalPages} 页 · 共 {filtered.length} 篇
+          </span>
+          {page < totalPages ? (
+            <a
+              href={pageUrl(page + 1)}
+              class="inline-flex items-center gap-1 px-4 py-2 text-sm font-medium rounded-full border border-[var(--color-border)] bg-[var(--color-surface)] text-[var(--color-text-muted)] hover:border-[var(--color-accent)] hover:text-[var(--color-accent)] transition-all"
+            >
+              下一页 →
+            </a>
+          ) : (
+            <span class="px-4 py-2 text-sm font-medium rounded-full border border-[var(--color-border)] opacity-40 select-none">
+              下一页 →
+            </span>
+          )}
         </div>
       )
     }

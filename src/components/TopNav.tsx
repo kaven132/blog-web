@@ -11,33 +11,19 @@ const navLinks = [
 interface TopNavProps {
   onToggleSidebar: () => void;
   sidebarOpen: boolean;
+  /** 服务端下发的登录态与用户名（Layout.astro 读 cookie + 查库），不再客户端请求 */
+  authed: boolean;
+  userName?: string;
 }
 
-export default function TopNav({ onToggleSidebar, sidebarOpen }: TopNavProps) {
-  const [loggedIn, setLoggedIn] = useState(false);
-  const [userName, setUserName] = useState("kaven");
+export default function TopNav({ onToggleSidebar, sidebarOpen, authed, userName = "kaven" }: TopNavProps) {
+  const [loggedIn, setLoggedIn] = useState(authed);
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [loginOpen, setLoginOpen] = useState(false);
   const [logoutConfirmOpen, setLogoutConfirmOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
-  const checkAuth = () => {
-    fetch("/api/auth/me")
-      .then((r) => r.json())
-      .then((d) => {
-        setLoggedIn(d.loggedIn);
-        if (d.loggedIn) {
-          fetch("/api/profile")
-            .then((r) => r.json())
-            .then((p) => { if (p?.name) setUserName(p.name); })
-            .catch(() => {});
-        }
-      })
-      .catch(() => setLoggedIn(false));
-  };
-
   useEffect(() => {
-    checkAuth();
     const onOutsideClick = (e: MouseEvent) => {
       if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
         setDropdownOpen(false);

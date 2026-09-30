@@ -1,15 +1,24 @@
 import type { APIRoute } from "astro";
 import { db } from "../../db";
-import { likes } from "../../db/schema";
-import { sql } from "drizzle-orm";
+import { likes, posts } from "../../db/schema";
+import { eq, sql } from "drizzle-orm";
 
 export const POST: APIRoute = async ({ request }) => {
   try {
     const { postId } = await request.json();
 
-    if (!postId || typeof postId !== "number") {
+    if (!postId || typeof postId !== "number" || !Number.isInteger(postId)) {
       return new Response(JSON.stringify({ error: "无效的请求" }), {
         status: 400,
+        headers: { "Content-Type": "application/json" },
+      });
+    }
+
+    // 不存在的文章：外键约束会把插入变成 500，提前拦成 404
+    const exists = db.select({ id: posts.id }).from(posts).where(eq(posts.id, postId)).get();
+    if (!exists) {
+      return new Response(JSON.stringify({ error: "文章不存在" }), {
+        status: 404,
         headers: { "Content-Type": "application/json" },
       });
     }

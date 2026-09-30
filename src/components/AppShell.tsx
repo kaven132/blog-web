@@ -5,16 +5,19 @@ import NewsPanel from "./NewsPanel";
 
 interface AppShellProps {
   children: ReactNode;
+  /** 服务端读 cookie 得出的登录态，避免客户端再发 /api/auth/me，也消除「登录」按钮闪烁 */
+  authed: boolean;
+  userName?: string;
 }
 
 const PAD = "px-4 sm:px-5 md:px-6 xl:px-8";
 
-export default function AppShell({ children }: AppShellProps) {
+export default function AppShell({ children, authed, userName }: AppShellProps) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
   return (
     <div className="min-h-screen flex flex-col">
-      <TopNav onToggleSidebar={() => setSidebarOpen((v) => !v)} sidebarOpen={sidebarOpen} />
+      <TopNav onToggleSidebar={() => setSidebarOpen((v) => !v)} sidebarOpen={sidebarOpen} authed={authed} userName={userName} />
 
       {/* ── Body ── */}
       <div className={`flex-1 w-full max-w-[var(--spacing-container)] mx-auto ${PAD} py-6 lg:py-8`}>
@@ -23,7 +26,7 @@ export default function AppShell({ children }: AppShellProps) {
           {/* Desktop: inline ProfileCard (≥1280px) */}
           <aside className="hidden xl:block xl:w-60 xl:flex-shrink-0">
             <div className="xl:sticky xl:top-20 space-y-5">
-              <ProfileCard />
+              <ProfileCard authed={authed} />
               <NewsPanel />
             </div>
           </aside>
@@ -50,7 +53,7 @@ export default function AppShell({ children }: AppShellProps) {
                 </svg>
               </button>
             </div>
-            <ProfileCard />
+            <ProfileCard authed={authed} />
             <div className="p-3 pb-4"><NewsPanel /></div>
           </div>
         </div>

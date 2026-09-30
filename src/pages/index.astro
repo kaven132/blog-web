@@ -7,7 +7,14 @@ import { posts } from "../db/schema";
 import { desc, eq } from "drizzle-orm";
 
 const recentPosts = db
-  .select()
+  .select({
+    title: posts.title,
+    slug: posts.slug,
+    excerpt: posts.excerpt,
+    tags: posts.tags,
+    coverImage: posts.coverImage,
+    createdAt: posts.createdAt,
+  })
   .from(posts)
   .where(eq(posts.published, true))
   .orderBy(desc(posts.createdAt))

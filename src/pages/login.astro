@@ -1,9 +1,9 @@
 ---
 import Layout from "../layouts/Layout.astro";
+import { AUTH_COOKIE, isAuthed } from "../lib/auth";
 
 // Redirect if already logged in
-const authCookie = Astro.cookies.get("auth")?.value;
-if (authCookie === "true") {
+if (isAuthed(Astro.cookies.get(AUTH_COOKIE)?.value)) {
   return Astro.redirect("/write");
 }
 ---

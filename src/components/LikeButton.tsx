@@ -1,4 +1,4 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 
 interface LikeButtonProps {
   postId: number;
@@ -10,6 +10,16 @@ export default function LikeButton({ postId, initialCount }: LikeButtonProps) {
   const [liked, setLiked] = useState(false);
   const [loading, setLoading] = useState(false);
   const [animating, setAnimating] = useState(false);
+
+  // 已点赞状态落到 localStorage：刷新/再次访问不会「已点赞」变回未点，
+  // 防止无意识重复点赞把计数刷虚高（服务端本身没有按用户去重）
+  useEffect(() => {
+    try {
+      if (localStorage.getItem(`liked:${postId}`) === "1") setLiked(true);
+    } catch {
+      // 隐私模式等拿不到 localStorage 就退回无记忆行为
+    }
+  }, [postId]);
 
   const handleLike = useCallback(async () => {
     if (liked || loading) return;
@@ -26,6 +36,11 @@ export default function LikeButton({ postId, initialCount }: LikeButtonProps) {
         const data = await res.json();
         setCount(data.count);
         setLiked(true);
+        try {
+          localStorage.setItem(`liked:${postId}`, "1");
+        } catch {
+          // ignore
+        }
       }
     } catch {
       // silently fail

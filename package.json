@@ -12,6 +12,7 @@
     "db:migrate": "drizzle-kit migrate",
     "db:seed": "tsx src/db/seed.ts",
     "db:reset": "tsx src/db/seed.ts --force",
+    "db:backup": "node scripts/backup-db.mjs",
     "db:studio": "drizzle-kit studio"
   },
   "dependencies": {
