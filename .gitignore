@@ -5,8 +5,10 @@ data/
 *.db
 *.db-shm
 *.db-wal
-uploads/
+# 只忽略仓库根的 uploads 目录；不带斜杠锚定会误伤 src/pages/uploads/ 源码路由
+/uploads/
 .env
 .DS_Store
 .workbuddy/
 .mimosa/
+__pycache__/

@@ -1,0 +1,100 @@
+{
+  "_note": "游戏线（automation a49509f8）专属状态：本线只读写这个文件，不要去动 scripts/_posted.json（书籍线）或 scripts/_travel-state.json（旅游线）。每次运行【必须】先读这里，把「各游戏最新版本号」与 games[key].version 比对：版本号不同才写，相同则跳过并在汇报里说明。判定同时要查「前瞻/官宣状态」（A 类已上线信号 + B 类前瞻信号）。每次运行结束（无论写没写文）都要回写 lastChecked 与 seenPreview，并在 _history 追加记录。",
+  "_rule": "只记录「已写的版本号」，不要记 slug 作为去重依据——slug 是 game-<key>-YYYYMMDD（按运行日生成），表达不了版本号。",
+  "_fields": {
+    "version": "上次已写的版本号（判定基准）",
+    "title": "该版本名",
+    "releaseDate": "该版本上线日期",
+    "postSlug": "对应已发布文章的 slug",
+    "postedAt": "发文日期",
+    "nextVersion": "下一版本号（供下次核查用）",
+    "nextVersionEta": "下一版本预计上线时间",
+    "lastChecked": "上次核查日期（每次运行都更新）",
+    "seenPreview": "上次核查时下一版本前瞻的命中情况：{hit: bool, version: '', versionName: '', eta: '', note: ''}",
+    "note": "自由备注"
+  },
+  "lastRun": "2026-09-28",
+  "games": {
+    "endfield": {
+      "name": "明日方舟：终末地",
+      "tag": "明日方舟终末地",
+      "version": "1.5",
+      "title": "雪凇幽梦",
+      "releaseDate": "2026-09-02",
+      "postSlug": "game-endfield-20260904",
+      "postedAt": "2026-09-04",
+      "nextVersion": "1.6",
+      "nextVersionEta": "2026-10-15",
+      "lastChecked": "2026-09-28",
+      "seenPreview": {
+        "hit": false,
+        "version": "1.6",
+        "versionName": "",
+        "eta": "2026-10-15",
+        "note": "截至 2026-09-28，1.6 官方前瞻尚未放出（NGA 推测：录播则 9/29 放前瞻预告，直播则 10/3 放链接）。网传新六星「祀」（火·术师，10/15）、「夜明晦」（电·先锋，11/05）均来自 1.5 直播的「未来版本前瞻」段与社区泄露，非 1.6 官方前瞻，不计为 B 类命中。"
+      },
+      "note": "1.5 周期至 2026-10-15。1.6 预计 10-15 上线，届时必然触发 NEEDS_WRITE，是下次运行的头号候选。"
+    },
+    "hsr": {
+      "name": "崩坏：星穹铁道",
+      "tag": "崩坏星穹铁道",
+      "version": "4.6",
+      "title": "月升之前，与兽共舞",
+      "releaseDate": "2026-09-28",
+      "postSlug": "game-hsr-20260928",
+      "postedAt": "2026-09-28",
+      "nextVersion": "4.7",
+      "nextVersionEta": "2026-11 中下旬",
+      "lastChecked": "2026-09-28",
+      "seenPreview": {
+        "hit": true,
+        "version": "4.7",
+        "versionName": "入画奇航（货币战争新赛季）",
+        "eta": "2026-11 中下旬",
+        "note": "4.6 前瞻节目已放出 4.7 方向：货币战争新赛季「入画奇航」、新五星「虚照」。另 4.8 将开启与《绝区零》联动（艾莲、耀嘉音）。"
+      },
+      "note": "4.6 周期 2026-09-28 至 2026-11-10。下次运行（约 10 月）时 4.7 应尚未上线，预判为 SKIP；若已上线则 NEEDS_WRITE。"
+    },
+    "genshin": {
+      "name": "原神",
+      "tag": "原神",
+      "version": "7.1",
+      "title": "往冥府的安魂歌",
+      "releaseDate": "2026-09-23",
+      "postSlug": "game-genshin-20260928",
+      "postedAt": "2026-09-28",
+      "nextVersion": "7.2",
+      "nextVersionEta": "2026-11 初",
+      "lastChecked": "2026-09-28",
+      "seenPreview": {
+        "hit": false,
+        "version": "7.2",
+        "versionName": "",
+        "eta": "2026-11 初",
+        "note": "7.2 新角色立绘预计 2026-09-28 公布（网传米提亚、瓦列里），截至核查时无官方前瞻。7.1 为六周年版本，双自选五星为周年长期机制。"
+      },
+      "note": "7.1 于 2026-09-23 上线。下次运行（约 10 月）时 7.2 应尚未上线，预判为 SKIP；若已上线或官方前瞻已放出，按 1.2 的 B 类信号记录并据实判定。"
+    }
+  },
+  "_history": [
+    {
+      "date": "2026-09-04",
+      "action": "首次试跑，三款各写一篇",
+      "posts": ["game-endfield-20260904", "game-hsr-20260904", "game-genshin-20260904"],
+      "versions": { "endfield": "1.5", "hsr": "4.5", "genshin": "7.0" }
+    },
+    {
+      "date": "2026-09-28",
+      "action": "首次应用版本判定：终末地 1.5 已写过（09-04）且无新版本 → 跳过；星铁 4.6、原神 7.1 为新版本 → 各写一篇",
+      "posts": ["game-hsr-20260928", "game-genshin-20260928"],
+      "skipped": ["endfield"],
+      "versions": { "endfield": "1.5", "hsr": "4.6", "genshin": "7.1" },
+      "previews": {
+        "endfield": "1.6 官方前瞻未放出（仅社区泄露）",
+        "hsr": "4.7 前瞻方向已由 4.6 前瞻放出（入画奇航 + 虚照）",
+        "genshin": "7.2 官方前瞻未放出（立绘预计 09-28 公布）"
+      },
+      "skipReason": "终末地当前版本仍为 1.5（2026-09-02 上线），已于 2026-09-04 发文覆盖；1.6 预计 2026-10-15 上线，1.6 官方前瞻尚未放出。"
+    }
+  ]
+}

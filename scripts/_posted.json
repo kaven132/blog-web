@@ -30,7 +30,15 @@
     "埃涅阿斯纪",
     "杀死一只知更鸟",
     "一句顶一万句",
-    "罪与罚"
+    "罪与罚",
+    "呐喊",
+    "霍乱时期的爱情",
+    "包法利夫人",
+    "红与黑",
+    "许三观卖血记",
+    "呼啸山庄",
+    "儒林外史",
+    "堂吉诃德"
   ],
   "plugins": [
     "DeepSeek Harness (dsh) — https://github.com/deepseek-ai/deepseek-harness",
@@ -47,7 +55,15 @@
     "Vercel AI SDK — https://github.com/vercel/ai",
     "smolagents — https://github.com/huggingface/smolagents",
     "Browser Use — https://github.com/browser-use/browser-use",
-    "opencode — https://github.com/anomalyco/opencode"
+    "opencode — https://github.com/anomalyco/opencode",
+    "Dify — https://github.com/langgenius/dify",
+    "n8n — https://github.com/n8n-io/n8n",
+    "CrewAI — https://github.com/crewAIInc/crewAI",
+    "Langfuse — https://github.com/langfuse/langfuse",
+    "dsh-context — https://github.com/bowenliang123/dsh-context",
+    "dsh-remote — https://github.com/flymysql/dsh-remote",
+    "dsh-vision-toolkit — https://github.com/Anionex/dsh-vision-toolkit",
+    "SandBase Harness — https://github.com/sandbaseai/sandbase-harness"
   ],
   "skills": [
     "subagent",
