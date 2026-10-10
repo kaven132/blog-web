@@ -52,3 +52,12 @@ export const profile = sqliteTable("profile", {
     .notNull()
     .default(sql`(CURRENT_TIMESTAMP)`),
 });
+
+/** 登录凭证（单行）：在「账户设置」页改过密码后落库，未设置时登录回退 env / 默认密码 */
+export const credentials = sqliteTable("credentials", {
+  id: integer("id").primaryKey().default(1),
+  passwordHash: text("password_hash").notNull(), // scrypt: "<salt hex>:<hash hex>"
+  updatedAt: text("updated_at")
+    .notNull()
+    .default(sql`(CURRENT_TIMESTAMP)`),
+});

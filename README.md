@@ -42,12 +42,14 @@ src/
 │   ├── games.astro          # 小游戏（俄罗斯方块 / 贪吃蛇占位模块，开发中）
 │   ├── 404.astro            # 404 友好提示
 │   ├── login.astro          # 登录页（密码可见性切换）
+│   ├── account.astro        # 账户设置（头像裁切上传 / 编辑资料 / 修改密码 / 退出登录，需登录）
 │   ├── write.astro          # 写文章页（需登录，自动生成 slug）
 │   ├── posts/
 │   │   ├── index.astro      #   文章列表（搜索过滤）
 │   │   └── [slug].astro     #   文章详情（Markdown + 评论 + 点赞）
 │   └── api/
 │       ├── profile.ts       #   个人信息 CRUD
+│       ├── account/password.ts # 修改登录密码（校验原密码，scrypt 落库）
 │       ├── posts.ts         #   创建文章（需登录）
 │       ├── like.ts          #   点赞 API
 │       ├── comment.ts       #   评论 API
@@ -88,12 +90,14 @@ src/
 | 项目 | 值 |
 |------|-----|
 | 账号 | `ADMIN_ACCOUNT` 环境变量，默认 `kavenyyds` |
-| 密码 | `ADMIN_PASSWORD` 环境变量，默认 `4399123456` |
+| 密码 | 默认 `ADMIN_PASSWORD` 环境变量（默认 `4399123456`）；**在账户设置页改过密码后以库内 scrypt 凭证为准** |
 | 有效期 | 7 天（HMAC 签名 Cookie，不可伪造） |
+| 账户设置 | 右上角头像 → `/account`（登录后）：改头像（裁切上传）、编辑资料、修改密码、退出登录 |
 
 - Cookie 的值不再是明文 `auth=true`（旧版任何人 curl 带上这个头就能绕过登录），
   而是服务端用密钥签发的 HMAC token；换用 `AUTH_SECRET` 环境变量可独立于密码控制会话失效。
 - 登录失败限流：同一 IP 10 分钟内失败 5 次锁定 10 分钟。
+- 修改密码：`credentials` 表存 scrypt 哈希（`salt:hash`），登录校验优先读库、未改过回退环境变量；改密码后当前会话仍有效，其他端需重新登录。
 - 上 HTTPS 后设置 `COOKIE_SECURE=1` 让 Cookie 仅走加密连接。
 - **改动后旧会话全部失效，需要重新登录一次。**
 

@@ -1,5 +1,5 @@
 import type { APIRoute } from "astro";
-import { AUTH_COOKIE, ADMIN_ACCOUNT, ADMIN_PASSWORD, makeAuthToken } from "../../../lib/auth";
+import { AUTH_COOKIE, ADMIN_ACCOUNT, verifyPassword, makeAuthToken } from "../../../lib/auth";
 
 /**
  * 登录失败限流：同一 IP 10 分钟内失败满 5 次，锁定 10 分钟。
@@ -31,7 +31,8 @@ export const POST: APIRoute = async ({ request, cookies, clientAddress }) => {
   try {
     const { account, password } = await request.json();
 
-    if (account === ADMIN_ACCOUNT && password === ADMIN_PASSWORD) {
+    // 密码校验优先走库内凭证（账户设置页改过），未改过回退 env / 默认
+    if (account === ADMIN_ACCOUNT && verifyPassword(password)) {
       attempts.delete(ip);
       cookies.set(AUTH_COOKIE, makeAuthToken(), {
         httpOnly: true,

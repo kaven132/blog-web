@@ -15,9 +15,11 @@ interface TopNavProps {
   /** 服务端下发的登录态与用户名（Layout.astro 读 cookie + 查库），不再客户端请求 */
   authed: boolean;
   userName?: string;
+  /** 用户头像（/uploads/xxx 或 dataURL），空则回退首字母圆标 */
+  userAvatar?: string;
 }
 
-export default function TopNav({ onToggleSidebar, sidebarOpen, authed, userName = "kaven" }: TopNavProps) {
+export default function TopNav({ onToggleSidebar, sidebarOpen, authed, userName = "kaven", userAvatar = "" }: TopNavProps) {
   const [loggedIn, setLoggedIn] = useState(authed);
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [loginOpen, setLoginOpen] = useState(false);
@@ -87,11 +89,17 @@ export default function TopNav({ onToggleSidebar, sidebarOpen, authed, userName 
                   文章管理
                 </a>
                 <div className="relative" ref={dropdownRef}>
+                  {/* 头像按钮：点击弹下拉（账户设置 / 退出登录）；有头像显示头像，无则回退首字母 */}
                   <button
                     onClick={() => setDropdownOpen((v) => !v)}
-                    className="w-8 h-8 rounded-full bg-[var(--color-accent-muted)] text-[var(--color-accent)] flex items-center justify-center text-sm font-bold hover:ring-2 hover:ring-[var(--color-accent)]/30 transition-all"
+                    className="w-8 h-8 rounded-full overflow-hidden bg-[var(--color-accent-muted)] text-[var(--color-accent)] flex items-center justify-center text-sm font-bold ring-2 ring-transparent hover:ring-[var(--color-accent)]/30 transition-all"
+                    title="账户菜单"
                   >
-                    {initial}
+                    {userAvatar ? (
+                      <img src={userAvatar} alt="头像" className="w-full h-full object-cover" />
+                    ) : (
+                      initial
+                    )}
                   </button>
                   {dropdownOpen && (
                     <div className="absolute right-0 top-full mt-2 w-44 bg-[var(--color-surface)] border border-[var(--color-border)] rounded-xl shadow-lg overflow-hidden animate-[scale-in_0.15s_ease-out]">
@@ -99,6 +107,17 @@ export default function TopNav({ onToggleSidebar, sidebarOpen, authed, userName 
                         <p className="text-sm font-semibold text-[var(--color-text)]">{userName}</p>
                         <p className="text-[11px] text-[var(--color-text-subtle)] mt-0.5">管理员</p>
                       </div>
+                      <a
+                        href="/account"
+                        onClick={() => setDropdownOpen(false)}
+                        className="w-full flex items-center gap-2 px-4 py-2.5 text-sm text-[var(--color-text-muted)] hover:text-[var(--color-text)] hover:bg-[var(--color-bg)] transition-colors text-left"
+                      >
+                        <svg className="w-3.5 h-3.5 flex-shrink-0" fill="none" stroke="currentColor" strokeWidth={1.8} viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+                          <circle cx="12" cy="12" r="3" />
+                        </svg>
+                        账户设置
+                      </a>
                       <button
                         onClick={() => { setLogoutConfirmOpen(true); setDropdownOpen(false); }}
                         className="w-full flex items-center gap-2 px-4 py-2.5 text-sm text-[var(--color-text-muted)] hover:text-red-500 hover:bg-red-50 transition-colors text-left"

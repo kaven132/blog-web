@@ -5,8 +5,8 @@ import SearchBar from "../../components/SearchBar";
 import TagFilter from "../../components/TagFilter.astro";
 import Pagination from "../../components/Pagination.astro";
 import { db } from "../../db";
-import { posts } from "../../db/schema";
-import { eq, desc } from "drizzle-orm";
+import { posts, likes, comments } from "../../db/schema";
+import { eq, desc, sql } from "drizzle-orm";
 import { parseTags, buildTagFacets } from "../../lib/tags";
 
 const searchQuery = Astro.url.searchParams.get("search") || "";
@@ -14,7 +14,15 @@ const l1 = Astro.url.searchParams.get("l1") || "";
 const l2 = Astro.url.searchParams.get("l2") || "";
 const l3 = Astro.url.searchParams.get("l3") || "";
 
-// 列表只取元数据，不带 content 大字段
+// 排序：时间 / 点赞数 / 评论数 × 升降序（默认时间倒序）；URL 参数白名单校验
+const SORT_KEYS = ["time", "likes", "comments"];
+const sort: string = SORT_KEYS.includes(Astro.url.searchParams.get("sort") || "")
+  ? (Astro.url.searchParams.get("sort") as string)
+  : "time";
+const order: string = Astro.url.searchParams.get("order") === "asc" ? "asc" : "desc";
+const sortActive = sort !== "time" || order !== "desc";
+
+// 列表只取元数据 + 点赞/评论计数（点赞每篇一行，评论按篇聚合），不带 content 大字段
 const allPosts = db
   .select({
     title: posts.title,
@@ -23,9 +31,14 @@ const allPosts = db
     tags: posts.tags,
     coverImage: posts.coverImage,
     createdAt: posts.createdAt,
+    likeCount: sql<number>`coalesce(${likes.count}, 0)`,
+    commentCount: sql<number>`count(${comments.id})`,
   })
   .from(posts)
+  .leftJoin(likes, eq(likes.postId, posts.id))
+  .leftJoin(comments, eq(comments.postId, posts.id))
   .where(eq(posts.published, true))
+  .groupBy(posts.id)
   .orderBy(desc(posts.createdAt))
   .all()
   .map((p) => ({ ...p, tagList: parseTags(p.tags) }));
@@ -46,6 +59,14 @@ const filtered = allPosts.filter((p) => {
   return true;
 });
 
+// 排序（筛选后内存排序；createdAt 格式固定，字符串比较即时间比较）
+const dir = order === "asc" ? 1 : -1;
+filtered.sort((a, b) => {
+  if (sort === "likes") return (a.likeCount - b.likeCount) * dir;
+  if (sort === "comments") return (a.commentCount - b.commentCount) * dir;
+  return a.createdAt < b.createdAt ? -dir : a.createdAt > b.createdAt ? dir : 0;
+});
+
 // 分页：计数与筛选基于全量，渲染按页切片
 const PAGE_SIZE = 24;
 const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
@@ -59,43 +80,93 @@ const pageUrl = (p: number) => {
   if (l1) params.set("l1", l1);
   if (l2) params.set("l2", l2);
   if (l3) params.set("l3", l3);
+  if (sortActive) {
+    params.set("sort", sort);
+    params.set("order", order);
+  }
   if (p > 1) params.set("page", String(p));
   const qs = params.toString();
   return qs ? `/posts?${qs}` : "/posts";
 };
 
+// 排序链接：点 inactive 项按其默认方向（倒序，多数在前）；点 active 项反转方向
+const sortUrl = (key: string, nextOrder: string) => {
+  const params = new URLSearchParams();
+  if (searchQuery) params.set("search", searchQuery);
+  if (l1) params.set("l1", l1);
+  if (l2) params.set("l2", l2);
+  if (l3) params.set("l3", l3);
+  if (!(key === "time" && nextOrder === "desc")) {
+    params.set("sort", key);
+    params.set("order", nextOrder);
+  }
+  const qs = params.toString();
+  return qs ? `/posts?${qs}` : "/posts";
+};
+
 const isFiltering = Boolean(searchQuery || l1 || l2 || l3);
+const showClear = isFiltering || sortActive;
 const pageTitle = [l1, l2, l3].filter(Boolean).join(" · ") || (searchQuery ? `搜索: ${searchQuery}` : "文章列表");
 ---
 
 <Layout title={pageTitle} description="浏览所有博客文章">
   <div class="py-8 md:py-12">
-    <!-- Header -->
-    <div class="flex flex-col sm:flex-row sm:items-end justify-between gap-5 mb-8">
-      <div>
-        <p class="text-xs font-semibold tracking-[0.15em] uppercase text-[var(--color-text-subtle)] mb-2">Articles</p>
-        <h1 class="text-3xl font-bold tracking-[-0.015em]">
-          {searchQuery ? `"${searchQuery}" 的搜索结果` : [l1, l2, l3].filter(Boolean).join(" · ") || "所有文章"}
-        </h1>
-        <p class="text-sm text-[var(--color-text-muted)] mt-2 font-serif">共 {filtered.length} 篇文章</p>
-      </div>
-      <SearchBar client:load placeholder="搜索文章..." />
+    <!-- Search（独立一行置顶） -->
+    <div class="flex justify-center mb-10">
+      <SearchBar client:load placeholder="搜索文章..." defaultValue={searchQuery} />
     </div>
 
-    <!-- Clear filters -->
-    {
-      isFiltering && (
-        <a
-          href="/posts"
-          class="inline-flex items-center gap-1 text-sm text-[var(--color-text-muted)] hover:text-[var(--color-accent)] transition-colors mb-6"
-        >
-          <span>←</span> 清除全部筛选
-        </a>
-      )
-    }
+    <!-- Header -->
+    <div class="mb-6">
+      <p class="text-xs font-semibold tracking-[0.15em] uppercase text-[var(--color-text-subtle)] mb-2">Articles</p>
+      <h1 class="text-3xl font-bold tracking-[-0.015em]">
+        {searchQuery ? `"${searchQuery}" 的搜索结果` : [l1, l2, l3].filter(Boolean).join(" · ") || "所有文章"}
+      </h1>
+      <p class="text-sm text-[var(--color-text-muted)] mt-2 font-serif">共 {filtered.length} 篇文章</p>
+    </div>
 
-    <!-- Category filter -->
-    <TagFilter base="/posts" l1={l1} l2={l2} l3={l3} searchQuery={searchQuery} facets={facets} />
+    <!-- Sort（点 inactive 项按倒序生效；再点一次切升降序） -->
+    <div class="flex flex-wrap items-center gap-2 mb-3">
+      <span class="text-xs font-semibold tracking-wider uppercase text-[var(--color-text-subtle)] mr-1">排序</span>
+      {
+        [
+          { key: "time", label: "时间" },
+          { key: "likes", label: "点赞数" },
+          { key: "comments", label: "评论数" },
+        ].map(({ key, label }) => {
+          const active = sort === key;
+          const nextOrder = active && order === "desc" ? "asc" : "desc";
+          return (
+            <a
+              href={sortUrl(key, nextOrder)}
+              class={`inline-flex items-center gap-1 px-3 py-1 text-xs font-medium rounded-full border transition-all ${
+                active
+                  ? "bg-[var(--color-accent-muted)] text-[var(--color-accent)] border-[var(--color-accent)]/40"
+                  : "bg-[var(--color-surface)] text-[var(--color-text-muted)] border-[var(--color-border)] hover:border-[var(--color-accent)]/50"
+              }`}
+            >
+              {label}
+              {active && <span aria-hidden="true">{order === "asc" ? "↑" : "↓"}</span>}
+            </a>
+          );
+        })
+      }
+    </div>
+
+    <!-- Category filter（清除筛选靠右，有筛选或非默认排序时才出现） -->
+    <TagFilter base="/posts" l1={l1} l2={l2} l3={l3} searchQuery={searchQuery} facets={facets}>
+      {
+        showClear && (
+          <a
+            href="/posts"
+            slot="extra"
+            class="ml-auto inline-flex items-center gap-1 text-sm text-[var(--color-text-muted)] hover:text-[var(--color-accent)] transition-colors"
+          >
+            <span>←</span> 清除全部筛选
+          </a>
+        )
+      }
+    </TagFilter>
 
     <!-- Post grid -->
     {
@@ -120,6 +191,7 @@ const pageTitle = [l1, l2, l3].filter(Boolean).join(" · ") || (searchQuery ? `�
               tags={post.tags}
               coverImage={post.coverImage ?? undefined}
               createdAt={post.createdAt}
+              likeCount={post.likeCount}
               index={i}
             />
           ))}

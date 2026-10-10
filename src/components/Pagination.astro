@@ -1,7 +1,8 @@
 ---
 /**
- * 分页条（上一页 / 页码 / 下一页），posts 列表页与 admin 管理页共用。
- * pageUrl 由调用方传入（两页的查询参数不同）。
+ * 分页条（上一页 / 页码跳转 / 下一页），posts 列表页与 admin 管理页共用。
+ * pageUrl 由调用方传入（两页的查询参数不同）；页码跳转输入框在客户端
+ * 直接改当前 URL 的 page 参数，其余筛选条件自动保留。
  */
 interface Props {
   page: number;
@@ -28,8 +29,17 @@ const { page, totalPages, total, pageUrl } = Astro.props;
           ← 上一页
         </span>
       )}
-      <span class="text-xs text-[var(--color-text-subtle)] font-mono">
-        第 {page} / {totalPages} 页 · 共 {total} 篇
+      <span class="flex items-center gap-1.5 text-xs text-[var(--color-text-subtle)]">
+        <span>第</span>
+        <input
+          type="number"
+          min="1"
+          max={totalPages}
+          value={page}
+          aria-label="跳转到指定页"
+          class="page-jump-input w-12 px-1 py-1 text-center text-xs font-mono text-[var(--color-text)] rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] focus:outline-none focus:border-[var(--color-accent)] [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+        />
+        <span>/ {totalPages} 页 · 共 {total} 篇</span>
       </span>
       {page < totalPages ? (
         <a
@@ -46,3 +56,36 @@ const { page, totalPages, total, pageUrl } = Astro.props;
     </div>
   )
 }
+
+<script>
+  // 页码跳转：回车或失焦时校验 1~总页数，改当前 URL 的 page 参数（保留其余筛选条件）。
+  // 回到第 1 页时移除 page 参数，与 pageUrl(1) 的干净 URL 保持一致。
+  const setup = () => {
+    for (const input of document.querySelectorAll<HTMLInputElement>(".page-jump-input")) {
+      if (input.dataset.jumpBound) continue;
+      input.dataset.jumpBound = "1";
+      const initial = input.value;
+      const jump = () => {
+        const max = Number(input.max) || 1;
+        const p = Math.floor(Number(input.value));
+        if (!p || p < 1 || p > max || String(p) === initial) {
+          input.value = initial; // 非法输入回显当前页
+          return;
+        }
+        const url = new URL(location.href);
+        url.searchParams.set("page", String(p));
+        if (p === 1) url.searchParams.delete("page");
+        location.href = url.toString();
+      };
+      input.addEventListener("keydown", (e) => {
+        if (e.key === "Enter") {
+          e.preventDefault();
+          jump();
+        }
+      });
+      input.addEventListener("change", jump);
+    }
+  };
+  setup();
+  document.addEventListener("astro:page-load", setup);
+</script>

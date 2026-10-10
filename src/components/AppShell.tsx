@@ -8,18 +8,19 @@ interface AppShellProps {
   /** 服务端读 cookie 得出的登录态，避免客户端再发 /api/auth/me，也消除「登录」按钮闪烁 */
   authed: boolean;
   userName?: string;
+  userAvatar?: string;
 }
 
 const PAD = "px-4 sm:px-5 md:px-6 xl:px-8";
 
-export default function AppShell({ children, authed, userName }: AppShellProps) {
+export default function AppShell({ children, authed, userName, userAvatar }: AppShellProps) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
   return (
     // ≥xl 时锁定为满屏应用式布局：左栏（个人卡片+资讯）与右栏（页面内容）
     // 各自独立滚动，互不牵连；<xl 仍走普通文档流整页滚动
     <div className="min-h-screen flex flex-col xl:h-screen xl:overflow-hidden">
-      <TopNav onToggleSidebar={() => setSidebarOpen((v) => !v)} sidebarOpen={sidebarOpen} authed={authed} userName={userName} />
+      <TopNav onToggleSidebar={() => setSidebarOpen((v) => !v)} sidebarOpen={sidebarOpen} authed={authed} userName={userName} userAvatar={userAvatar} />
 
       {/* ── Body ── */}
       <div className={`flex-1 w-full max-w-[var(--spacing-container)] mx-auto ${PAD} py-6 lg:py-8 xl:min-h-0 xl:overflow-hidden`}>

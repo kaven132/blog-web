@@ -16,8 +16,9 @@ const { title, description } = Astro.props;
 // 登录态和用户名在服务端就绪，作为 props 下发给岛屿：
 // 客户端不用再发 /api/auth/me + /api/profile，登录用户也不会先闪一下「登录」按钮
 const authed = isAuthed(Astro.cookies.get(AUTH_COOKIE)?.value);
-const row = db.select({ name: profile.name }).from(profile).where(eq(profile.id, 1)).get();
+const row = db.select({ name: profile.name, avatar: profile.avatar }).from(profile).where(eq(profile.id, 1)).get();
 const userName = row?.name || "kaven";
+const userAvatar = row?.avatar || "";
 ---
 
 <!doctype html>
@@ -46,7 +47,7 @@ const userName = row?.name || "kaven";
     </noscript>
   </head>
   <body>
-    <AppShell client:load authed={authed} userName={userName}>
+    <AppShell client:load authed={authed} userName={userName} userAvatar={userAvatar}>
       <slot />
     </AppShell>
   </body>

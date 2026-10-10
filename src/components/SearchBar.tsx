@@ -2,10 +2,12 @@ import { useState, useCallback } from "react";
 
 interface SearchBarProps {
   placeholder?: string;
+  /** 预填关键词（搜索结果页回显当前搜索词） */
+  defaultValue?: string;
 }
 
-export default function SearchBar({ placeholder = "搜索文章..." }: SearchBarProps) {
-  const [query, setQuery] = useState("");
+export default function SearchBar({ placeholder = "搜索文章...", defaultValue = "" }: SearchBarProps) {
+  const [query, setQuery] = useState(defaultValue);
   const [focused, setFocused] = useState(false);
 
   const handleSubmit = useCallback(

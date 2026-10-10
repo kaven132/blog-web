@@ -3,8 +3,8 @@ import Layout from "../layouts/Layout.astro";
 import PostCard from "../components/PostCard";
 import SearchBar from "../components/SearchBar";
 import { db } from "../db";
-import { posts } from "../db/schema";
-import { desc, eq } from "drizzle-orm";
+import { posts, likes } from "../db/schema";
+import { desc, eq, sql } from "drizzle-orm";
 
 const recentPosts = db
   .select({
@@ -14,8 +14,10 @@ const recentPosts = db
     tags: posts.tags,
     coverImage: posts.coverImage,
     createdAt: posts.createdAt,
+    likeCount: sql<number>`coalesce(${likes.count}, 0)`,
   })
   .from(posts)
+  .leftJoin(likes, eq(likes.postId, posts.id))
   .where(eq(posts.published, true))
   .orderBy(desc(posts.createdAt))
   .limit(3)
@@ -70,6 +72,7 @@ const recentPosts = db
               tags={post.tags}
               coverImage={post.coverImage ?? undefined}
               createdAt={post.createdAt}
+              likeCount={post.likeCount}
               index={i}
             />
           ))}
