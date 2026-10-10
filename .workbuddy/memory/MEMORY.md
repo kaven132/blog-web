@@ -29,13 +29,14 @@
 - 封面落 `data/uploads/_cover-tmp-<slug>.jpg`，**别下到 `scripts/`**（丢过文件 → cover_image=null）。
 - 若日后 loremflickr 复活，注意历史故障形态：兜底图 / 占位帧（纯红底 + 嵌小照片）/ 截断图（下半灰块）/ 跨日复用真图 / 题材完全不搭的真图，`judge()` 全判 ✅，拦截只能靠肉眼 + `--reject-md5`。指纹明细见各线 automation memory。
 
-## 自动发文（3 条线）
-- `5cff0944` 每日 10:00 书籍 + 让 AI 编程助手更能干的工具（各 4800–5200 汉字）；`3b3c6b54` 每日 10:30 城市旅游；`a49509f8` 每月 2 日 11:00 游戏。
+## 自动发文（4 条线）
+- `5cff0944` 每日 10:00 书籍解读（4800–5200 汉字，只管 `books` 键、只用 `scripts/_books/book/`）；`a21c40ac` 每日 11:00 AI 编程工具长文（4800–5200 汉字，只管 `plugins` 键、只用 `scripts/_books/tech/`）——2026-10-10 由原 5cff0944 拆分而来，两条 prompt 互相声明不替对方发文、清理只删各自子目录；`3b3c6b54` 每日 10:30 城市旅游；`a49509f8` 每月 2 日 11:00 游戏。
+- `automation_update` 的 `cwds` 参数要传逗号分隔字符串（如 `E:\work\ai project\blog2`），传数组会被双重编码。
 - **第二篇选题边界**：主题是「让 AI 编程助手（尤其 dsh）跑得更好的东西」。**五类**：①agent 技能包 ②agent 插件与扩展 ③MCP server 与工具接入 ④记忆/检索/上下文工程 ⑤执行与操作环境（沙箱/容器/远程/终端/浏览器/OCR）。**排除五类**：LLM 应用开发框架与低代码编排平台、面向终端用户的聊天客户端、模型网关/代理聚合层、纯 API 封装 SDK、与 agent 工作流无关的娱乐消费件。
 - 候选池 `scripts/_dsh_candidates.mjs`（读 `C:/Users/kaven/.dsh/plugins/dsh-market/plugins-cache.json`，按五类分组并自动剔除已写过项目与娱乐件；**勿删**）。写第二篇先跑它，别凭记忆编项目名；标 `⚠️star 数存疑` 的别选。
 - **dsh 扩展机制**：插件 = Cordis bundle，`dsh plugin --profile <web|desktop|headless> add <包名|github:owner/repo>`，注册在 `~/.dsh/profiles/<name>/package.json` 的 `dsh.profile.bundles`；**skill 是另一套**，放 `~/.dsh/skills/<name>/SKILL.md`；跨平台技能另有 `npx skills add owner/repo`。dsh 工作区 `E:\work\ai project\dsh`，权威定制清单 `CUSTOMIZATIONS.md`。
 - **临时文件按线分目录**：`scripts/_travel/`、`scripts/_books/book|tech/`、`scripts/_game/<key>/`；**禁用通用名** `_tmp.md`/`_gen.mjs`/`_article.json`/`_cover.jpg`（多条线时间窗真实重叠，曾互删工作文件）。
-- 状态文件：旅游 `scripts/_travel-state.json`；书籍 `scripts/_posted.json` 的 `books`/`plugins`；游戏 `scripts/_game-state.json`。**三线各写各的**（`skills` 是废弃键）。
+- 状态文件：旅游 `scripts/_travel-state.json`；书籍线 `scripts/_posted.json` 的 `books`、AI 工具线同文件的 `plugins`；游戏 `scripts/_game-state.json`。**各线各写各的**（`skills` 是废弃键）。
 - 游戏线：`_game-state.json` 按游戏记**版本号**（不是 slug），双信号判定（A 类已上线 / B 类前瞻官宣），**只有「最新版本号 ≠ 台账版本号」才写文**，每次运行都要回写台账；自检 `scripts/_game-selfcheck.mjs`。
 - slug：`book-rec-YYYYMMDD` / `deepseek-YYYYMMDD` / `travel-<城市>-YYYYMMDD` / `game-<key>-YYYYMMDD`。`deepseek-*` 前缀**不要改**（去重逻辑依赖）。书籍标题与正文**禁「重读/再读/重温」**；正文插图 书籍 1 / 技术 1 / 旅游 2 / 游戏 0。
 

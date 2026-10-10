@@ -38,7 +38,9 @@
     "许三观卖血记",
     "呼啸山庄",
     "儒林外史",
-    "堂吉诃德"
+    "堂吉诃德",
+    "月亮和六便士",
+    "生死疲劳"
   ],
   "plugins": [
     "DeepSeek Harness (dsh) — https://github.com/deepseek-ai/deepseek-harness",
@@ -63,7 +65,9 @@
     "dsh-context — https://github.com/bowenliang123/dsh-context",
     "dsh-remote — https://github.com/flymysql/dsh-remote",
     "dsh-vision-toolkit — https://github.com/Anionex/dsh-vision-toolkit",
-    "SandBase Harness — https://github.com/sandbaseai/sandbase-harness"
+    "SandBase Harness — https://github.com/sandbaseai/sandbase-harness",
+    "ThoughtDAG — https://github.com/chenxiachan/thoughtdag",
+    "DSH-taskboard — https://github.com/shengsheng90/DSH-taskboard"
   ],
   "skills": [
     "subagent",
