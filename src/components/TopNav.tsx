@@ -5,6 +5,7 @@ import ConfirmDialog from "./ConfirmDialog";
 const navLinks = [
   { href: "/", label: "首页" },
   { href: "/posts", label: "文章" },
+  { href: "/games", label: "小游戏" },
   { href: "/about", label: "关于" },
 ];
 

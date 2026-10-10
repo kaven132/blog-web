@@ -1,0 +1,152 @@
+---
+import Layout from "../layouts/Layout.astro";
+
+/**
+ * 小游戏聚合页 —— 目前先放两个占位模块（俄罗斯方块 / 贪吃蛇），
+ * 预览图是纯 SVG 手绘的静态示意图；后续每款游戏实现为 React Island，
+ * 把「开始游戏」按钮换成 client:load 的游戏画布即可，页面结构不用动。
+ */
+const games = [
+  {
+    id: "tetris",
+    title: "俄罗斯方块",
+    subtitle: "TETRIS",
+    desc: "经典落块益智游戏 —— 旋转、消行、连击加速，方块间见缝插针的几何美学。",
+    tags: ["益智", "经典", "键盘操作"],
+  },
+  {
+    id: "snake",
+    title: "贪吃蛇",
+    subtitle: "SNAKE",
+    desc: "控制小蛇吃掉食物不断变长，撞墙或咬到自己即告终局，看谁的蛇更长。",
+    tags: ["休闲", "街机", "键盘操作"],
+  },
+];
+---
+
+<Layout title="小游戏" description="休息一下 —— 俄罗斯方块与贪吃蛇，即将上线">
+  <article class="py-12 md:py-16">
+    <!-- Header -->
+    <header class="mb-10 animate-[slide-up_0.5s_ease-out_both]">
+      <p class="text-xs font-semibold tracking-[0.15em] uppercase text-[var(--color-text-subtle)] mb-3">Games</p>
+      <h1 class="text-3xl md:text-4xl font-bold tracking-[-0.02em] mb-4">小游戏</h1>
+      <p class="text-base text-[var(--color-text-muted)] leading-relaxed font-serif max-w-xl">
+        写代码之余放松一下。两款经典像素小游戏正在开发中，上线后不用装 App，打开浏览器就能来一局。
+      </p>
+    </header>
+
+    <!-- Game cards -->
+    <div class="grid gap-5 sm:grid-cols-2">
+      {games.map((game, i) => (
+        <div
+          class={`group bg-[var(--color-surface)] border border-[var(--color-border)] hover:border-[var(--color-border-hover)] rounded-2xl overflow-hidden transition-all duration-300 animate-[slide-up_0.5s_ease-out_both] ${
+            i === 0 ? "" : "[animation-delay:100ms]"
+          }`}
+        >
+          <!-- 预览区（占位示意图） -->
+          <div class="relative h-36 bg-[var(--color-bg)] border-b border-[var(--color-border)] overflow-hidden">
+            {game.id === "tetris" && (
+              <svg viewBox="0 0 240 140" class="absolute inset-0 h-full w-full" preserveAspectRatio="xMidYMid meet" aria-hidden="true">
+                <defs>
+                  <pattern id="grid-tetris" width="20" height="20" patternUnits="userSpaceOnUse">
+                    <path d="M20 0H0V20" fill="none" stroke="var(--color-border)" stroke-width="1" />
+                  </pattern>
+                </defs>
+                <rect width="240" height="140" fill="url(#grid-tetris)" opacity="0.55" />
+                <!-- 底部堆叠：O / I / L -->
+                <g fill="var(--color-accent)">
+                  <rect x="21.5" y="101.5" width="17" height="17" rx="2.5" opacity="0.9" />
+                  <rect x="41.5" y="101.5" width="17" height="17" rx="2.5" opacity="0.9" />
+                  <rect x="21.5" y="121.5" width="17" height="17" rx="2.5" opacity="0.5" />
+                  <rect x="41.5" y="121.5" width="17" height="17" rx="2.5" opacity="0.5" />
+                  <rect x="81.5" y="121.5" width="17" height="17" rx="2.5" opacity="0.3" />
+                  <rect x="101.5" y="121.5" width="17" height="17" rx="2.5" opacity="0.3" />
+                  <rect x="121.5" y="121.5" width="17" height="17" rx="2.5" opacity="0.3" />
+                  <rect x="141.5" y="121.5" width="17" height="17" rx="2.5" opacity="0.3" />
+                  <rect x="181.5" y="81.5" width="17" height="17" rx="2.5" opacity="0.6" />
+                  <rect x="181.5" y="101.5" width="17" height="17" rx="2.5" opacity="0.6" />
+                  <rect x="181.5" y="121.5" width="17" height="17" rx="2.5" opacity="0.6" />
+                  <rect x="201.5" y="121.5" width="17" height="17" rx="2.5" opacity="0.6" />
+                  <!-- 下落中的 T -->
+                  <rect x="121.5" y="21.5" width="17" height="17" rx="2.5" opacity="0.85" />
+                  <rect x="141.5" y="21.5" width="17" height="17" rx="2.5" opacity="0.85" />
+                  <rect x="161.5" y="21.5" width="17" height="17" rx="2.5" opacity="0.85" />
+                  <rect x="141.5" y="41.5" width="17" height="17" rx="2.5" opacity="0.85" />
+                </g>
+              </svg>
+            )}
+            {game.id === "snake" && (
+              <svg viewBox="0 0 240 140" class="absolute inset-0 h-full w-full" preserveAspectRatio="xMidYMid meet" aria-hidden="true">
+                <defs>
+                  <pattern id="grid-snake" width="20" height="20" patternUnits="userSpaceOnUse">
+                    <path d="M20 0H0V20" fill="none" stroke="var(--color-border)" stroke-width="1" />
+                  </pattern>
+                </defs>
+                <rect width="240" height="140" fill="url(#grid-snake)" opacity="0.55" />
+                <!-- 食物 -->
+                <circle cx="190" cy="50" r="10" fill="none" stroke="var(--color-accent)" stroke-width="1.5" opacity="0.35" />
+                <circle cx="190" cy="50" r="5.5" fill="var(--color-accent)" />
+                <!-- 蛇身 -->
+                <polyline
+                  points="50,90 50,70 110,70 110,110 150,110"
+                  fill="none"
+                  stroke="var(--color-accent)"
+                  stroke-width="10"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  opacity="0.75"
+                />
+                <!-- 蛇头 + 眼睛 -->
+                <circle cx="150" cy="110" r="7.5" fill="var(--color-accent-hover)" />
+                <circle cx="152.5" cy="107.5" r="1.3" fill="white" />
+              </svg>
+            )}
+            <!-- 状态角标 -->
+            <span class="absolute top-3 right-3 inline-flex items-center gap-1.5 rounded-full bg-[var(--color-surface)]/90 backdrop-blur border border-[var(--color-border)] px-2.5 py-1 text-[11px] font-medium text-[var(--color-text-muted)]">
+              <span class="w-1.5 h-1.5 rounded-full bg-[var(--color-accent)] animate-pulse" />
+              开发中
+            </span>
+          </div>
+
+          <!-- 信息区 -->
+          <div class="p-5">
+            <div class="flex items-baseline gap-2.5">
+              <h2 class="text-lg font-bold text-[var(--color-text)]">{game.title}</h2>
+              <span class="text-[11px] font-mono tracking-[0.18em] uppercase text-[var(--color-text-subtle)]">{game.subtitle}</span>
+            </div>
+            <p class="mt-2 text-sm text-[var(--color-text-muted)] leading-relaxed">{game.desc}</p>
+            <div class="mt-3 flex flex-wrap gap-1.5">
+              {game.tags.map((tag) => (
+                <span class="px-2 py-0.5 rounded-full bg-[var(--color-bg)] border border-[var(--color-border)] text-[11px] font-medium text-[var(--color-text-muted)]">
+                  {tag}
+                </span>
+              ))}
+            </div>
+            <div class="mt-4 pt-4 border-t border-[var(--color-border)] flex items-center justify-between">
+              <span class="text-xs text-[var(--color-text-subtle)]">敬请期待</span>
+              <button
+                disabled
+                title="即将上线"
+                class="px-3.5 py-1.5 text-sm font-medium rounded-lg border border-[var(--color-border)] text-[var(--color-text-subtle)] cursor-not-allowed select-none"
+              >
+                开始游戏
+              </button>
+            </div>
+          </div>
+        </div>
+      ))}
+    </div>
+
+    <!-- 更多游戏 -->
+    <div class="mt-5 rounded-2xl border border-dashed border-[var(--color-border)] p-5 flex items-center gap-3.5 animate-[slide-up_0.5s_ease-out_both] [animation-delay:200ms]">
+      <span class="w-9 h-9 flex-shrink-0 flex items-center justify-center rounded-full bg-[var(--color-accent-muted)] text-[var(--color-accent)]">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+        </svg>
+      </span>
+      <p class="text-sm text-[var(--color-text-subtle)] leading-relaxed">
+        更多小游戏排队开发中 —— 有想玩的经典款？欢迎在文章评论区留言点名。
+      </p>
+    </div>
+  </article>
+</Layout>

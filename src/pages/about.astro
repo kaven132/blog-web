@@ -1,29 +1,86 @@
 ---
 import Layout from "../layouts/Layout.astro";
+import { db } from "../db";
+import { posts, comments, likes } from "../db/schema";
+import { eq, sql } from "drizzle-orm";
+
+// 真实数据小统计：SSR 时直接查库，客户端零请求
+const postCount = db.select({ n: sql<number>`count(*)` }).from(posts).where(eq(posts.published, true)).get()?.n ?? 0;
+const commentCount = db.select({ n: sql<number>`count(*)` }).from(comments).get()?.n ?? 0;
+const likeCount = db.select({ n: sql<number>`coalesce(sum(${likes.count}), 0)` }).from(likes).get()?.n ?? 0;
+
+const techStack = [
+  { glyph: "◆", label: "框架", title: "Astro 5 SSR", desc: "服务端动态渲染，Node standalone 部署，首屏直出无需等待。" },
+  { glyph: "◉", label: "UI", title: "React 19 Islands", desc: "群岛架构：静态 HTML 里按需注水，只有交互组件携带 JS。" },
+  { glyph: "○", label: "样式", title: "Tailwind CSS v4", desc: "CSS 优先的 @theme 配置，oklch 色彩空间，Oxide 引擎。" },
+  { glyph: "△", label: "语言", title: "TypeScript 5", desc: "strict 模式全量类型约束，页面、接口与脚本共享类型。" },
+  { glyph: "◈", label: "ORM", title: "Drizzle ORM", desc: "类型安全的 SQL 查询构建器，schema 即类型，迁移可追溯。" },
+  { glyph: "▣", label: "数据库", title: "SQLite · WAL", desc: "better-sqlite3 单文件库，零运维，全站唯一数据源。" },
+];
+
+const features = [
+  "Markdown 文章与封面插图",
+  "实时搜索 · 标签筛选 · 分页",
+  "点赞与评论互动",
+  "头像裁切上传与个人名片",
+  "RSS 资讯聚合（国内 / 国外 / 科技 / 游戏）",
+  "HMAC 签名 Cookie 登录态",
+  "阅读进度指示器",
+  "自动化发文流水线",
+  "小游戏板块（开发中）",
+];
+
+const palette = [
+  { name: "珊瑚红", token: "accent", color: "var(--color-accent)" },
+  { name: "暖白", token: "bg", color: "var(--color-bg)" },
+  { name: "纸白", token: "surface", color: "var(--color-surface)" },
+  { name: "墨黑", token: "text", color: "var(--color-text)" },
+  { name: "暖灰", token: "border", color: "var(--color-border)" },
+];
+
+const fonts = [
+  { sample: "Aa", name: "DM Sans · Noto Sans SC", usage: "界面与正文 · 无衬线", css: "var(--font-sans)" },
+  { sample: "永", name: "Noto Serif SC", usage: "引文与强调 · 衬线", css: "var(--font-serif)" },
+  { sample: "{}", name: "JetBrains Mono", usage: "代码与数字 · 等宽", css: "var(--font-mono)" },
+];
 ---
 
-<Layout title="关于" description="关于 Blog3 — 技术栈、设计理念与功能特性">
+<Layout title="关于" description="关于 kaven的个人网页 — 技术栈、设计理念与功能特性">
   <article class="max-w-3xl mx-auto py-12 md:py-16">
-    <div class="mb-12">
+    <!-- Hero -->
+    <div class="mb-12 animate-[slide-up_0.5s_ease-out_both]">
       <p class="text-xs font-semibold tracking-[0.15em] uppercase text-[var(--color-text-subtle)] mb-3">About</p>
       <h1 class="text-3xl md:text-4xl font-bold tracking-[-0.02em] mb-5">关于这个博客</h1>
       <p class="text-base text-[var(--color-text-muted)] leading-relaxed font-serif max-w-xl">
-        Blog3 是一个使用现代前端技术栈构建的个人技术博客，也是探索最新 Web 开发实践的实验场。
+        这是一个使用现代前端技术栈构建的个人技术博客，也是探索最新 Web 开发实践的实验场 ——
+        从 SSR 渲染、群岛注水到自动化发文，站上每一处细节都 open to read。
       </p>
+      <div class="mt-7 flex gap-8">
+        <div>
+          <p class="text-2xl font-bold tabular-nums">{postCount}<span class="text-sm font-medium text-[var(--color-text-subtle)] ml-1">篇</span></p>
+          <p class="text-xs text-[var(--color-text-subtle)] mt-0.5">已发布文章</p>
+        </div>
+        <div>
+          <p class="text-2xl font-bold tabular-nums">{likeCount}<span class="text-sm font-medium text-[var(--color-text-subtle)] ml-1">次</span></p>
+          <p class="text-xs text-[var(--color-text-subtle)] mt-0.5">收到点赞</p>
+        </div>
+        <div>
+          <p class="text-2xl font-bold tabular-nums">{commentCount}<span class="text-sm font-medium text-[var(--color-text-subtle)] ml-1">条</span></p>
+          <p class="text-xs text-[var(--color-text-subtle)] mt-0.5">读者评论</p>
+        </div>
+      </div>
     </div>
 
-    <!-- Tech stack cards -->
-    <section class="mb-14">
+    <!-- Tech stack -->
+    <section class="mb-14 animate-[slide-up_0.5s_ease-out_both] [animation-delay:80ms]">
       <h2 class="text-sm font-semibold tracking-[0.12em] uppercase text-[var(--color-text-subtle)] mb-5">技术栈</h2>
       <div class="grid gap-3 sm:grid-cols-2">
-        {[
-          { icon: "◆", title: "Astro SSR", desc: "服务端渲染，按需生成页面，极致的内容交付性能。" },
-          { icon: "◇", title: "React Islands", desc: "群岛架构 — 在静态 HTML 中嵌入交互式 React 组件。" },
-          { icon: "○", title: "Tailwind CSS v4", desc: "CSS 优先主题配置，oklch 色彩空间，容器查询。" },
-          { icon: "◉", title: "Drizzle ORM + SQLite", desc: "类型安全 ORM，零依赖的轻量数据库。" },
-        ].map((item) => (
+        {techStack.map((item) => (
           <div class="group bg-[var(--color-surface)] border border-[var(--color-border)] hover:border-[var(--color-border-hover)] rounded-xl p-5 transition-all duration-300">
-            <span class="text-[var(--color-accent)] text-lg mb-3 block">{item.icon}</span>
+            <div class="flex items-center justify-between mb-3">
+              <span class="text-[var(--color-accent)] text-lg leading-none">{item.glyph}</span>
+              <span class="text-[10px] font-semibold tracking-[0.12em] uppercase text-[var(--color-text-subtle)]">{item.label}</span>
+            </div>
             <h3 class="font-semibold text-[var(--color-text)] mb-1.5">{item.title}</h3>
             <p class="text-sm text-[var(--color-text-muted)] leading-relaxed">{item.desc}</p>
           </div>
@@ -32,24 +89,57 @@ import Layout from "../layouts/Layout.astro";
     </section>
 
     <!-- Features -->
-    <section>
+    <section class="mb-14 animate-[slide-up_0.5s_ease-out_both] [animation-delay:140ms]">
       <h2 class="text-sm font-semibold tracking-[0.12em] uppercase text-[var(--color-text-subtle)] mb-5">功能</h2>
-      <div class="grid gap-2 sm:grid-cols-2">
-        {[
-          "Markdown 风格文章排版",
-          "实时文章搜索",
-          "文章点赞功能",
-          "文章评论系统",
-          "文章标签分类",
-          "响应式设计",
-          "服务端渲染 · SEO 友好",
-          "阅读进度指示器",
-        ].map((feature) => (
+      <div class="grid gap-x-6 gap-y-1 sm:grid-cols-2">
+        {features.map((feature) => (
           <div class="flex items-center gap-3 text-sm text-[var(--color-text-muted)] py-2">
             <span class="w-1 h-1 rounded-full bg-[var(--color-accent)] flex-shrink-0" />
             {feature}
           </div>
         ))}
+      </div>
+    </section>
+
+    <!-- Design tokens -->
+    <section class="mb-14 animate-[slide-up_0.5s_ease-out_both] [animation-delay:200ms]">
+      <h2 class="text-sm font-semibold tracking-[0.12em] uppercase text-[var(--color-text-subtle)] mb-5">设计语言</h2>
+
+      <p class="text-sm text-[var(--color-text-muted)] mb-4">暖白单色打底，珊瑚红只做点缀 —— 颜色即层级。</p>
+      <div class="grid grid-cols-3 sm:grid-cols-5 gap-3 mb-8">
+        {palette.map((c) => (
+          <div>
+            <div class="h-12 rounded-lg border border-[var(--color-border)] mb-2" style={`background:${c.color}`} />
+            <p class="text-xs font-medium text-[var(--color-text)]">{c.name}</p>
+            <p class="text-[10px] font-mono text-[var(--color-text-subtle)]">--color-{c.token}</p>
+          </div>
+        ))}
+      </div>
+
+      <div class="grid gap-3 sm:grid-cols-3">
+        {fonts.map((f) => (
+          <div class="bg-[var(--color-surface)] border border-[var(--color-border)] rounded-xl p-4">
+            <p class="text-3xl text-[var(--color-text)] mb-3" style={`font-family:${f.css}`}>{f.sample}</p>
+            <p class="text-sm font-semibold text-[var(--color-text)]">{f.name}</p>
+            <p class="text-xs text-[var(--color-text-subtle)] mt-0.5">{f.usage}</p>
+          </div>
+        ))}
+      </div>
+    </section>
+
+    <!-- Games CTA -->
+    <section class="animate-[slide-up_0.5s_ease-out_both] [animation-delay:260ms]">
+      <div class="bg-[var(--color-surface)] border border-[var(--color-border)] rounded-2xl p-6 sm:p-7 flex flex-col sm:flex-row sm:items-center gap-4 sm:justify-between">
+        <div>
+          <h3 class="font-semibold text-[var(--color-text)] mb-1">劳逸结合</h3>
+          <p class="text-sm text-[var(--color-text-muted)]">写完代码来一局俄罗斯方块或贪吃蛇 —— 小游戏板块已经开工。</p>
+        </div>
+        <a
+          href="/games"
+          class="flex-shrink-0 inline-flex items-center gap-1.5 px-4 py-2 text-sm font-medium rounded-lg bg-[var(--color-accent)] text-white hover:bg-[var(--color-accent-hover)] transition-colors"
+        >
+          去逛逛<span aria-hidden="true">→</span>
+        </a>
       </div>
     </section>
   </article>

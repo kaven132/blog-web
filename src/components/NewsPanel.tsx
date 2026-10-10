@@ -316,7 +316,7 @@ export default function NewsPanel() {
             {switchError ?? `来源：${category.source}`}
           </span>
 
-          {/* 同分类多来源时，切换按钮 */}
+          {/* 同分类多来源时，切换按钮（规格与右上角刷新按钮一致：w-6 h-6 + 3.5 图标） */}
           {siblings.length > 1 && nextSource && (
             <button
               type="button"
@@ -324,10 +324,10 @@ export default function NewsPanel() {
               disabled={Boolean(switching)}
               title={`切换来源：${category.source} → ${nextSource.label}（共 ${siblings.length} 个）`}
               aria-label={`切换资讯来源，当前 ${category.source}`}
-              className="ml-0.5 w-5 h-5 flex-shrink-0 flex items-center justify-center rounded-md text-[var(--color-text-subtle)] hover:text-[var(--color-accent)] hover:bg-[var(--color-bg)] transition-all disabled:opacity-40"
+              className="ml-0.5 w-6 h-6 flex-shrink-0 flex items-center justify-center rounded-md text-[var(--color-text-subtle)] hover:text-[var(--color-accent)] hover:bg-[var(--color-bg)] transition-all disabled:opacity-40"
             >
               <svg
-                className={`w-3 h-3 ${switching ? "animate-spin" : ""}`}
+                className={`w-3.5 h-3.5 ${switching ? "animate-spin" : ""}`}
                 fill="none" stroke="currentColor" strokeWidth={1.8} viewBox="0 0 24 24"
               >
                 <path strokeLinecap="round" strokeLinejoin="round" d="M7.5 21L3 16.5m0 0L7.5 12M3 16.5h13.5m0-13.5L21 7.5m0 0L16.5 12M21 7.5H7.5" />

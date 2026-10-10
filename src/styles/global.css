@@ -92,6 +92,17 @@ body {
   background: var(--color-border-hover);
 }
 
+/* ── 隐藏滚动条但保留滚动能力 ──
+   独立滚动的左右分栏、移动端抽屉用：滚轮/触摸/键盘滚动不受影响，
+   只是不再显示各自的滚动条（分区滚动时界面保持干净） */
+.scrollbar-none {
+  scrollbar-width: none;
+}
+
+.scrollbar-none::-webkit-scrollbar {
+  display: none;
+}
+
 /* ── Prose (article content) ── */
 .prose {
   font-family: var(--font-serif);
