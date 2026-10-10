@@ -12,3 +12,4 @@ data/
 .workbuddy/
 .mimosa/
 __pycache__/
+.zcodeignore

@@ -1,10 +1,10 @@
 ---
 import Layout from "../layouts/Layout.astro";
+import GameLauncher from "../components/games/GameLauncher";
 
 /**
- * 小游戏聚合页 —— 目前先放两个占位模块（俄罗斯方块 / 贪吃蛇），
- * 预览图是纯 SVG 手绘的静态示意图；后续每款游戏实现为 React Island，
- * 把「开始游戏」按钮换成 client:load 的游戏画布即可，页面结构不用动。
+ * 小游戏聚合页 —— 四款均已可玩（GameLauncher 岛屿弹窗对局）；
+ * 新游戏上线：实现组件 → GameLauncher 加分支 → 下方 games 数组加一张卡片。
  */
 const games = [
   {
@@ -21,6 +21,20 @@ const games = [
     desc: "控制小蛇吃掉食物不断变长，撞墙或咬到自己即告终局，看谁的蛇更长。",
     tags: ["休闲", "街机", "键盘操作"],
   },
+  {
+    id: "2048",
+    title: "2048",
+    subtitle: "2048",
+    desc: "滑动合并相同数字，直到拼出 2048 —— 越合越上瘾的数字益智经典。",
+    tags: ["益智", "数字", "滑动操作"],
+  },
+  {
+    id: "mines",
+    title: "扫雷",
+    subtitle: "MINESWEEPER",
+    desc: "根据数字推理地雷位置，翻开所有安全格 —— 点击开路，长按插旗。",
+    tags: ["推理", "经典", "点击操作"],
+  },
 ];
 ---
 
@@ -31,7 +45,7 @@ const games = [
       <p class="text-xs font-semibold tracking-[0.15em] uppercase text-[var(--color-text-subtle)] mb-3">Games</p>
       <h1 class="text-3xl md:text-4xl font-bold tracking-[-0.02em] mb-4">小游戏</h1>
       <p class="text-base text-[var(--color-text-muted)] leading-relaxed font-serif max-w-xl">
-        写代码之余放松一下。两款经典像素小游戏正在开发中，上线后不用装 App，打开浏览器就能来一局。
+        写代码之余放松一下。四款经典小游戏全部上线，不用装 App，打开浏览器就能来一局。
       </p>
     </header>
 
@@ -101,10 +115,71 @@ const games = [
                 <circle cx="152.5" cy="107.5" r="1.3" fill="white" />
               </svg>
             )}
+            {game.id === "2048" && (
+              <svg viewBox="0 0 240 140" class="absolute inset-0 h-full w-full" preserveAspectRatio="xMidYMid meet" aria-hidden="true">
+                {/* 4×4 底格 */}
+                {Array.from({ length: 16 }).map((_, i) => {
+                  const col = i % 4;
+                  const row = Math.floor(i / 4);
+                  return <rect x={63.5 + col * 29} y={13.5 + row * 29} width="26" height="26" rx="4" fill="#eae3d6" opacity="0.5" />;
+                })}
+                {/* 已拼出的数字块 */}
+                <g font-family="inherit" font-weight="bold" text-anchor="middle">
+                  <rect x={63.5} y={13.5} width="26" height="26" rx="4" fill="#f0e9dc" />
+                  <text x={76.5} y={30.5} font-size="11" fill="#6b6357">2</text>
+                  <rect x={92.5} y={13.5} width="26" height="26" rx="4" fill="#f0e9dc" />
+                  <text x={105.5} y={30.5} font-size="11" fill="#6b6357">2</text>
+                  <rect x={63.5} y={42.5} width="26" height="26" rx="4" fill="#eccfa5" />
+                  <text x={76.5} y={59.5} font-size="11" fill="#fff">8</text>
+                  <rect x={150.5} y={42.5} width="26" height="26" rx="4" fill="#e8bc85" />
+                  <text x={163.5} y={59.5} font-size="10" fill="#fff">16</text>
+                  <rect x={92.5} y={71.5} width="26" height="26" rx="4" fill="#db8b50" />
+                  <text x={105.5} y={88.5} font-size="10" fill="#fff">64</text>
+                  <rect x={121.5} y={100.5} width="26" height="26" rx="4" fill="#d37340" />
+                  <text x={134.5} y={117.5} font-size="9" fill="#fff">128</text>
+                  <rect x={150.5} y={100.5} width="26" height="26" rx="4" fill="#ca5c36" />
+                  <text x={163.5} y={117.5} font-size="9" fill="#fff">256</text>
+                </g>
+              </svg>
+            )}
+            {game.id === "mines" && (
+              <svg viewBox="0 0 240 140" class="absolute inset-0 h-full w-full" preserveAspectRatio="xMidYMid meet" aria-hidden="true">
+                {/* 5×3 迷你雷区 */}
+                {[
+                  // row 0
+                  { x: 29, y: 16, covered: true }, { x: 66, y: 16, n: 1, color: "#8ba3b5" }, { x: 103, y: 16, covered: true }, { x: 140, y: 16, flag: true }, { x: 177, y: 16, covered: true },
+                  // row 1
+                  { x: 29, y: 53, n: 2, color: "#9cb491" }, { x: 66, y: 53, n: 1, color: "#d97a6a" }, { x: 103, y: 53, n: 1, color: "#8ba3b5" }, { x: 140, y: 53, covered: true }, { x: 177, y: 53, covered: true },
+                  // row 2
+                  { x: 29, y: 90, covered: true }, { x: 66, y: 90, n: 1, color: "#9cb491" }, { x: 103, y: 90, mine: true }, { x: 140, y: 90, covered: true }, { x: 177, y: 90, covered: true },
+                ].map((cell) =>
+                  cell.covered ? (
+                    <rect x={cell.x} y={cell.y} width="34" height="34" rx="5" fill="#fff" stroke="#eae3d6" stroke-width="1.5" />
+                  ) : (
+                    <g>
+                      <rect x={cell.x} y={cell.y} width="34" height="34" rx="5" fill="#f1ebdf" />
+                      {cell.n && <text x={cell.x + 17} y={cell.y + 22} font-size="14" font-weight="bold" fill={cell.color} text-anchor="middle">{cell.n}</text>}
+                      {cell.flag && (
+                        <g>
+                          <line x1={cell.x + 13} y1={cell.y + 8} x2={cell.x + 13} y2={cell.y + 26} stroke="#6b6357" stroke-width="2" />
+                          <path d={`M${cell.x + 13} ${cell.y + 8} L${cell.x + 27} ${cell.y + 13} L${cell.x + 13} ${cell.y + 18} Z`} fill="var(--color-accent)" />
+                        </g>
+                      )}
+                      {cell.mine && (
+                        <g>
+                          <circle cx={cell.x + 17} cy={cell.y + 17} r="8" fill="#b85a4a" />
+                          <circle cx={cell.x + 14.5} cy={cell.y + 14.5} r="2" fill="#fff" opacity="0.7" />
+                        </g>
+                      )}
+                    </g>
+                  )
+                )}
+              </svg>
+            )}
             <!-- 状态角标 -->
             <span class="absolute top-3 right-3 inline-flex items-center gap-1.5 rounded-full bg-[var(--color-surface)]/90 backdrop-blur border border-[var(--color-border)] px-2.5 py-1 text-[11px] font-medium text-[var(--color-text-muted)]">
               <span class="w-1.5 h-1.5 rounded-full bg-[var(--color-accent)] animate-pulse" />
-              开发中
+              可玩
             </span>
           </div>
 
@@ -123,14 +198,8 @@ const games = [
               ))}
             </div>
             <div class="mt-4 pt-4 border-t border-[var(--color-border)] flex items-center justify-between">
-              <span class="text-xs text-[var(--color-text-subtle)]">敬请期待</span>
-              <button
-                disabled
-                title="即将上线"
-                class="px-3.5 py-1.5 text-sm font-medium rounded-lg border border-[var(--color-border)] text-[var(--color-text-subtle)] cursor-not-allowed select-none"
-              >
-                开始游戏
-              </button>
+              <span class="text-xs text-[var(--color-text-subtle)]">支持键盘 / 触屏</span>
+              <GameLauncher client:load game={game.id} title={game.title} subtitle={game.subtitle} />
             </div>
           </div>
         </div>

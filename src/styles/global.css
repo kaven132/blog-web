@@ -52,6 +52,13 @@
   100% { transform: translateX(100%); }
 }
 
+/* 2048 新块 / 合并块的缩放入场 */
+@keyframes pop {
+  0% { transform: scale(0.5); }
+  70% { transform: scale(1.08); }
+  100% { transform: scale(1); }
+}
+
 /* ── Base ── */
 body {
   background-color: var(--color-bg);
