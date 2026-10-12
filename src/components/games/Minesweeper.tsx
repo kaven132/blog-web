@@ -31,12 +31,12 @@ const NUM_COLOR: Record<number, string> = {
   8: CORAL.deep,
 };
 
-/** 插旗 / 地雷的小图形，配色与卡片预览图同款 */
+/** 插旗 / 地雷的小图形，配色与卡片预览图同款；绘制内容以 viewBox 中心对齐 */
 function FlagIcon() {
   return (
     <svg viewBox="0 0 24 24" className="w-[60%] h-[60%]" aria-hidden="true">
-      <line x1="9" y1="4" x2="9" y2="20" stroke="#6b6357" strokeWidth="2" strokeLinecap="round" />
-      <path d="M9 4 L19 8.5 L9 13 Z" fill="var(--color-accent)" />
+      <line x1="7" y1="3" x2="7" y2="21" stroke="#6b6357" strokeWidth="2" strokeLinecap="round" />
+      <path d="M7 3 L17 7.5 L7 12 Z" fill="var(--color-accent)" />
     </svg>
   );
 }
@@ -273,7 +273,7 @@ export default function Minesweeper() {
                   onPointerDown={() => onCellPointerDown(r, c)}
                   onPointerUp={onCellPointerUp}
                   onPointerLeave={onCellPointerUp}
-                  className={`aspect-square rounded-md text-sm font-bold tabular-nums transition-colors ${
+                  className={`aspect-square rounded-md flex items-center justify-center text-sm font-bold tabular-nums transition-colors ${
                     cell.revealed
                       ? cell.mine
                         ? exploded

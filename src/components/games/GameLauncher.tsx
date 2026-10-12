@@ -4,6 +4,7 @@ import Tetris from "./Tetris";
 import Snake from "./Snake";
 import Game2048 from "./Game2048";
 import Minesweeper from "./Minesweeper";
+import PacMan from "./PacMan";
 
 interface GameLauncherProps {
   game: string;
@@ -36,6 +37,8 @@ export default function GameLauncher({ game, title, subtitle }: GameLauncherProp
             <Snake />
           ) : game === "2048" ? (
             <Game2048 />
+          ) : game === "pacman" ? (
+            <PacMan />
           ) : (
             <Minesweeper />
           )}
