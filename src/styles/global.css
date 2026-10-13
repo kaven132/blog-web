@@ -1,5 +1,8 @@
 @import "tailwindcss";
 
+/* 暗色模式：class 策略（.dark 挂在 <html> 上，进入页面前由内联脚本设置防闪烁） */
+@custom-variant dark (&:where(.dark, .dark *));
+
 @theme {
   /* ── Warm monochrome + coral accent palette ── */
   --color-accent: oklch(58% 0.22 20);
@@ -12,6 +15,14 @@
   --color-text-subtle: oklch(60% 0.01 260);
   --color-border: oklch(88% 0.008 95);
   --color-border-hover: oklch(78% 0.01 260);
+  --color-code-bg: oklch(95% 0.005 95);
+
+  /* ── 游戏画布专用（暗色在下方 .dark 中覆盖） ── */
+  --game-board-bg: #faf8f1;
+  --game-board-grid: #eae3d6;
+  --game-wall: #e2dbc9;
+  --game-pellet: #d9b48f;
+  --game-cell-revealed: #f1ebdf;
 
   /* ── Typography ──
      Tailwind v4 的字体命名空间是 --font-*，写成 --font-family-* 不会生成
@@ -25,6 +36,24 @@
   --animate-fade-in: fade-in 0.6s ease-out both;
   --animate-slide-up: slide-up 0.5s ease-out both;
   --animate-scale-in: scale-in 0.3s ease-out both;
+}
+
+/* ── 暗色 token：与 :root 同名覆盖，组件全部走 var() 自动切换 ── */
+.dark {
+  --color-bg: oklch(17% 0.008 260);
+  --color-surface: oklch(21% 0.011 260);
+  --color-text: oklch(90% 0.006 260);
+  --color-text-muted: oklch(70% 0.012 260);
+  --color-text-subtle: oklch(52% 0.012 260);
+  --color-border: oklch(30% 0.013 260);
+  --color-border-hover: oklch(43% 0.013 260);
+  --color-accent-muted: oklch(58% 0.22 20 / 0.16);
+  --color-code-bg: oklch(27% 0.012 260);
+  --game-board-bg: #26262e;
+  --game-board-grid: #393943;
+  --game-wall: #46464f;
+  --game-pellet: #cfa87d;
+  --game-cell-revealed: #2c2c34;
 }
 
 @keyframes fade-in {
@@ -141,7 +170,7 @@ body {
   margin-bottom: 1.25rem;
   line-height: 1.85;
   font-size: 1.05rem;
-  color: oklch(25% 0.015 260);
+  color: var(--color-text);
 }
 
 .prose ul,
@@ -157,7 +186,7 @@ body {
 }
 
 .prose code {
-  background-color: oklch(95% 0.005 95);
+  background-color: var(--color-code-bg);
   color: var(--color-accent);
   padding: 0.15em 0.4em;
   border-radius: 0.25rem;
@@ -175,6 +204,63 @@ body {
   margin-bottom: 1.5rem;
   font-size: 0.9rem;
   line-height: 1.7;
+  position: relative;
+}
+
+/* ── 代码块语言标签 + 复制按钮（详情页脚本注入） ── */
+.code-lang {
+  position: absolute;
+  top: 0.55rem;
+  right: 3.6rem;
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: oklch(70% 0.01 260);
+  opacity: 0.75;
+  pointer-events: none;
+}
+
+.code-copy {
+  position: absolute;
+  top: 0.45rem;
+  right: 0.55rem;
+  padding: 0.22rem 0.55rem;
+  font-size: 0.7rem;
+  font-family: var(--font-sans);
+  color: oklch(85% 0.005 260);
+  background: oklch(32% 0.012 260 / 0.75);
+  border: 1px solid oklch(48% 0.012 260 / 0.5);
+  border-radius: 0.4rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.code-copy:hover {
+  color: #fff;
+  background: var(--color-accent);
+  border-color: var(--color-accent);
+}
+
+/* ── 图片灯箱 ── */
+.lightbox {
+  position: fixed;
+  inset: 0;
+  z-index: 300;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.82);
+  backdrop-filter: blur(4px);
+  cursor: zoom-out;
+  padding: 2rem;
+}
+
+.lightbox img {
+  max-width: min(1200px, 92vw);
+  max-height: 88vh;
+  border-radius: 0.75rem;
+  box-shadow: 0 24px 80px rgba(0, 0, 0, 0.5);
 }
 
 .prose pre code {

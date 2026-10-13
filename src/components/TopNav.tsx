@@ -83,6 +83,28 @@ export default function TopNav({ onToggleSidebar, sidebarOpen, authed, userName 
               ))}
             </nav>
 
+            {/* 深色模式切换：图标由 .dark class 驱动自动换形，选择存 localStorage */}
+            <button
+              onClick={() => {
+                const dark = document.documentElement.classList.toggle("dark");
+                try {
+                  localStorage.setItem("theme", dark ? "dark" : "light");
+                } catch {
+                  /* ignore */
+                }
+              }}
+              aria-label="切换深色模式"
+              title="切换深色模式"
+              className="w-8 h-8 flex items-center justify-center rounded-lg text-[var(--color-text-subtle)] hover:text-[var(--color-text)] hover:bg-[var(--color-bg)] transition-all"
+            >
+              <svg className="w-4 h-4 dark:hidden" fill="none" stroke="currentColor" strokeWidth={1.8} viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M12 3v2.25m6.364.386-1.591 1.591M21 12h-2.25m-.386 6.364-1.591-1.591M12 18.75V21m-4.773-4.227-1.591 1.591M5.25 12h2.25m-.386-6.364L7.859 7.859M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z" />
+              </svg>
+              <svg className="w-4 h-4 hidden dark:block" fill="none" stroke="currentColor" strokeWidth={1.8} viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M21.752 15.002A9.72 9.72 0 0 1 18 15.75c-5.385 0-9.75-4.365-9.75-9.75 0-1.33.266-2.597.748-3.752A9.753 9.753 0 0 0 3 11.25C3 16.635 7.365 21 12.75 21a9.753 9.753 0 0 0 9.002-5.998Z" />
+              </svg>
+            </button>
+
             {loggedIn ? (
               <div className="flex items-center gap-2">
                 <a href="/admin" className="px-3 py-1.5 text-sm font-medium rounded-lg bg-[var(--color-accent)] text-white hover:bg-[var(--color-accent-hover)] transition-colors">

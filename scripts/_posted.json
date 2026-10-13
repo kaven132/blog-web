@@ -41,7 +41,8 @@
     "堂吉诃德",
     "月亮和六便士",
     "生死疲劳",
-    "我们仨"
+    "我们仨",
+    "红楼梦"
   ],
   "plugins": [
     "DeepSeek Harness (dsh) — https://github.com/deepseek-ai/deepseek-harness",
@@ -69,7 +70,8 @@
     "SandBase Harness — https://github.com/sandbaseai/sandbase-harness",
     "ThoughtDAG — https://github.com/chenxiachan/thoughtdag",
     "DSH-taskboard — https://github.com/shengsheng90/DSH-taskboard",
-    "dsh-browser — https://github.com/omdsh-dev/dsh-browser"
+    "dsh-browser — https://github.com/omdsh-dev/dsh-browser",
+    "SpecFusion — https://github.com/wxkingstar/SpecFusion"
   ],
   "skills": [
     "subagent",

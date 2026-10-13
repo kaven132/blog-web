@@ -21,9 +21,12 @@ export default defineConfig({
     // 未配置时 Astro 会把 url.origin 回退成无端口的 http://localhost，浏览器携带的
     // Origin（带端口）永远匹配不上，DELETE 等无 Content-Type 的写入请求全部 403。
     // 部署到公网时，把真实域名（如 { hostname: "blog.example.com", protocol: "https" }）加进来。
+    // 4321 = dev / 生产常用端口；4399 = 本地预览端口（评论表单 multipart POST 会被 CSRF 拦截）
     allowedDomains: [
       { hostname: "localhost", protocol: "http", port: "4321" },
       { hostname: "127.0.0.1", protocol: "http", port: "4321" },
+      { hostname: "localhost", protocol: "http", port: "4399" },
+      { hostname: "127.0.0.1", protocol: "http", port: "4399" },
     ],
   },
 });

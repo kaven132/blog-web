@@ -14,15 +14,15 @@ const l1 = Astro.url.searchParams.get("l1") || "";
 const l2 = Astro.url.searchParams.get("l2") || "";
 const l3 = Astro.url.searchParams.get("l3") || "";
 
-// 排序：时间 / 点赞数 / 评论数 × 升降序（默认时间倒序）；URL 参数白名单校验
-const SORT_KEYS = ["time", "likes", "comments"];
+// 排序：时间 / 点赞数 / 评论数 / 浏览量 × 升降序（默认时间倒序）；URL 参数白名单校验
+const SORT_KEYS = ["time", "likes", "comments", "views"];
 const sort: string = SORT_KEYS.includes(Astro.url.searchParams.get("sort") || "")
   ? (Astro.url.searchParams.get("sort") as string)
   : "time";
 const order: string = Astro.url.searchParams.get("order") === "asc" ? "asc" : "desc";
 const sortActive = sort !== "time" || order !== "desc";
 
-// 列表只取元数据 + 点赞/评论计数（点赞每篇一行，评论按篇聚合），不带 content 大字段
+// 列表只取元数据 + 点赞/评论/浏览计数（评论按篇聚合），不带 content 全文（length 计算字数供阅读时长展示）
 const allPosts = db
   .select({
     title: posts.title,
@@ -31,6 +31,8 @@ const allPosts = db
     tags: posts.tags,
     coverImage: posts.coverImage,
     createdAt: posts.createdAt,
+    views: posts.views,
+    contentLen: sql<number>`length(${posts.content})`,
     likeCount: sql<number>`coalesce(${likes.count}, 0)`,
     commentCount: sql<number>`count(${comments.id})`,
   })
@@ -64,6 +66,7 @@ const dir = order === "asc" ? 1 : -1;
 filtered.sort((a, b) => {
   if (sort === "likes") return (a.likeCount - b.likeCount) * dir;
   if (sort === "comments") return (a.commentCount - b.commentCount) * dir;
+  if (sort === "views") return (a.views - b.views) * dir;
   return a.createdAt < b.createdAt ? -dir : a.createdAt > b.createdAt ? dir : 0;
 });
 
@@ -133,6 +136,7 @@ const pageTitle = [l1, l2, l3].filter(Boolean).join(" · ") || (searchQuery ? `�
           { key: "time", label: "时间" },
           { key: "likes", label: "点赞数" },
           { key: "comments", label: "评论数" },
+          { key: "views", label: "浏览量" },
         ].map(({ key, label }) => {
           const active = sort === key;
           const nextOrder = active && order === "desc" ? "asc" : "desc";
@@ -192,6 +196,8 @@ const pageTitle = [l1, l2, l3].filter(Boolean).join(" · ") || (searchQuery ? `�
               coverImage={post.coverImage ?? undefined}
               createdAt={post.createdAt}
               likeCount={post.likeCount}
+              views={post.views}
+              contentLen={post.contentLen}
               index={i}
             />
           ))}

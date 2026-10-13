@@ -7,12 +7,16 @@ interface PostCardProps {
   coverImage?: string;
   index?: number;
   likeCount?: number;
+  views?: number;
+  contentLen?: number;
 }
 
 import { getParentTag, getChildTags } from "../lib/tags";
 import { formatDateCN, dbDateToISO } from "../lib/datetime";
 
-export default function PostCard({ title, slug, excerpt, tags, createdAt, coverImage, index = 0, likeCount = 0 }: PostCardProps) {
+export default function PostCard({ title, slug, excerpt, tags, createdAt, coverImage, index = 0, likeCount = 0, views = 0, contentLen = 0 }: PostCardProps) {
+  const readMinutes = contentLen ? Math.max(1, Math.ceil(contentLen / 400)) : null;
+  const viewsDisplay = views > 9999 ? `${(views / 10000).toFixed(1)} 万` : String(views);
   const tagList: string[] = (() => {
     try {
       return JSON.parse(tags);
@@ -80,10 +84,17 @@ export default function PostCard({ title, slug, excerpt, tags, createdAt, coverI
               </svg>
               <span className="tabular-nums">{likeCount}</span>
             </span>
+            <span className="inline-flex items-center gap-1" title="浏览量">
+              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24" aria-hidden="true">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M2.036 12.322a1.012 1.012 0 0 1 0-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178Z" />
+                <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z" />
+              </svg>
+              <span className="tabular-nums">{viewsDisplay}</span>
+            </span>
           </div>
-          <span className="text-xs text-[var(--color-accent)] font-medium opacity-0 group-hover:opacity-100 translate-x-0 group-hover:translate-x-1 transition duration-300">
-            阅读 →
-          </span>
+          {readMinutes && (
+            <span className="text-xs text-[var(--color-text-subtle)] tabular-nums">约 {readMinutes} 分钟</span>
+          )}
         </div>
         </div>
       </a>

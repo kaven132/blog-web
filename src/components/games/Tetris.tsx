@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { BOARD_BG, BOARD_GRID, CORAL, DUSTY, GOLD, AMBER } from "./palette";
+import { CORAL, DUSTY, GOLD, AMBER, boardColors } from "./palette";
 
 /**
  * 俄罗斯方块（弹窗内对局）。
@@ -100,9 +100,9 @@ export default function Tetris() {
     const cw = w / COLS;
     const ch = h / ROWS;
 
-    ctx.fillStyle = BOARD_BG;
+    ctx.fillStyle = boardColors().bg;
     ctx.fillRect(0, 0, w, h);
-    ctx.strokeStyle = BOARD_GRID;
+    ctx.strokeStyle = boardColors().grid;
     ctx.lineWidth = 1;
     ctx.beginPath();
     for (let c = 1; c < COLS; c++) {

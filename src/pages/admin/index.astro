@@ -3,8 +3,8 @@ import Layout from "../../layouts/Layout.astro";
 import TagFilter from "../../components/TagFilter.astro";
 import Pagination from "../../components/Pagination.astro";
 import { db } from "../../db";
-import { posts } from "../../db/schema";
-import { desc } from "drizzle-orm";
+import { posts, comments, likes } from "../../db/schema";
+import { desc, eq, sql } from "drizzle-orm";
 import { parseTags, buildTagFacets } from "../../lib/tags";
 import { AUTH_COOKIE, isAuthed } from "../../lib/auth";
 import { formatDateCN } from "../../lib/datetime";
@@ -60,6 +60,20 @@ const pageUrl = (p: number) => {
 const isFiltering = Boolean(l1 || l2 || l3);
 const breadcrumb = [l1, l2, l3].filter(Boolean).join(" · ");
 const facets = buildTagFacets(allPosts.map((p) => p.tagList), l1, l2);
+
+// ── 数据总览：全站统计 + 浏览量 Top5 ──
+const totalViews = db.select({ v: sql<number>`coalesce(sum(${posts.views}), 0)` }).from(posts).get()?.v ?? 0;
+const totalLikes = db.select({ v: sql<number>`coalesce(sum(${likes.count}), 0)` }).from(likes).get()?.v ?? 0;
+const totalComments = db.select({ n: sql<number>`count(*)` }).from(comments).get()?.n ?? 0;
+const totalPosts = allPosts.filter((p) => p.published).length;
+const draftCount = allPosts.length - totalPosts;
+const topViewed = db
+  .select({ title: posts.title, slug: posts.slug, views: posts.views })
+  .from(posts)
+  .where(eq(posts.published, true))
+  .orderBy(desc(posts.views))
+  .limit(5)
+  .all();
 ---
 
 <Layout title="文章管理">
@@ -80,6 +94,54 @@ const facets = buildTagFacets(allPosts.map((p) => p.tagList), l1, l2);
         写文章
       </a>
     </div>
+
+    <!-- 数据总览 -->
+    <section class="mb-8">
+      <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        {[
+          { label: "已发布文章", value: String(totalPosts), sub: `草稿 ${draftCount}` },
+          { label: "总浏览量", value: String(totalViews), sub: "详情页累计" },
+          { label: "总点赞", value: String(totalLikes), sub: "全部文章" },
+          { label: "总评论", value: String(totalComments), sub: "含回复" },
+        ].map((s) => (
+          <div class="bg-[var(--color-surface)] border border-[var(--color-border)] rounded-xl p-4">
+            <p class="text-[10px] font-semibold tracking-[0.12em] uppercase text-[var(--color-text-subtle)]">{s.label}</p>
+            <p class="text-2xl font-bold tabular-nums text-[var(--color-text)] mt-1">{s.value}</p>
+            <p class="text-[11px] text-[var(--color-text-subtle)] mt-0.5">{s.sub}</p>
+          </div>
+        ))}
+      </div>
+
+      {topViewed.length > 0 && (
+        <div class="mt-3 bg-[var(--color-surface)] border border-[var(--color-border)] rounded-xl p-4">
+          <p class="text-[10px] font-semibold tracking-[0.12em] uppercase text-[var(--color-text-subtle)] mb-2.5">
+            浏览量 Top 5
+          </p>
+          <ol class="space-y-1.5">
+            {topViewed.map((p, i) => (
+              <li class="flex items-center gap-2.5 text-sm">
+                <span
+                  class={`w-5 h-5 flex-shrink-0 flex items-center justify-center rounded text-[11px] font-bold ${
+                    i === 0
+                      ? "bg-[var(--color-accent)] text-white"
+                      : "bg-[var(--color-accent-muted)] text-[var(--color-accent)]"
+                  }`}
+                >
+                  {i + 1}
+                </span>
+                <a
+                  href={`/posts/${encodeURIComponent(p.slug)}`}
+                  class="flex-1 min-w-0 truncate text-[var(--color-text-muted)] hover:text-[var(--color-accent)] transition-colors"
+                >
+                  {p.title}
+                </a>
+                <span class="text-xs tabular-nums text-[var(--color-text-subtle)]">{p.views} 次浏览</span>
+              </li>
+            ))}
+          </ol>
+        </div>
+      )}
+    </section>
 
     <!-- Tag filter -->
     <div class="mb-6">

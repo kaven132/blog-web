@@ -15,6 +15,8 @@ const recentPosts = db
     coverImage: posts.coverImage,
     createdAt: posts.createdAt,
     likeCount: sql<number>`coalesce(${likes.count}, 0)`,
+    views: posts.views,
+    contentLen: sql<number>`length(${posts.content})`,
   })
   .from(posts)
   .leftJoin(likes, eq(likes.postId, posts.id))
@@ -73,6 +75,8 @@ const recentPosts = db
               coverImage={post.coverImage ?? undefined}
               createdAt={post.createdAt}
               likeCount={post.likeCount}
+              views={post.views}
+              contentLen={post.contentLen}
               index={i}
             />
           ))}

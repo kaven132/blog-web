@@ -16,4 +16,12 @@ sqlite.exec(`CREATE TABLE IF NOT EXISTS credentials (
   updated_at TEXT NOT NULL DEFAULT (CURRENT_TIMESTAMP)
 )`);
 
+// 后加列的兜底迁移（列已存在时 ALTER 会抛错，吞掉即可）
+try {
+  sqlite.exec("ALTER TABLE posts ADD COLUMN views INTEGER NOT NULL DEFAULT 0");
+} catch { /* 列已存在 */ }
+try {
+  sqlite.exec("ALTER TABLE comments ADD COLUMN parent_id INTEGER");
+} catch { /* 列已存在 */ }
+
 export const db = drizzle(sqlite);

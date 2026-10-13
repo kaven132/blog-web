@@ -29,8 +29,23 @@ export const POST: APIRoute = async ({ request, redirect }) => {
     // 昵称服务端再截一次（前端 maxlength 可绕过）
     const author = authorRaw.slice(0, 20) || "匿名";
 
+    // 回复目标（可选）：必须存在、属于同一篇、且本身是顶层评论（只做一层盖楼）
+    const parentIdRaw = formData.get("parentId");
+    let parentId: number | null = null;
+    if (parentIdRaw) {
+      const pid = Number(parentIdRaw);
+      const parent = Number.isInteger(pid)
+        ? db.select().from(comments).where(eq(comments.id, pid)).get()
+        : undefined;
+      if (!parent || parent.postId !== post.id || parent.parentId !== null) {
+        return new Response("回复目标无效", { status: 400 });
+      }
+      parentId = pid;
+    }
+
     db.insert(comments).values({
       postId: post.id,
+      parentId,
       author,
       content,
     }).run();

@@ -1,12 +1,14 @@
 ---
 import Layout from "../../layouts/Layout.astro";
 import LikeButton from "../../components/LikeButton";
+import ShareButtons from "../../components/ShareButtons";
 import ReadingProgress from "../../components/ReadingProgress";
+import TocNav from "../../components/TocNav";
 import { db } from "../../db";
 import { posts, comments, likes } from "../../db/schema";
-import { eq } from "drizzle-orm";
+import { eq, and, lt, gt, desc, asc, sql } from "drizzle-orm";
 import { parseTags, getParentTag, getChildTags } from "../../lib/tags";
-import { renderMarkdown } from "../../lib/markdown";
+import { renderMarkdown, extractHeadings } from "../../lib/markdown";
 import { formatDateCN, dbDateToISO } from "../../lib/datetime";
 
 export const prerender = false;
@@ -18,6 +20,13 @@ if (!post || !post.published) {
   return Astro.redirect("/404");
 }
 
+// 浏览量：本次访问之前的累计值先读出来展示，随后 +1（并发下少许误差对博客无碍）
+const postViews = post.views;
+db.update(posts)
+  .set({ views: sql`${posts.views} + 1` })
+  .where(eq(posts.id, post.id))
+  .run();
+
 const postLikes = db.select().from(likes).where(eq(likes.postId, post.id)).get();
 const postComments = db
   .select()
@@ -26,6 +35,27 @@ const postComments = db
   .orderBy(comments.createdAt)
   .all();
 
+// 评论盖楼：顶层评论 + 挂在其下的回复（只做一层）；回复可指向回复，展示时归并到同一顶层
+const rootComments = postComments.filter((c) => c.parentId === null);
+const repliesOf = (id: number) => postComments.filter((c) => c.parentId === id);
+const authorOf = (id: number | null) => postComments.find((c) => c.id === id)?.author;
+
+// 相邻文章（按发布时间，仅已发布）
+const prevPost = db
+  .select({ title: posts.title, slug: posts.slug })
+  .from(posts)
+  .where(and(eq(posts.published, true), lt(posts.createdAt, post.createdAt)))
+  .orderBy(desc(posts.createdAt))
+  .limit(1)
+  .get();
+const nextPost = db
+  .select({ title: posts.title, slug: posts.slug })
+  .from(posts)
+  .where(and(eq(posts.published, true), gt(posts.createdAt, post.createdAt)))
+  .orderBy(asc(posts.createdAt))
+  .limit(1)
+  .get();
+
 const tagList = parseTags(post.tags);
 
 const parentTag = getParentTag(tagList);
@@ -33,10 +63,24 @@ const childTags = getChildTags(tagList);
 
 // createdAt 是 UTC 时间串，formatDateCN 内部会补时区再格式化
 const formattedDate = formatDateCN(post.createdAt);
+
+// 目录（h2/h3）与字数、阅读时长
+const headings = extractHeadings(post.content);
+const contentHtml = renderMarkdown(post.content);
+const charCount = post.content.replace(/\s/g, "").length;
+const wordCountDisplay = charCount > 9999 ? `${(charCount / 10000).toFixed(1)} 万` : String(charCount);
+const readMinutes = Math.max(1, Math.ceil(charCount / 400));
+const viewsDisplay = postViews > 9999 ? `${(postViews / 10000).toFixed(1)} 万` : String(postViews);
 ---
 
-<Layout title={post.title} description={post.excerpt}>
+<Layout
+  title={post.title}
+  description={post.excerpt}
+  ogImage={post.coverImage?.startsWith("/") ? post.coverImage : undefined}
+  ogType="article"
+>
   <ReadingProgress client:load />
+  {headings.length >= 3 && <TocNav client:load headings={headings} />}
 
   <article class="max-w-3xl mx-auto py-10 md:py-14">
     <!-- Back navigation -->
@@ -74,7 +118,7 @@ const formattedDate = formatDateCN(post.createdAt);
       </h1>
 
       <!-- Meta -->
-      <div class="flex items-center gap-3 text-sm text-[var(--color-text-subtle)] font-medium">
+      <div class="flex flex-wrap items-center gap-x-3 gap-y-1.5 text-sm text-[var(--color-text-subtle)] font-medium">
         <time datetime={dbDateToISO(post.createdAt)}>{formattedDate}</time>
         {
           post.updatedAt !== post.createdAt && (
@@ -85,7 +129,17 @@ const formattedDate = formatDateCN(post.createdAt);
           )
         }
         <span class="w-1 h-1 rounded-full bg-[var(--color-text-subtle)]" />
-        <span>{Math.ceil(post.content.length / 400)} 分钟阅读</span>
+        <span>{wordCountDisplay} 字</span>
+        <span class="w-1 h-1 rounded-full bg-[var(--color-text-subtle)]" />
+        <span>约 {readMinutes} 分钟阅读</span>
+        <span class="w-1 h-1 rounded-full bg-[var(--color-text-subtle)]" />
+        <span class="inline-flex items-center gap-1">
+          <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24" aria-hidden="true">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M2.036 12.322a1.012 1.012 0 0 1 0-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178Z" />
+            <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z" />
+          </svg>
+          {viewsDisplay} 次浏览
+        </span>
       </div>
     </header>
 
@@ -102,7 +156,7 @@ const formattedDate = formatDateCN(post.createdAt);
     }
 
     <!-- Content -->
-    <div class="prose max-w-none mb-14" set:html={renderMarkdown(post.content)} />
+    <div class="prose max-w-none mb-14" set:html={contentHtml} />
 
     <!-- Divider -->
     <div class="flex items-center gap-4 mb-10">
@@ -111,13 +165,48 @@ const formattedDate = formatDateCN(post.createdAt);
       <div class="flex-1 h-px bg-[var(--color-border)]" />
     </div>
 
-    <!-- Like section -->
-    <div class="flex flex-col items-center gap-3 mb-14">
+    <!-- Like + Share section -->
+    <div class="flex flex-col items-center gap-4 mb-14">
       <p class="text-xs text-[var(--color-text-subtle)] uppercase tracking-widest font-semibold">
         这篇文章对你有帮助吗？
       </p>
       <LikeButton client:load postId={post.id} initialCount={postLikes?.count || 0} />
+      <ShareButtons client:load title={post.title} />
     </div>
+
+    <!-- Prev / Next -->
+    <nav class="grid sm:grid-cols-2 gap-3 mb-14">
+      {
+        prevPost ? (
+          <a
+            href={`/posts/${encodeURIComponent(prevPost.slug)}`}
+            class="group bg-[var(--color-surface)] border border-[var(--color-border)] hover:border-[var(--color-accent)]/40 rounded-xl p-4 transition-colors"
+          >
+            <p class="text-[11px] text-[var(--color-text-subtle)] mb-1.5">← 上一篇</p>
+            <p class="text-sm font-semibold text-[var(--color-text)] group-hover:text-[var(--color-accent)] transition-colors leading-snug">
+              {prevPost.title}
+            </p>
+          </a>
+        ) : (
+          <span />
+        )
+      }
+      {
+        nextPost ? (
+          <a
+            href={`/posts/${encodeURIComponent(nextPost.slug)}`}
+            class="group bg-[var(--color-surface)] border border-[var(--color-border)] hover:border-[var(--color-accent)]/40 rounded-xl p-4 transition-colors sm:text-right"
+          >
+            <p class="text-[11px] text-[var(--color-text-subtle)] mb-1.5">下一篇 →</p>
+            <p class="text-sm font-semibold text-[var(--color-text)] group-hover:text-[var(--color-accent)] transition-colors leading-snug">
+              {nextPost.title}
+            </p>
+          </a>
+        ) : (
+          <span />
+        )
+      }
+    </nav>
 
     <!-- Comments section -->
     <section id="comments" class="max-w-2xl mx-auto">
@@ -130,29 +219,67 @@ const formattedDate = formatDateCN(post.createdAt);
 
       <!-- Comment list -->
       {
-        postComments.length === 0 ? (
+        rootComments.length === 0 ? (
           <p class="text-center py-10 text-sm text-[var(--color-text-subtle)] font-serif">
             暂无评论，成为第一个留言的人
           </p>
         ) : (
           <div class="space-y-3 mb-10">
-            {postComments.map((comment) => (
-              <div class="bg-[var(--color-surface)] border border-[var(--color-border)] rounded-xl p-4 hover:border-[var(--color-border-hover)] transition-colors duration-200">
-                <div class="flex items-center gap-2.5 mb-2.5">
-                  <div class="w-7 h-7 rounded-full bg-[var(--color-accent-muted)] text-[var(--color-accent)] flex items-center justify-center text-xs font-bold">
-                    {comment.author.charAt(0)}
+            {rootComments.map((comment) => {
+              const replies = repliesOf(comment.id);
+              return (
+                <div class="bg-[var(--color-surface)] border border-[var(--color-border)] rounded-xl p-4 hover:border-[var(--color-border-hover)] transition-colors duration-200">
+                  <div class="flex items-center gap-2.5 mb-2.5">
+                    <div class="w-7 h-7 rounded-full bg-[var(--color-accent-muted)] text-[var(--color-accent)] flex items-center justify-center text-xs font-bold">
+                      {comment.author.charAt(0)}
+                    </div>
+                    <span class="font-semibold text-sm text-[var(--color-text)]">{comment.author}</span>
+                    <span class="text-xs text-[var(--color-text-subtle)]">
+                      {new Date(comment.createdAt).toLocaleDateString("zh-CN", {
+                        month: "short",
+                        day: "numeric",
+                      })}
+                    </span>
+                    <button
+                      type="button"
+                      data-reply-to={comment.id}
+                      data-reply-author={comment.author}
+                      class="ml-auto text-xs text-[var(--color-text-subtle)] hover:text-[var(--color-accent)] transition-colors"
+                    >
+                      回复
+                    </button>
                   </div>
-                  <span class="font-semibold text-sm text-[var(--color-text)]">{comment.author}</span>
-                  <span class="text-xs text-[var(--color-text-subtle)]">
-                    {new Date(comment.createdAt).toLocaleDateString("zh-CN", {
-                      month: "short",
-                      day: "numeric",
-                    })}
-                  </span>
+                  <p class="text-sm text-[var(--color-text-muted)] leading-relaxed pl-9">{comment.content}</p>
+
+                  {replies.length > 0 && (
+                    <div class="mt-3 pl-9 space-y-3">
+                      {replies.map((reply) => {
+                        const target = authorOf(reply.parentId);
+                        return (
+                          <div class="bg-[var(--color-bg)] rounded-lg p-3">
+                            <div class="flex items-center gap-2 mb-1.5">
+                              <span class="font-semibold text-xs text-[var(--color-text)]">{reply.author}</span>
+                              {target && (
+                                <span class="text-[11px] text-[var(--color-text-subtle)]">
+                                  回复 @{target}
+                                </span>
+                              )}
+                              <span class="text-[11px] text-[var(--color-text-subtle)]">
+                                {new Date(reply.createdAt).toLocaleDateString("zh-CN", {
+                                  month: "short",
+                                  day: "numeric",
+                                })}
+                              </span>
+                            </div>
+                            <p class="text-sm text-[var(--color-text-muted)] leading-relaxed">{reply.content}</p>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
                 </div>
-                <p class="text-sm text-[var(--color-text-muted)] leading-relaxed pl-9">{comment.content}</p>
-              </div>
-            ))}
+              );
+            })}
           </div>
         )
       }
@@ -161,10 +288,24 @@ const formattedDate = formatDateCN(post.createdAt);
       <form method="POST" action="/api/comment" class="space-y-3">
         <input type="hidden" name="postId" value={post.id} />
         <input type="hidden" name="slug" value={slug} />
+        <input type="hidden" name="parentId" value="" />
+        {/* 回复目标提示条 */}
+        <div
+          id="reply-notice"
+          class="hidden items-center gap-2 text-xs text-[var(--color-text-muted)] bg-[var(--color-bg)] border border-[var(--color-border)] rounded-lg px-3 py-2"
+        >
+          <span>
+            回复 <span id="reply-notice-author" class="font-semibold text-[var(--color-accent)]" />
+          </span>
+          <button type="button" id="reply-cancel" class="text-[var(--color-text-subtle)] hover:text-[var(--color-text)] transition-colors">
+            取消
+          </button>
+        </div>
         <div class="flex flex-col sm:flex-row gap-3">
           <input
             type="text"
             name="author"
+            id="comment-author"
             placeholder="昵称"
             maxlength="20"
             required
@@ -188,6 +329,101 @@ const formattedDate = formatDateCN(post.createdAt);
           </div>
         </div>
       </form>
+
+      <script>
+        // 评论表单增强：昵称记忆（localStorage）+ 回复定位与取消
+        (() => {
+          const form = document.querySelector('form[action="/api/comment"]');
+          if (!form) return;
+          const authorInput = form.querySelector('input[name="author"]');
+          const parentInput = form.querySelector('input[name="parentId"]');
+          const notice = form.querySelector("#reply-notice");
+          const noticeAuthor = form.querySelector("#reply-notice-author");
+          const cancelBtn = form.querySelector("#reply-cancel");
+
+          const clearReply = () => {
+            if (parentInput) parentInput.value = "";
+            notice?.classList.add("hidden");
+            notice?.classList.remove("flex");
+          };
+
+          try {
+            const saved = localStorage.getItem("comment-author");
+            if (saved && authorInput && !authorInput.value) authorInput.value = saved;
+          } catch {}
+
+          form.addEventListener("submit", () => {
+            try {
+              if (authorInput) localStorage.setItem("comment-author", authorInput.value);
+            } catch {}
+          });
+
+          for (const btn of document.querySelectorAll("[data-reply-to]")) {
+            btn.addEventListener("click", () => {
+              if (!parentInput || !notice) return;
+              parentInput.value = btn.dataset.replyTo ?? "";
+              if (noticeAuthor) noticeAuthor.textContent = `@${btn.dataset.replyAuthor ?? ""}`;
+              notice.classList.remove("hidden");
+              notice.classList.add("flex");
+              form.scrollIntoView({ behavior: "smooth", block: "center" });
+              form.querySelector('input[name="content"]')?.focus();
+            });
+          }
+          cancelBtn?.addEventListener("click", clearReply);
+        })();
+      </script>
     </section>
+
+    <!-- 代码块复制 / 语言标签 / 图片灯箱（静态增强，无框架依赖） -->
+    <script>
+      (() => {
+        const prose = document.querySelector(".prose");
+        if (!prose || prose.dataset.enhanced) return;
+        prose.dataset.enhanced = "1";
+
+        // 代码块：语言标签 + 复制按钮
+        for (const pre of prose.querySelectorAll("pre")) {
+          pre.classList.add("relative");
+          const lang = pre.dataset.lang;
+          if (lang) {
+            const tag = document.createElement("span");
+            tag.className = "code-lang";
+            tag.textContent = lang;
+            pre.appendChild(tag);
+          }
+          const btn = document.createElement("button");
+          btn.type = "button";
+          btn.className = "code-copy";
+          btn.textContent = "复制";
+          btn.addEventListener("click", () => {
+            navigator.clipboard?.writeText(pre.querySelector("code")?.textContent ?? "").then(() => {
+              btn.textContent = "已复制";
+              setTimeout(() => (btn.textContent = "复制"), 1500);
+            });
+          });
+          pre.appendChild(btn);
+        }
+
+        // 图片灯箱：点击放大，Esc / 点击空白关闭
+        const openLightbox = (src: string, alt: string) => {
+          document.querySelector(".lightbox")?.remove();
+          const box = document.createElement("div");
+          box.className = "lightbox";
+          const img = document.createElement("img");
+          img.src = src;
+          img.alt = alt;
+          box.appendChild(img);
+          box.addEventListener("click", () => box.remove());
+          document.body.appendChild(box);
+        };
+        for (const img of prose.querySelectorAll("img")) {
+          img.addEventListener("click", () => openLightbox(img.getAttribute("src") ?? "", img.alt));
+          img.style.cursor = "zoom-in";
+        }
+        document.addEventListener("keydown", (e) => {
+          if (e.key === "Escape") document.querySelector(".lightbox")?.remove();
+        });
+      })();
+    </script>
   </article>
 </Layout>

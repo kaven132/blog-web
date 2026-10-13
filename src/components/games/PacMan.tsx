@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { BOARD_BG, BOARD_GRID, CORAL, DUSTY, GOLD, AMBER } from "./palette";
+import { CORAL, DUSTY, GOLD, AMBER, boardColors } from "./palette";
 
 /**
  * 吃豆人（弹窗内对局）。19×20 迷你迷宫（已脚本验证：全豆可达、无死角、隧道环绕）。
@@ -35,9 +35,6 @@ const COLS = 19;
 const ROWS = 20;
 const HOUSE_DOOR = { x: 9, y: 8 };
 const HIGH_SCORE_KEY = "pacman-high-score-v1";
-
-const WALL_COLOR = "#e2dbc9";
-const PELLET_COLOR = "#d9b48f";
 
 interface Pt {
   x: number;
@@ -201,11 +198,11 @@ export default function PacMan() {
     const ch = canvas.clientHeight / ROWS;
     const p = pacRef.current;
 
-    ctx.fillStyle = BOARD_BG;
+    ctx.fillStyle = boardColors().bg;
     ctx.fillRect(0, 0, w, canvas.clientHeight);
 
     // 墙体
-    ctx.fillStyle = WALL_COLOR;
+    ctx.fillStyle = boardColors().wall;
     for (let r = 0; r < ROWS; r++) {
       for (let c = 0; c < COLS; c++) {
         if (wallRef.current.has(key(c, r))) {
@@ -214,7 +211,7 @@ export default function PacMan() {
       }
     }
     // 豆子
-    ctx.fillStyle = PELLET_COLOR;
+    ctx.fillStyle = boardColors().pellet;
     for (let r = 0; r < ROWS; r++) {
       for (let c = 0; c < COLS; c++) {
         const v = pelletRef.current[r * COLS + c];

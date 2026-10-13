@@ -10,6 +10,7 @@ export const posts = sqliteTable("posts", {
   coverImage: text("cover_image"),
   tags: text("tags").notNull().default("[]"), // JSON array stored as text
   published: integer("published", { mode: "boolean" }).notNull().default(false),
+  views: integer("views").notNull().default(0), // 浏览量：详情页每次渲染 +1
   createdAt: text("created_at")
     .notNull()
     .default(sql`(CURRENT_TIMESTAMP)`),
@@ -23,6 +24,7 @@ export const comments = sqliteTable("comments", {
   postId: integer("post_id")
     .notNull()
     .references(() => posts.id, { onDelete: "cascade" }),
+  parentId: integer("parent_id"), // 回复目标（仅一层：必须是顶层评论）
   author: text("author").notNull().default("匿名"),
   content: text("content").notNull(),
   createdAt: text("created_at")

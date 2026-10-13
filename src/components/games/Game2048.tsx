@@ -250,7 +250,7 @@ export default function Game2048() {
       >
         <div className="grid h-full w-full grid-cols-4 grid-rows-4 gap-[3%]">
           {Array.from({ length: SIZE * SIZE }).map((_, i) => (
-            <div key={i} className="rounded-lg bg-[#eae3d6]/70" />
+            <div key={i} className="rounded-lg bg-[var(--game-board-grid)]/70" />
           ))}
         </div>
         {board.flat().map((t) => {

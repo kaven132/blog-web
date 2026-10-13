@@ -9,9 +9,18 @@ import "../styles/global.css";
 interface Props {
   title: string;
   description?: string;
+  /** 封面图路径（/uploads/...），社交分享卡片用；data URL 等无效形式由调用方过滤 */
+  ogImage?: string;
+  ogType?: string;
 }
 
-const { title, description } = Astro.props;
+const { title, description, ogImage, ogType = "website" } = Astro.props;
+
+// OG / canonical 需要绝对地址：以当前请求的协议 + 域名 + 端口为基准
+const siteOrigin = Astro.url.origin.replace(/\/$/, "");
+const canonical = new URL(Astro.url.pathname, siteOrigin).href;
+const ogImageAbs = ogImage ? new URL(ogImage, siteOrigin).href : undefined;
+const desc = description || title;
 
 // 登录态和用户名在服务端就绪，作为 props 下发给岛屿：
 // 客户端不用再发 /api/auth/me + /api/profile，登录用户也不会先闪一下「登录」按钮
@@ -26,9 +35,30 @@ const userAvatar = row?.avatar || "";
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="description" content={description || title} />
+    <meta name="description" content={desc} />
     <title>{title} | kaven的个人网页</title>
+    <!-- Open Graph / Twitter Card：聊天与社交平台分享链接时的卡片数据 -->
+    <meta property="og:type" content={ogType} />
+    <meta property="og:site_name" content="kaven的个人网页" />
+    <meta property="og:title" content={title} />
+    <meta property="og:description" content={desc} />
+    <meta property="og:url" content={canonical} />
+    {ogImageAbs && <meta property="og:image" content={ogImageAbs} />}
+    <meta name="twitter:card" content={ogImageAbs ? "summary_large_image" : "summary"} />
+    <meta name="twitter:title" content={title} />
+    <meta name="twitter:description" content={desc} />
+    {ogImageAbs && <meta name="twitter:image" content={ogImageAbs} />}
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <!-- 深色模式在样式加载前定档：优先本地选择，未选择跟随系统，避免首屏闪白/闪黑 -->
+    <script is:inline>
+      (() => {
+        try {
+          const saved = localStorage.getItem("theme");
+          const dark = saved ? saved === "dark" : window.matchMedia("(prefers-color-scheme: dark)").matches;
+          document.documentElement.classList.toggle("dark", dark);
+        } catch {}
+      })();
+    </script>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <!-- 非阻塞加载：大陆访问 googleapis 不稳定，不能让它挡住首屏渲染；

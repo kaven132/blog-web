@@ -7,6 +7,41 @@ export function escapeHtml(str: string): string {
     .replace(/'/g, "&#39;");
 }
 
+export interface MdHeading {
+  level: number;
+  text: string;
+  id: string;
+}
+
+/** 标题文本 → 目录锚点 id：保留中英文与数字，其余折叠为 -；同一 id 自动 -1/-2 去重 */
+function headingId(text: string, used: Map<string, number>): string {
+  let base =
+    text
+      .replace(/[`*]/g, "")
+      .toLowerCase()
+      .replace(/[^\p{Letter}\p{Number}]+/gu, "-")
+      .replace(/^-+|-+$/g, "") || "section";
+  const n = used.get(base) ?? 0;
+  used.set(base, n + 1);
+  return n ? `${base}-${n}` : base;
+}
+
+/** 提取 h2/h3 生成目录数据；id 生成规则与 renderMarkdown 的标题 id 完全一致 */
+export function extractHeadings(src: string): MdHeading[] {
+  const used = new Map<string, number>();
+  const out: MdHeading[] = [];
+  let inCode = false;
+  for (const rawLine of src.split("\n")) {
+    if (rawLine.startsWith("```")) inCode = !inCode;
+    if (inCode) continue;
+    const m = rawLine.match(/^(#{2,3})\s+(.*)/);
+    if (!m) continue;
+    const text = m[2].replace(/[`*]/g, "").trim();
+    out.push({ level: m[1].length, text, id: headingId(text, used) });
+  }
+  return out;
+}
+
 function inline(md: string): string {
   const codes: string[] = [];
   let s = escapeHtml(md).replace(/`([^`]+)`/g, (_, code: string) => {
@@ -31,10 +66,12 @@ export function renderMarkdown(src: string): string {
   const lines = src.split("\n");
   const out: string[] = [];
   let inCode = false;
+  let codeLang = "";
   let codeBuf: string[] = [];
   let listType: "ul" | "ol" | null = null;
   let listBuf: string[] = [];
   let paraBuf: string[] = [];
+  const usedIds = new Map<string, number>();
 
   const closeList = () => {
     if (listType) {
@@ -63,8 +100,10 @@ export function renderMarkdown(src: string): string {
     if (inCode) {
       if (line.startsWith("```")) {
         inCode = false;
-        out.push(`<pre><code>${escapeHtml(codeBuf.join("\n"))}</code></pre>`);
+        const lang = codeLang.replace(/[^a-z0-9_-]/gi, "");
+        out.push(`<pre${lang ? ` data-lang="${lang}"` : ""}><code>${escapeHtml(codeBuf.join("\n"))}</code></pre>`);
         codeBuf = [];
+        codeLang = "";
       } else {
         codeBuf.push(line);
       }
@@ -74,6 +113,7 @@ export function renderMarkdown(src: string): string {
     if (line.startsWith("```")) {
       flush();
       inCode = true;
+      codeLang = (line.match(/^```(\S*)/)?.[1] ?? "").toLowerCase();
       codeBuf = [];
       continue;
     }
@@ -87,7 +127,8 @@ export function renderMarkdown(src: string): string {
     if (heading) {
       flush();
       const level = heading[1].length;
-      out.push(`<h${level}>${inline(heading[2])}</h${level}>`);
+      const id = level >= 2 && level <= 3 ? ` id="${headingId(heading[2], usedIds)}"` : "";
+      out.push(`<h${level}${id}>${inline(heading[2])}</h${level}>`);
       continue;
     }
 

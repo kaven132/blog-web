@@ -2,14 +2,23 @@
  * 四款小游戏共用色板 —— 贴合站点「暖白单色 + 珊瑚红点缀」的主题：
  * 棋盘统一暖白底 + 暖灰网格；方块/数字用低饱和大地色系（沙金 / 琥珀 / 灰蓝 / 灰紫 / 灰绿 / 灰粉），
  * 珊瑚红只做点缀（蛇头、食物、踩中的雷、2048 目标块）。
- * 色值刻意镜像 global.css 的 --color-bg / --color-border，改主题时同步这里。
+ * 棋盘底色走 CSS 变量（--game-*，global.css 定义、暗色模式覆盖），其余为与主题无关的固定色。
  */
 
-/** 棋盘底与网格线（≈ --color-bg / --color-border） */
-export const BOARD_BG = "#faf8f1";
-export const BOARD_GRID = "#eae3d6";
-/** 扫雷已翻开的格子（比棋盘底略深半档） */
-export const CELL_REVEALED = "#f1ebdf";
+/** 从 CSS 变量读取棋盘配色（每帧调用一次的开销可忽略；暗色切换自动生效） */
+export function boardColors() {
+  const s = getComputedStyle(document.documentElement);
+  const v = (name: string, fallback: string) => s.getPropertyValue(name).trim() || fallback;
+  return {
+    bg: v("--game-board-bg", "#faf8f1"),
+    grid: v("--game-board-grid", "#eae3d6"),
+    wall: v("--game-wall", "#e2dbc9"),
+    pellet: v("--game-pellet", "#d9b48f"),
+  };
+}
+
+/** 扫雷已翻开的格子底色（CSS 变量，暗色模式自动覆盖） */
+export const CELL_REVEALED = "var(--game-cell-revealed)";
 
 /** 珊瑚红家族：点缀专用 */
 export const CORAL = {

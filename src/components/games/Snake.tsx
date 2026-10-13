@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { BOARD_BG, BOARD_GRID, CORAL } from "./palette";
+import { CORAL, boardColors } from "./palette";
 
 /**
  * 贪吃蛇（弹窗内对局），渲染风格与 Tetris.tsx 一致（暖白棋盘 + 珊瑚红蛇身）。
@@ -75,9 +75,9 @@ export default function Snake() {
     const cw = w / COLS;
     const ch = canvas.clientHeight / ROWS;
 
-    ctx.fillStyle = BOARD_BG;
+    ctx.fillStyle = boardColors().bg;
     ctx.fillRect(0, 0, w, canvas.clientHeight);
-    ctx.strokeStyle = BOARD_GRID;
+    ctx.strokeStyle = boardColors().grid;
     ctx.lineWidth = 1;
     ctx.beginPath();
     for (let c = 1; c < COLS; c++) {

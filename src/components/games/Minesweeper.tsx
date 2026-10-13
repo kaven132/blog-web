@@ -35,7 +35,7 @@ const NUM_COLOR: Record<number, string> = {
 function FlagIcon() {
   return (
     <svg viewBox="0 0 24 24" className="w-[60%] h-[60%]" aria-hidden="true">
-      <line x1="7" y1="3" x2="7" y2="21" stroke="#6b6357" strokeWidth="2" strokeLinecap="round" />
+      <line x1="7" y1="3" x2="7" y2="21" stroke="var(--color-text-subtle)" strokeWidth="2" strokeLinecap="round" />
       <path d="M7 3 L17 7.5 L7 12 Z" fill="var(--color-accent)" />
     </svg>
   );
