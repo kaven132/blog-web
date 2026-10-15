@@ -84,7 +84,7 @@ export default function TocNav({ headings }: { headings: Heading[] }) {
               <a
                 href={`#${h.id}`}
                 title={h.text}
-                className={`block truncate py-1 leading-snug transition-colors -ml-px border-l-2 ${
+                className={`block truncate py-1 leading-snug text-[0.85rem] transition-colors -ml-px border-l-2 ${
                   h.level === 3 ? "pl-5" : "pl-3"
                 } ${
                   active === h.id

@@ -10,7 +10,7 @@ import { eq, and, lt, gt, desc, asc, sql } from "drizzle-orm";
 import { parseTags, getParentTag, getChildTags } from "../../lib/tags";
 import { renderMarkdown, extractHeadings } from "../../lib/markdown";
 import { formatDateCN, dbDateToISO } from "../../lib/datetime";
-import { optimizeImgSrc } from "../../lib/imgsrc";
+import { optimizeImgSrc, imgSrcSet } from "../../lib/imgsrc";
 
 export const prerender = false;
 
@@ -149,6 +149,8 @@ const viewsDisplay = postViews > 9999 ? `${(postViews / 10000).toFixed(1)} 万` 
       post.coverImage && (
         <img
           src={optimizeImgSrc(post.coverImage)}
+          srcset={imgSrcSet(post.coverImage, [768, 1536])}
+          sizes="(max-width: 768px) 100vw, 768px"
           alt={post.title}
           loading="lazy"
           class="w-full rounded-2xl border border-[var(--color-border)] object-cover mb-12"
@@ -181,6 +183,7 @@ const viewsDisplay = postViews > 9999 ? `${(postViews / 10000).toFixed(1)} 万` 
         prevPost ? (
           <a
             href={`/posts/${encodeURIComponent(prevPost.slug)}`}
+            data-nav-prev
             class="group bg-[var(--color-surface)] border border-[var(--color-border)] hover:border-[var(--color-accent)]/40 rounded-xl p-4 transition-colors"
           >
             <p class="text-[11px] text-[var(--color-text-subtle)] mb-1.5">← 上一篇</p>
@@ -196,6 +199,7 @@ const viewsDisplay = postViews > 9999 ? `${(postViews / 10000).toFixed(1)} 万` 
         nextPost ? (
           <a
             href={`/posts/${encodeURIComponent(nextPost.slug)}`}
+            data-nav-next
             class="group bg-[var(--color-surface)] border border-[var(--color-border)] hover:border-[var(--color-accent)]/40 rounded-xl p-4 transition-colors sm:text-right"
           >
             <p class="text-[11px] text-[var(--color-text-subtle)] mb-1.5">下一篇 →</p>
@@ -434,6 +438,30 @@ const viewsDisplay = postViews > 9999 ? `${(postViews / 10000).toFixed(1)} 万` 
               if (e.key === "Escape") closeEmoji();
             });
           }
+        })();
+      </script>
+
+      <script data-astro-rerun>
+        // 键盘快捷键：←/→ 切上/下篇，T 收展目录。
+        // document 只绑一次（事件里实时查 DOM，换页后天然服务新内容）；输入焦点与修饰键下不生效
+        (() => {
+          if (document.documentElement.dataset.kbdNavBound) return;
+          document.documentElement.dataset.kbdNavBound = "1";
+          document.addEventListener("keydown", (e) => {
+            if (e.ctrlKey || e.metaKey || e.altKey) return;
+            const t = e.target;
+            if (t && (t.tagName === "INPUT" || t.tagName === "TEXTAREA" || t.tagName === "SELECT" || t.isContentEditable)) return;
+            if (e.key === "ArrowLeft" || e.key === "ArrowRight") {
+              const link = document.querySelector(e.key === "ArrowLeft" ? "[data-nav-prev]" : "[data-nav-next]");
+              if (link) {
+                e.preventDefault();
+                link.click();
+              }
+            } else if (e.key === "t" || e.key === "T") {
+              const btn = document.querySelector("[aria-label='收起目录'], [aria-label='展开目录']");
+              if (btn) btn.click();
+            }
+          });
         })();
       </script>
     </section>

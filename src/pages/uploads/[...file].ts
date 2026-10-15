@@ -37,6 +37,7 @@ function fileResponse(full: string, mime: string, varyAccept: boolean) {
 }
 
 export const GET: APIRoute = async ({ params, request }) => {
+  const url = new URL(request.url);
   const name = params.file;
   if (!name) return new Response(null, { status: 404 });
 
@@ -50,6 +51,26 @@ export const GET: APIRoute = async ({ params, request }) => {
     return new Response(null, { status: 404 });
   }
   if (!existsSync(full)) return new Response(null, { status: 404 });
+
+  // w= 期望宽度：srcset 用，按需缩放转 WebP（不放大小图）；范围收紧防乱刷缓存
+  const wRaw = Number(url.searchParams.get("w") ?? 0);
+  const w = Number.isInteger(wRaw) && wRaw >= 64 && wRaw <= 2560 ? wRaw : 0;
+
+  // 带 w 的缩放变体：显式选型 URL，直接回 WebP；不值得转的类型回原图
+  if (w && shouldConvertUpload(ext)) {
+    const cacheFull = uploadsCachePath(`${name}.w${w}`);
+    if (cacheFull) {
+      if (!existsSync(cacheFull)) await convertToWebpFile(full, cacheFull, w);
+      if (existsSync(cacheFull)) {
+        try {
+          return fileResponse(cacheFull, "image/webp", false);
+        } catch {
+          // 缓存读取失败就回原图
+        }
+      }
+    }
+  }
+  if (w) return fileResponse(full, mime, false);
 
   // 浏览器支持 WebP 且原图值得转（jpg/png）时，按需转档并回缓存；
   // URL 不变，爬虫等不带 Accept: image/webp 的客户端仍拿原图，og:image 因此无需特殊处理。

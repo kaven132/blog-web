@@ -1,4 +1,4 @@
-import { optimizeImgSrc } from "./imgsrc";
+import { optimizeImgSrc, responsiveImgAttrs } from "./imgsrc";
 
 export function escapeHtml(str: string): string {
   return str
@@ -56,8 +56,9 @@ function inline(md: string): string {
   s = s
     .replace(/!\[([^\]]*)\]\(([^)\s]+)\)/g, (_, alt: string, url: string) => {
       // 此时 url 已被 escapeHtml 过（& → &amp;），先还原再走代理改写，避免双重编码
-      const src = optimizeImgSrc(url.replace(/&amp;/g, "&")) ?? url;
-      return `<img src="${src}" alt="${alt}" loading="lazy" />`;
+      const raw = url.replace(/&amp;/g, "&");
+      const src = optimizeImgSrc(raw) ?? url;
+      return `<img src="${src}" alt="${alt}" loading="lazy"${responsiveImgAttrs(raw)} />`;
     })
     .replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>")
     .replace(/\*([^*]+)\*/g, "<em>$1</em>")
@@ -171,7 +172,7 @@ export function renderMarkdown(src: string): string {
       flush();
       // 独立成行的图：img[2] 是原文（未 escape），直接走代理改写
       const src = optimizeImgSrc(img[2]) ?? escapeHtml(img[2]);
-      out.push(`<img src="${src}" alt="${escapeHtml(img[1])}" loading="lazy" />`);
+      out.push(`<img src="${src}" alt="${escapeHtml(img[1])}" loading="lazy"${responsiveImgAttrs(img[2])} />`);
       continue;
     }
 

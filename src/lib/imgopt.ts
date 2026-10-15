@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { mkdirSync, renameSync, unlinkSync, writeFileSync } from "node:fs";
+import { mkdirSync, readdirSync, renameSync, unlinkSync, writeFileSync } from "node:fs";
 import { resolve, sep } from "node:path";
 import sharp from "sharp";
 
@@ -25,6 +25,19 @@ export function uploadsCachePath(name: string): string | null {
   return full;
 }
 
+/** 某张 uploads 图的全部尺寸变体缓存（<原名>.w<宽>.webp），删原图时连带清理 */
+export function uploadsCacheVariants(name: string): string[] {
+  const prefix = `${name}.w`;
+  try {
+    return readdirSync(CACHE_ROOT)
+      .filter((f) => f.startsWith(prefix) && f.endsWith(".webp"))
+      .map((f) => resolve(CACHE_ROOT, f))
+      .filter((full) => full.startsWith(CACHE_ROOT + sep));
+  } catch {
+    return [];
+  }
+}
+
 /** 远程图缓存路径：<sha256(url)>.webp（可转换）或 .raw + .ct 旁车（不可转换，记录原始类型） */
 export function remoteCachePaths(url: string) {
   const h = createHash("sha256").update(url).digest("hex");
@@ -42,12 +55,14 @@ export function shouldConvertUpload(ext: string): boolean {
   return [".jpg", ".jpeg", ".png"].includes(e);
 }
 
-/** 原子写缓存：先写临时文件再改名，并发首访最多重复转一次，不会出现半截文件 */
-export async function convertToWebpFile(srcPath: string, destPath: string): Promise<boolean> {
+/** 原子写缓存：先写临时文件再改名，并发首访最多重复转一次，不会出现半截文件；width>0 时按宽缩放（不放大小图） */
+export async function convertToWebpFile(srcPath: string, destPath: string, width = 0): Promise<boolean> {
   ensureCacheDir();
   const tmp = `${destPath}.${process.hrtime.bigint().toString(36)}.tmp`;
   try {
-    await sharp(srcPath).webp({ quality: WEBP_QUALITY }).toFile(tmp);
+    let pipeline = sharp(srcPath);
+    if (width > 0) pipeline = pipeline.resize({ width, withoutEnlargement: true });
+    await pipeline.webp({ quality: WEBP_QUALITY }).toFile(tmp);
     renameSync(tmp, destPath);
     return true;
   } catch {

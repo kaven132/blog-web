@@ -15,7 +15,7 @@ interface PostCardProps {
 
 import { getParentTag, getChildTags } from "../lib/tags";
 import { formatDateCN, dbDateToISO } from "../lib/datetime";
-import { optimizeImgSrc } from "../lib/imgsrc";
+import { optimizeImgSrc, imgSrcSet } from "../lib/imgsrc";
 
 export default function PostCard({ title, slug, excerpt, tags, createdAt, coverImage, index = 0, likeCount = 0, views = 0, contentLen = 0, searchSnippet }: PostCardProps) {
   const readMinutes = contentLen ? Math.max(1, Math.ceil(contentLen / 400)) : null;
@@ -38,10 +38,12 @@ export default function PostCard({ title, slug, excerpt, tags, createdAt, coverI
       style={{ animation: `slide-up 0.4s ease-out ${index * 0.06}s both` }}
     >
       <a href={`/posts/${slug}`} className="block">
-        {/* Cover */}
+        {/* Cover — srcset 多尺寸：卡片栅格 1/2/3 列，小屏不拉全尺寸原图 */}
         {coverSrc && (
           <img
             src={coverSrc}
+            srcSet={imgSrcSet(coverImage, [480, 960, 1440])}
+            sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
             alt={title}
             loading="lazy"
             className="w-full h-40 object-cover"
