@@ -20,17 +20,18 @@
 - 正文插图高度由 CSS 统一负责（`.prose img` `height:25rem`），出图不必按固定比例。
 
 ## 配图
-- 🚨 **loremflickr 自 2026-09-24 起全站 401 硬封锁**（站点级反爬，任意 URL/UA/lock 都无效）→ `scripts/fetch-images.mjs` 已作废，改走替代路径。
-- 现行路径：`scripts/pick-image.mjs`（Bing 图搜取候选：`--q= --name= --n= --out=<目录>`；落盘 `--pick=N --from=<目录> --dest=<文件>`）→ `scripts/montage-images.mjs`（`--dir= --out= --cols=` 拼带编号预览网格，**一次 Read 看完全部候选**）→ 目标文件必须 Read 原图肉眼确认切题、无水印、非 AI 生图。
+- 🚨 **loremflickr 自 2026-09-24 起全站 401 硬封锁**（站点级反爬，任意 URL/UA/lock 都无效）→ `scripts/fetch-images.mjs` 已作废，2026-10-15 起三条日更线 prompt 的配图节已全部改写为 pick-image/montage 管线（fetch-images 仅存档勿跑）。现行路径：`scripts/pick-image.mjs`（Bing 图搜取候选：`--q= --name= --n= --out=<目录>`；落盘 `--pick=N --from=<目录> --dest=<文件>`）→ `scripts/montage-images.mjs`（`--dir= --out= --cols=` 拼带编号预览网格，**一次 Read 看完全部候选**）→ 目标文件必须 Read 原图肉眼确认切题、无水印、非 AI 生图。
 - 各家图库搜索页/API 全被 bot 门控（pexels/unsplash/pixabay 403/401），检索只能借道 `bing.com/images`（`murl` 是 HTML 实体编码，先解 `&quot;`）。
 - 选词：**「地名 + 地区名」英文查询命中率最高**；地方政府官网是好图源。带角标/水印的域名直接跳过：`english.news.cn`/`xinhuanet`/`chinadaily`/`jstv`（官媒）、`lovepik`/`58pic`/`tukuppt`/`zhituwang`/`ooopic`/`pngtree`（付费图库）、`i-blog.csdnimg.cn` 等 csdn 图常带账号角标。`stockcake` 是 **AI 生图库**（连同 openart/lexica/midjourney/nightcafe 已在 `STOCK_BLOCK`）。**严禁 AI 生图。**
 - 两个高频坑：① **博客/个人站的自拍图普遍压着可见版权水印**（`© xxx.com` 在左下或右下角），切题度再好也要弃用，选图必须放大看四角；② `pick-image.mjs` 的 `--name` 前缀**在同一目录重复使用会互相覆盖**，同批次补搜要换前缀（`--name=tc` / `tc2` / `tc3`）。
 - 国内题材选词（2026-09-29 景德镇线实测）：中文「**地名 + 建筑构件/食物名词**」（如 `景德镇 御窑厂遗址 窑砖 拱券`）一轮就能出 6 张干净图；泛泛的「古窑 烧窑 匠人」整批落**微信公众号名片水印**（图源 chinaguyao.com 这类景区自有站）。图源质量：`youimg1.c-ctrip.com`、`n.sinaimg.cn`（大图）干净可用；`x0.ifengimg.com`、`qnam.smzdm.com`、`pic.nximg.cn`、`img1.bala.cc` 带水印/画质差。另注意 `.prose img` 是**定高 25rem**，竖构图（如 1024x1643）会渲染成窄条，配图优先选横幅。
 - 封面落 `data/uploads/_cover-tmp-<slug>.jpg`，**别下到 `scripts/`**（丢过文件 → cover_image=null）。
-- 若日后 loremflickr 复活，注意历史故障形态：兜底图 / 占位帧（纯红底 + 嵌小照片）/ 截断图（下半灰块）/ 跨日复用真图 / 题材完全不搭的真图，`judge()` 全判 ✅，拦截只能靠肉眼 + `--reject-md5`。指纹明细见各线 automation memory。
+- 若日后 loremflickr 复活，注意历史故障形态：兜底图 / 占位帧（纯红底 + 嵌小照片）/ 截断图（下半灰块）/ 跨日复用真图 / 题材完全不搭的真图，`judge()` 全判 ✅，拦截只能靠肉眼 + `--reject-md5`。历史指纹明细见 `.workbuddy/memory/2026-09-11.md`、`2026-09-22.md`、`2026-09-23.md`（书籍线 automation memory 的 60KB 汇编已于 2026-10-15 裁剪中归档缺失，增量记录在工作日志里有副本）。
 
 ## 自动发文（4 条线）
-- `5cff0944` 每日 10:00 书籍解读（4800–5200 汉字，只管 `books` 键、只用 `scripts/_books/book/`）；`a21c40ac` 每日 11:00 AI 编程工具长文（4800–5200 汉字，只管 `plugins` 键、只用 `scripts/_books/tech/`）——2026-10-10 由原 5cff0944 拆分而来，两条 prompt 互相声明不替对方发文、清理只删各自子目录；`3b3c6b54` 每日 10:30 城市旅游；`a49509f8` 每月 2 日 11:00 游戏。
+- `5cff0944` 每日 09:30 书籍解读（4800–5200 汉字，只管 `books` 键、只用 `scripts/_books/book/`）；`a21c40ac` 每日 10:10 AI 编程工具长文（4800–5200 汉字，只管 `plugins` 键、只用 `scripts/_books/tech/`）——2026-10-10 由原 5cff0944 拆分而来，两条 prompt 互相声明不替对方发文、清理只删各自子目录；`3b3c6b54` 每日 09:50 城市旅游；`a49509f8` 每月 1 日 10:15 游戏。
+- **前置数据脚本（2026-10-15 起，prompt 已接入）**：`scripts/travel-preflight.mjs`（旅游线）与 `scripts/line-preflight.mjs --key=books|plugins`（书籍/工具线）一次输出「同日查重 + 台账 + 近期文章 + 建议类别 + memoryTail」，替代分散查库；四类计数由脚本从 types 实算（曾抓到人工计数错 1），`_travel-state.json` **不再写 `_counts_*` 快照**。
+- **自动化执行记忆**：`.workbuddy/memory/automations/<id>/memory.md` 保持 ≤10 条（结构条如「长期约定/踩坑与经验」常驻），旧条目挪同目录 `memory-archive.md`；prompt 不再让 agent 整读记忆，统一由 preflight 输出末尾 `memoryTail`。automations 目录不在 git 跟踪里，裁剪前先确认内容在日工作日志有副本。
 - `automation_update` 的 `cwds` 参数要传逗号分隔字符串（如 `E:\work\ai project\blog2`），传数组会被双重编码。
 - **第二篇选题边界**：主题是「让 AI 编程助手（尤其 dsh）跑得更好的东西」。**五类**：①agent 技能包 ②agent 插件与扩展 ③MCP server 与工具接入 ④记忆/检索/上下文工程 ⑤执行与操作环境（沙箱/容器/远程/终端/浏览器/OCR）。**排除五类**：LLM 应用开发框架与低代码编排平台、面向终端用户的聊天客户端、模型网关/代理聚合层、纯 API 封装 SDK、与 agent 工作流无关的娱乐消费件。
 - 候选池 `scripts/_dsh_candidates.mjs`（读 `C:/Users/kaven/.dsh/plugins/dsh-market/plugins-cache.json`，按五类分组并自动剔除已写过项目与娱乐件；**勿删**）。写第二篇先跑它，别凭记忆编项目名；标 `⚠️star 数存疑` 的别选。
@@ -44,7 +45,7 @@
 ## 写长文入库流程
 1. **分片写正文**（单次 Write 长中文会截断，每片 ≤900 汉字）。插图位置**必须写完整 markdown** `![图注]({{FIG1}})`；只写裸 `{{FIG1}}` 会报「正文插图 0/N」FAIL。
 2. `node scripts/build-article.mjs --dir=… --slug=… --title=… --tags=… --excerpt=… --cover=… --min-han/--max-han --figs=N [--banned=…]`；**退出码 1 = 有 FAIL，先修再发**。
-3. 发布：`node node_modules/tsx/dist/cli.mjs scripts/post-article.ts --file=<线目录>/article.json`。**`post-article.ts` 只本地化封面，正文插图要自己拷到 `data/uploads/<slug>-fig1.jpg`。**
+3. 发布：`node node_modules/tsx/dist/cli.mjs scripts/post-article.ts --file=<线目录>/article.json`。**2026-10-15 起发布脚本内置 slug 查重（重复拒绝入库，防 `-2`）与 renderMarkdown 渲染体检（`<img>`/`<h2>` 数与 markdown 源一致、裸 `|` 不泄漏，FAIL 退出码 1 不写库）；`--check-only` 可发布前自检。**正文插图仍要自己拷到 `data/uploads/<slug>-fig1.jpg`。
 4. 验收：封面在 `cover_image` 字段、**不在 `content` 里**；`renderMarkdown` 的 `<img>` 数 = 正文插图数。excerpt 80–120 字（口径 = 去空白后全部字符，ASCII 模型名/参数名都算数）；发布后才发现越界只能 `update posts set excerpt=?` 原地改库，别重发（会变 `-2`）。
 5. 同文件多条 Edit 并行会**静默丢失** → 逐条顺序发，改完 Read 复核。
 

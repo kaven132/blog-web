@@ -1,4 +1,5 @@
 ---
+import { ClientRouter } from "astro:transitions";
 import AppShell from "../components/AppShell";
 import { db } from "../db";
 import { profile } from "../db/schema";
@@ -37,6 +38,8 @@ const userAvatar = row?.avatar || "";
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="description" content={desc} />
     <title>{title} | kaven的个人网页</title>
+    <!-- 页面转场：ClientRouter 拦截导航做客户端换页，默认交叉淡入淡出 -->
+    <ClientRouter />
     <!-- Open Graph / Twitter Card：聊天与社交平台分享链接时的卡片数据 -->
     <meta property="og:type" content={ogType} />
     <meta property="og:site_name" content="kaven的个人网页" />

@@ -3,7 +3,7 @@ import Layout from "../../layouts/Layout.astro";
 import TagFilter from "../../components/TagFilter.astro";
 import Pagination from "../../components/Pagination.astro";
 import { db } from "../../db";
-import { posts, comments, likes } from "../../db/schema";
+import { comments, posts, likes } from "../../db/schema";
 import { desc, eq, sql } from "drizzle-orm";
 import { parseTags, buildTagFacets } from "../../lib/tags";
 import { AUTH_COOKIE, isAuthed } from "../../lib/auth";
@@ -74,6 +74,22 @@ const topViewed = db
   .orderBy(desc(posts.views))
   .limit(5)
   .all();
+
+// 最新评论（管理）：联文章标题，倒序 20 条
+const recentComments = db
+  .select({
+    id: comments.id,
+    author: comments.author,
+    content: comments.content,
+    createdAt: comments.createdAt,
+    parentId: comments.parentId,
+    postTitle: posts.title,
+  })
+  .from(comments)
+  .leftJoin(posts, eq(comments.postId, posts.id))
+  .orderBy(desc(comments.createdAt))
+  .limit(20)
+  .all();
 ---
 
 <Layout title="文章管理">
@@ -141,6 +157,44 @@ const topViewed = db
           </ol>
         </div>
       )}
+    </section>
+
+    <!-- 评论管理 -->
+    <section class="mb-8">
+      <div class="flex items-center justify-between mb-3">
+        <p class="text-xs font-semibold tracking-[0.15em] uppercase text-[var(--color-text-subtle)]">评论管理</p>
+        <span class="text-xs text-[var(--color-text-subtle)] font-mono">最新 {recentComments.length} 条</span>
+      </div>
+      <div class="bg-[var(--color-surface)] border border-[var(--color-border)] rounded-xl divide-y divide-[var(--color-border)]">
+        {
+          recentComments.length === 0 ? (
+            <p class="text-center text-sm text-[var(--color-text-subtle)] py-8 font-serif">暂无评论</p>
+          ) : (
+            recentComments.map((cm) => (
+              <div class="flex items-start gap-3 px-4 py-3">
+                <div class="min-w-0 flex-1">
+                  <div class="flex items-center gap-2 flex-wrap">
+                    <span class="text-sm font-semibold text-[var(--color-text)]">{cm.author}</span>
+                    <span class="text-[11px] text-[var(--color-text-subtle)]">评于「{cm.postTitle}」</span>
+                    {cm.parentId && <span class="text-[10px] text-[var(--color-text-subtle)]">（回复）</span>}
+                    <span class="text-[11px] text-[var(--color-text-subtle)]">{formatDateCN(cm.createdAt)}</span>
+                  </div>
+                  <p class="text-xs text-[var(--color-text-muted)] leading-relaxed mt-1 line-clamp-2">{cm.content}</p>
+                </div>
+                <button
+                  type="button"
+                  data-del-comment={cm.id}
+                  data-cdel-text={cm.content}
+                  aria-label={`删除 ${cm.author} 的评论`}
+                  class="flex-shrink-0 inline-flex items-center justify-center gap-1 px-3 py-1.5 text-xs font-semibold rounded-lg border border-[var(--color-border)] text-red-400 hover:text-red-500 hover:border-red-200 hover:bg-red-50 transition-all"
+                >
+                  删除
+                </button>
+              </div>
+            ))
+          )
+        }
+      </div>
     </section>
 
     <!-- Tag filter -->
@@ -303,49 +357,130 @@ const topViewed = db
       </div>
     </div>
   </div>
-</Layout>
 
-<script>
-  const modal = document.getElementById("delete-modal")!;
-  const deleteTitle = document.getElementById("delete-title")!;
-  const cancelBtn = document.getElementById("cancel-delete")!;
-  const confirmBtn = document.getElementById("confirm-delete")!;
-  let deleteId: number | null = null;
+  <!-- Comment delete confirm modal -->
+  <div
+    id="comment-del-modal"
+    class="hidden fixed inset-0 z-[200] flex items-center justify-center bg-black/40 backdrop-blur-sm p-4"
+  >
+    <div class="w-full max-w-xs bg-[var(--color-surface)] rounded-2xl shadow-2xl shadow-black/10 overflow-hidden" style="animation:scale-in 0.15s ease-out">
+      <div class="h-1 bg-red-400" />
+      <div class="px-6 pt-6 pb-2 text-center">
+        <div class="w-12 h-12 mx-auto mb-4 rounded-full bg-red-50 text-red-400 flex items-center justify-center">
+          <svg class="w-6 h-6" fill="none" stroke="currentColor" strokeWidth={1.5} viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0" />
+          </svg>
+        </div>
+        <h3 class="text-lg font-bold text-[var(--color-text)] tracking-[-0.01em] mb-1.5">删除评论</h3>
+        <p class="text-sm text-[var(--color-text-muted)] leading-relaxed font-serif break-all">
+          确定要删除「<span id="cdel-text"></span>」吗？<br />此操作不可撤销。
+        </p>
+      </div>
+      <div class="flex border-t border-[var(--color-border)] mt-4">
+        <button
+          id="cdel-cancel"
+          class="flex-1 py-3 text-sm font-medium text-[var(--color-text-muted)] hover:bg-[var(--color-bg)] transition-colors border-r border-[var(--color-border)]"
+        >
+          取消
+        </button>
+        <button
+          id="cdel-confirm"
+          class="flex-1 py-3 text-sm font-semibold text-red-500 hover:bg-red-50 transition-colors"
+        >
+          删除
+        </button>
+      </div>
+    </div>
+  </div>
+  <script data-astro-rerun>
+    // 文章删除 + 评论删除（页面转场后需重新绑定，data-astro-rerun 保证脚本重执行）
+    // 注意：data-astro-rerun 按 is:inline 原样内联，不经过 TS 编译——只能写纯 JS
+    (() => {
+      const modal = document.getElementById("delete-modal");
+      const deleteTitle = document.getElementById("delete-title");
+      const cancelBtn = document.getElementById("cancel-delete");
+      const confirmBtn = document.getElementById("confirm-delete");
+      const cModal = document.getElementById("comment-del-modal");
+      const cdelText = document.getElementById("cdel-text");
+      const cdelCancel = document.getElementById("cdel-cancel");
+      const cdelConfirm = document.getElementById("cdel-confirm");
+      if (!modal || !deleteTitle || !cancelBtn || !confirmBtn || !cModal || !cdelText || !cdelCancel || !cdelConfirm) return;
+      let deleteId = null;
+      let cdelId = null;
 
-  const closeModal = () => {
-    modal.classList.add("hidden");
-    deleteId = null;
-  };
+      const closeModal = () => {
+        modal.classList.add("hidden");
+        deleteId = null;
+      };
 
-  document.querySelectorAll<HTMLButtonElement>("[data-delete]").forEach((btn) => {
-    btn.addEventListener("click", () => {
-      deleteId = Number(btn.dataset.delete);
-      deleteTitle.textContent = btn.dataset.title || "";
-      modal.classList.remove("hidden");
-    });
-  });
+      const closeCdel = () => {
+        cModal.classList.add("hidden");
+        cdelId = null;
+      };
 
-  cancelBtn.addEventListener("click", closeModal);
-  modal.addEventListener("click", (e) => {
-    if (e.target === modal) closeModal();
-  });
-  document.addEventListener("keydown", (e) => {
-    if (e.key === "Escape") closeModal();
-  });
-
-  confirmBtn.addEventListener("click", async () => {
-    if (!deleteId) return;
-    try {
-      const res = await fetch(`/api/posts?id=${deleteId}`, { method: "DELETE" });
-      if (res.ok) {
-        window.location.reload();
-      } else {
-        alert("删除失败，请重试");
-        closeModal();
+      for (const btn of document.querySelectorAll("[data-delete]")) {
+        btn.addEventListener("click", () => {
+          deleteId = Number(btn.dataset.delete);
+          deleteTitle.textContent = btn.dataset.title || "";
+          modal.classList.remove("hidden");
+        });
       }
-    } catch {
-      alert("网络错误");
-      closeModal();
-    }
-  });
-</script>
+
+      // 评论删除：先弹确认框，确认后走 DELETE /api/comment?id=，服务端级联删其回复
+      for (const btn of document.querySelectorAll("[data-del-comment]")) {
+        btn.addEventListener("click", () => {
+          cdelId = Number(btn.dataset.delComment);
+          cdelText.textContent = btn.dataset.cdelText || "";
+          cModal.classList.remove("hidden");
+        });
+      }
+
+      cancelBtn.addEventListener("click", closeModal);
+      cdelCancel.addEventListener("click", closeCdel);
+      modal.addEventListener("click", (e) => {
+        if (e.target === modal) closeModal();
+      });
+      cModal.addEventListener("click", (e) => {
+        if (e.target === cModal) closeCdel();
+      });
+      document.addEventListener("keydown", (e) => {
+        if (e.key === "Escape") {
+          closeModal();
+          closeCdel();
+        }
+      });
+
+      confirmBtn.addEventListener("click", async () => {
+        if (!deleteId) return;
+        try {
+          const res = await fetch(`/api/posts?id=${deleteId}`, { method: "DELETE" });
+          if (res.ok) {
+            window.location.reload();
+          } else {
+            alert("删除失败，请重试");
+            closeModal();
+          }
+        } catch {
+          alert("网络错误");
+          closeModal();
+        }
+      });
+
+      cdelConfirm.addEventListener("click", async () => {
+        if (!cdelId) return;
+        try {
+          const res = await fetch(`/api/comment?id=${cdelId}`, { method: "DELETE" });
+          if (res.ok) {
+            window.location.reload();
+          } else {
+            alert("删除失败，请重试");
+            closeCdel();
+          }
+        } catch {
+          alert("网络错误");
+          closeCdel();
+        }
+      });
+    })();
+  </script>
+</Layout>

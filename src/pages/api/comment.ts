@@ -2,6 +2,7 @@ import type { APIRoute } from "astro";
 import { db } from "../../db";
 import { comments, posts } from "../../db/schema";
 import { eq } from "drizzle-orm";
+import { AUTH_COOKIE, isAuthed } from "../../lib/auth";
 
 export const POST: APIRoute = async ({ request, redirect }) => {
   try {
@@ -55,4 +56,37 @@ export const POST: APIRoute = async ({ request, redirect }) => {
   } catch (err) {
     console.error("[comment] 插入或重定向失败:", err);
     return new Response("服务器错误", { status: 500 });
-  }};
+  }
+};
+
+/** DELETE /api/comment?id= —— 删除评论（需登录）；顶层评论连带删除其下回复 */
+export const DELETE: APIRoute = async ({ url, cookies }) => {
+  if (!isAuthed(cookies.get(AUTH_COOKIE)?.value)) {
+    return new Response(JSON.stringify({ error: "请先登录" }), {
+      status: 401,
+      headers: { "Content-Type": "application/json" },
+    });
+  }
+
+  const id = Number(url.searchParams.get("id"));
+  if (!id) {
+    return new Response(JSON.stringify({ error: "无效的请求" }), {
+      status: 400,
+      headers: { "Content-Type": "application/json" },
+    });
+  }
+
+  const deleted = db.delete(comments).where(eq(comments.id, id)).run();
+  if (deleted.changes === 0) {
+    return new Response(JSON.stringify({ error: "评论不存在" }), {
+      status: 404,
+      headers: { "Content-Type": "application/json" },
+    });
+  }
+  // 级联删除挂在该评论下的回复（仅一层盖楼）
+  db.delete(comments).where(eq(comments.parentId, id)).run();
+
+  return new Response(JSON.stringify({ ok: true }), {
+    headers: { "Content-Type": "application/json" },
+  });
+};
