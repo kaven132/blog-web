@@ -42,7 +42,9 @@
     "月亮和六便士",
     "生死疲劳",
     "我们仨",
-    "红楼梦"
+    "红楼梦",
+    "金锁记",
+    "尘埃落定"
   ],
   "plugins": [
     "DeepSeek Harness (dsh) — https://github.com/deepseek-ai/deepseek-harness",
@@ -71,7 +73,9 @@
     "ThoughtDAG — https://github.com/chenxiachan/thoughtdag",
     "DSH-taskboard — https://github.com/shengsheng90/DSH-taskboard",
     "dsh-browser — https://github.com/omdsh-dev/dsh-browser",
-    "SpecFusion — https://github.com/wxkingstar/SpecFusion"
+    "SpecFusion — https://github.com/wxkingstar/SpecFusion",
+    "dsh-capability-menu — https://github.com/PKUfudawei/dsh-capability-menu",
+    "dsh-mnemon — https://github.com/omdsh-dev/dsh-mnemon"
   ],
   "skills": [
     "subagent",

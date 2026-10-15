@@ -39,6 +39,7 @@
 - 状态文件：旅游 `scripts/_travel-state.json`；书籍线 `scripts/_posted.json` 的 `books`、AI 工具线同文件的 `plugins`；游戏 `scripts/_game-state.json`。**各线各写各的**（`skills` 是废弃键）。
 - 游戏线：`_game-state.json` 按游戏记**版本号**（不是 slug），双信号判定（A 类已上线 / B 类前瞻官宣），**只有「最新版本号 ≠ 台账版本号」才写文**，每次运行都要回写台账；自检 `scripts/_game-selfcheck.mjs`。
 - slug：`book-rec-YYYYMMDD` / `deepseek-YYYYMMDD` / `travel-<城市>-YYYYMMDD` / `game-<key>-YYYYMMDD`。`deepseek-*` 前缀**不要改**（去重逻辑依赖）。书籍标题与正文**禁「重读/再读/重温」**；正文插图 书籍 1 / 技术 1 / 旅游 2 / 游戏 0。
+- **旅行地图打点**（2026-10-15 起）：`/travel` 页按「标题『：』前缀 = 城市名」查 `src/data/travel-cities.json` 坐标台账打点，**台账外城市静默不上图**（不报错）。旅游线发文后必跑 `node scripts/travel-map-pin.mjs --add="城市|国内/国际|经度|纬度"`（幂等；写入自动保持国内前/国际后分组），再跑到 `--check` 退出码 0（零漏点）为止——已写进 3b3c6b54 prompt 第五节步骤 4。台账原本是 `travel-cities.ts` 字面量，现已迁 JSON，`travel-cities.ts` 只做 re-export。
 
 ## 写长文入库流程
 1. **分片写正文**（单次 Write 长中文会截断，每片 ≤900 汉字）。插图位置**必须写完整 markdown** `![图注]({{FIG1}})`；只写裸 `{{FIG1}}` 会报「正文插图 0/N」FAIL。
