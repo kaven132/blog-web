@@ -10,6 +10,7 @@ import { eq, and, lt, gt, desc, asc, sql } from "drizzle-orm";
 import { parseTags, getParentTag, getChildTags } from "../../lib/tags";
 import { renderMarkdown, extractHeadings } from "../../lib/markdown";
 import { formatDateCN, dbDateToISO } from "../../lib/datetime";
+import { optimizeImgSrc } from "../../lib/imgsrc";
 
 export const prerender = false;
 
@@ -147,7 +148,7 @@ const viewsDisplay = postViews > 9999 ? `${(postViews / 10000).toFixed(1)} 万` 
     {
       post.coverImage && (
         <img
-          src={post.coverImage}
+          src={optimizeImgSrc(post.coverImage)}
           alt={post.title}
           loading="lazy"
           class="w-full rounded-2xl border border-[var(--color-border)] object-cover mb-12"

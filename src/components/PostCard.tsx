@@ -15,10 +15,12 @@ interface PostCardProps {
 
 import { getParentTag, getChildTags } from "../lib/tags";
 import { formatDateCN, dbDateToISO } from "../lib/datetime";
+import { optimizeImgSrc } from "../lib/imgsrc";
 
 export default function PostCard({ title, slug, excerpt, tags, createdAt, coverImage, index = 0, likeCount = 0, views = 0, contentLen = 0, searchSnippet }: PostCardProps) {
   const readMinutes = contentLen ? Math.max(1, Math.ceil(contentLen / 400)) : null;
   const viewsDisplay = views > 9999 ? `${(views / 10000).toFixed(1)} 万` : String(views);
+  const coverSrc = optimizeImgSrc(coverImage);
   const tagList: string[] = (() => {
     try {
       return JSON.parse(tags);
@@ -37,9 +39,9 @@ export default function PostCard({ title, slug, excerpt, tags, createdAt, coverI
     >
       <a href={`/posts/${slug}`} className="block">
         {/* Cover */}
-        {coverImage && (
+        {coverSrc && (
           <img
-            src={coverImage}
+            src={coverSrc}
             alt={title}
             loading="lazy"
             className="w-full h-40 object-cover"

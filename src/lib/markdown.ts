@@ -1,3 +1,5 @@
+import { optimizeImgSrc } from "./imgsrc";
+
 export function escapeHtml(str: string): string {
   return str
     .replace(/&/g, "&amp;")
@@ -52,7 +54,11 @@ function inline(md: string): string {
   // 链接只放行 http(s)、协议相对地址和 mailto，防 javascript: 伪协议 XSS
   const SAFE_URL = /^(https?:\/\/|\/\/|mailto:)/i;
   s = s
-    .replace(/!\[([^\]]*)\]\(([^)\s]+)\)/g, (_, alt: string, url: string) => `<img src="${url}" alt="${alt}" loading="lazy" />`)
+    .replace(/!\[([^\]]*)\]\(([^)\s]+)\)/g, (_, alt: string, url: string) => {
+      // 此时 url 已被 escapeHtml 过（& → &amp;），先还原再走代理改写，避免双重编码
+      const src = optimizeImgSrc(url.replace(/&amp;/g, "&")) ?? url;
+      return `<img src="${src}" alt="${alt}" loading="lazy" />`;
+    })
     .replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>")
     .replace(/\*([^*]+)\*/g, "<em>$1</em>")
     .replace(/\[([^\]]+)\]\(([^)\s]+)\)/g, (m, text: string, url: string) =>
@@ -163,7 +169,9 @@ export function renderMarkdown(src: string): string {
     const img = line.match(/^!\[(.*?)\]\((.*?)\)\s*$/);
     if (img) {
       flush();
-      out.push(`<img src="${escapeHtml(img[2])}" alt="${escapeHtml(img[1])}" loading="lazy" />`);
+      // 独立成行的图：img[2] 是原文（未 escape），直接走代理改写
+      const src = optimizeImgSrc(img[2]) ?? escapeHtml(img[2]);
+      out.push(`<img src="${src}" alt="${escapeHtml(img[1])}" loading="lazy" />`);
       continue;
     }
 

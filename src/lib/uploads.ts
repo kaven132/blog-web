@@ -3,6 +3,7 @@ import { resolve, sep } from "node:path";
 import { db } from "../db";
 import { posts, profile } from "../db/schema";
 import { eq, ne } from "drizzle-orm";
+import { uploadsCachePath } from "./imgopt";
 
 const UPLOAD_ROOT = resolve("./data/uploads");
 
@@ -63,6 +64,9 @@ export function removeUnreferenced(names: Iterable<string>): string[] {
     if (p && existsSync(p)) {
       unlinkSync(p);
       removed.push(name);
+      // WebP 转档缓存一并清掉，防缓存目录留孤儿
+      const cache = uploadsCachePath(name);
+      if (cache && existsSync(cache)) unlinkSync(cache);
     }
   }
   return removed;

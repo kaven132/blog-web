@@ -90,6 +90,34 @@ const recentComments = db
   .orderBy(desc(comments.createdAt))
   .limit(20)
   .all();
+
+// ── 评论 Tab 统计：回复数 / 今日新增 / 涉及文章 + 评论最多 Top5 ──
+const replyCount = db
+  .select({ n: sql<number>`count(*)` })
+  .from(comments)
+  .where(sql`${comments.parentId} is not null`)
+  .get()?.n ?? 0;
+// 「今日」按服务器本地时区零点算：库里是 UTC 串，比较前先把本地零点折成 UTC 串（字典序即可比）
+const localMidnight = new Date();
+localMidnight.setHours(0, 0, 0, 0);
+const todayUtcStart = localMidnight.toISOString().slice(0, 19).replace("T", " ");
+const todayComments = db
+  .select({ n: sql<number>`count(*)` })
+  .from(comments)
+  .where(sql`${comments.createdAt} >= ${todayUtcStart}`)
+  .get()?.n ?? 0;
+const commentedPosts = db
+  .select({ n: sql<number>`count(distinct ${comments.postId})` })
+  .from(comments)
+  .get()?.n ?? 0;
+const commentTop = db
+  .select({ title: posts.title, slug: posts.slug, n: sql<number>`count(*)` })
+  .from(comments)
+  .leftJoin(posts, eq(comments.postId, posts.id))
+  .groupBy(comments.postId)
+  .orderBy(desc(sql`count(*)`))
+  .limit(5)
+  .all();
 ---
 
 <Layout title="文章管理">
@@ -111,6 +139,13 @@ const recentComments = db
       </a>
     </div>
 
+    <!-- Tab：文章 / 评论（状态落在 ?tab=，删除刷新后不丢） -->
+    <div class="inline-flex gap-1 p-1 rounded-xl bg-[var(--color-bg)] border border-[var(--color-border)] mb-6" role="tablist" aria-label="管理面板切换">
+      <button type="button" data-admin-tab="posts" class="px-5 py-1.5 text-sm font-semibold rounded-lg bg-[var(--color-accent)] text-white transition-colors">文章</button>
+      <button type="button" data-admin-tab="comments" class="px-5 py-1.5 text-sm font-semibold rounded-lg text-[var(--color-text-muted)] hover:text-[var(--color-text)] transition-colors">评论 {totalComments}</button>
+    </div>
+
+    <div id="tab-posts">
     <!-- 数据总览 -->
     <section class="mb-8">
       <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
@@ -157,44 +192,6 @@ const recentComments = db
           </ol>
         </div>
       )}
-    </section>
-
-    <!-- 评论管理 -->
-    <section class="mb-8">
-      <div class="flex items-center justify-between mb-3">
-        <p class="text-xs font-semibold tracking-[0.15em] uppercase text-[var(--color-text-subtle)]">评论管理</p>
-        <span class="text-xs text-[var(--color-text-subtle)] font-mono">最新 {recentComments.length} 条</span>
-      </div>
-      <div class="bg-[var(--color-surface)] border border-[var(--color-border)] rounded-xl divide-y divide-[var(--color-border)]">
-        {
-          recentComments.length === 0 ? (
-            <p class="text-center text-sm text-[var(--color-text-subtle)] py-8 font-serif">暂无评论</p>
-          ) : (
-            recentComments.map((cm) => (
-              <div class="flex items-start gap-3 px-4 py-3">
-                <div class="min-w-0 flex-1">
-                  <div class="flex items-center gap-2 flex-wrap">
-                    <span class="text-sm font-semibold text-[var(--color-text)]">{cm.author}</span>
-                    <span class="text-[11px] text-[var(--color-text-subtle)]">评于「{cm.postTitle}」</span>
-                    {cm.parentId && <span class="text-[10px] text-[var(--color-text-subtle)]">（回复）</span>}
-                    <span class="text-[11px] text-[var(--color-text-subtle)]">{formatDateCN(cm.createdAt)}</span>
-                  </div>
-                  <p class="text-xs text-[var(--color-text-muted)] leading-relaxed mt-1 line-clamp-2">{cm.content}</p>
-                </div>
-                <button
-                  type="button"
-                  data-del-comment={cm.id}
-                  data-cdel-text={cm.content}
-                  aria-label={`删除 ${cm.author} 的评论`}
-                  class="flex-shrink-0 inline-flex items-center justify-center gap-1 px-3 py-1.5 text-xs font-semibold rounded-lg border border-[var(--color-border)] text-red-400 hover:text-red-500 hover:border-red-200 hover:bg-red-50 transition-all"
-                >
-                  删除
-                </button>
-              </div>
-            ))
-          )
-        }
-      </div>
     </section>
 
     <!-- Tag filter -->
@@ -321,6 +318,100 @@ const recentComments = db
 
     <!-- Pagination -->
     <Pagination page={page} totalPages={totalPages} total={filtered.length} pageUrl={pageUrl} />
+    </div><!-- /tab-posts -->
+
+    <!-- ══ 评论 Tab ══ -->
+    <div id="tab-comments" class="hidden">
+      <!-- 评论统计 -->
+      <section class="mb-8">
+        <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
+          {[
+            { label: "总评论", value: String(totalComments), sub: "含回复" },
+            { label: "其中回复", value: String(replyCount), sub: "盖楼回复" },
+            { label: "今日新增", value: String(todayComments), sub: "本地零点起" },
+            { label: "有评论的文章", value: String(commentedPosts), sub: `共 ${totalPosts} 篇` },
+          ].map((s) => (
+            <div class="bg-[var(--color-surface)] border border-[var(--color-border)] rounded-xl p-4">
+              <p class="text-[10px] font-semibold tracking-[0.12em] uppercase text-[var(--color-text-subtle)]">{s.label}</p>
+              <p class="text-2xl font-bold tabular-nums text-[var(--color-text)] mt-1">{s.value}</p>
+              <p class="text-[11px] text-[var(--color-text-subtle)] mt-0.5">{s.sub}</p>
+            </div>
+          ))}
+        </div>
+
+        {commentTop.length > 0 && (
+          <div class="mt-3 bg-[var(--color-surface)] border border-[var(--color-border)] rounded-xl p-4">
+            <p class="text-[10px] font-semibold tracking-[0.12em] uppercase text-[var(--color-text-subtle)] mb-2.5">
+              评论最多 Top 5
+            </p>
+            <ol class="space-y-1.5">
+              {commentTop.map((p, i) => (
+                <li class="flex items-center gap-2.5 text-sm">
+                  <span
+                    class={`w-5 h-5 flex-shrink-0 flex items-center justify-center rounded text-[11px] font-bold ${
+                      i === 0
+                        ? "bg-[var(--color-accent)] text-white"
+                        : "bg-[var(--color-accent-muted)] text-[var(--color-accent)]"
+                    }`}
+                  >
+                    {i + 1}
+                  </span>
+                  {p.slug ? (
+                    <a
+                      href={`/posts/${encodeURIComponent(p.slug)}`}
+                      class="flex-1 min-w-0 truncate text-[var(--color-text-muted)] hover:text-[var(--color-accent)] transition-colors"
+                    >
+                      {p.title ?? "（文章已删除）"}
+                    </a>
+                  ) : (
+                    <span class="flex-1 min-w-0 truncate text-[var(--color-text-subtle)]">（文章已删除）</span>
+                  )}
+                  <span class="text-xs tabular-nums text-[var(--color-text-subtle)]">{p.n} 条评论</span>
+                </li>
+              ))}
+            </ol>
+          </div>
+        )}
+      </section>
+
+      <!-- 评论列表 -->
+      <section>
+        <div class="flex items-center justify-between mb-3">
+          <p class="text-xs font-semibold tracking-[0.15em] uppercase text-[var(--color-text-subtle)]">评论管理</p>
+          <span class="text-xs text-[var(--color-text-subtle)] font-mono">最新 {recentComments.length} 条</span>
+        </div>
+        <div class="bg-[var(--color-surface)] border border-[var(--color-border)] rounded-xl divide-y divide-[var(--color-border)]">
+          {
+            recentComments.length === 0 ? (
+              <p class="text-center text-sm text-[var(--color-text-subtle)] py-8 font-serif">暂无评论</p>
+            ) : (
+              recentComments.map((cm) => (
+                <div class="flex items-start gap-3 px-4 py-3">
+                  <div class="min-w-0 flex-1">
+                    <div class="flex items-center gap-2 flex-wrap">
+                      <span class="text-sm font-semibold text-[var(--color-text)]">{cm.author}</span>
+                      <span class="text-[11px] text-[var(--color-text-subtle)]">评于「{cm.postTitle}」</span>
+                      {cm.parentId && <span class="text-[10px] text-[var(--color-text-subtle)]">（回复）</span>}
+                      <span class="text-[11px] text-[var(--color-text-subtle)]">{formatDateCN(cm.createdAt)}</span>
+                    </div>
+                    <p class="text-xs text-[var(--color-text-muted)] leading-relaxed mt-1 line-clamp-2">{cm.content}</p>
+                  </div>
+                  <button
+                    type="button"
+                    data-del-comment={cm.id}
+                    data-cdel-text={cm.content}
+                    aria-label={`删除 ${cm.author} 的评论`}
+                    class="flex-shrink-0 inline-flex items-center justify-center gap-1 px-3 py-1.5 text-xs font-semibold rounded-lg border border-[var(--color-border)] text-red-400 hover:text-red-500 hover:border-red-200 hover:bg-red-50 transition-all"
+                  >
+                    删除
+                  </button>
+                </div>
+              ))
+            )
+          }
+        </div>
+      </section>
+    </div><!-- /tab-comments -->
   </div>
 
   <!-- Delete confirm modal -->
@@ -396,6 +487,35 @@ const recentComments = db
     // 文章删除 + 评论删除（页面转场后需重新绑定，data-astro-rerun 保证脚本重执行）
     // 注意：data-astro-rerun 按 is:inline 原样内联，不经过 TS 编译——只能写纯 JS
     (() => {
+      // ── 文章 / 评论 Tab 切换：状态落在 ?tab=，删除后 reload 也停在当前 Tab ──
+      const tabBtns = document.querySelectorAll("[data-admin-tab]");
+      const postsPanel = document.getElementById("tab-posts");
+      const commentsPanel = document.getElementById("tab-comments");
+      if (tabBtns.length && postsPanel && commentsPanel) {
+        const applyTab = function (t) {
+          const isComments = t === "comments";
+          postsPanel.classList.toggle("hidden", isComments);
+          commentsPanel.classList.toggle("hidden", !isComments);
+          tabBtns.forEach(function (b) {
+            const active = (b.dataset.adminTab === "comments") === isComments;
+            b.classList.toggle("bg-[var(--color-accent)]", active);
+            b.classList.toggle("text-white", active);
+            b.classList.toggle("text-[var(--color-text-muted)]", !active);
+            b.setAttribute("aria-selected", active ? "true" : "false");
+          });
+        };
+        tabBtns.forEach(function (b) {
+          b.addEventListener("click", function () {
+            applyTab(b.dataset.adminTab);
+            const u = new URL(location.href);
+            if (b.dataset.adminTab === "comments") u.searchParams.set("tab", "comments");
+            else u.searchParams.delete("tab");
+            history.replaceState(null, "", u);
+          });
+        });
+        if (new URLSearchParams(location.search).get("tab") === "comments") applyTab("comments");
+      }
+
       const modal = document.getElementById("delete-modal");
       const deleteTitle = document.getElementById("delete-title");
       const cancelBtn = document.getElementById("cancel-delete");
