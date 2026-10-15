@@ -14,3 +14,4 @@ dist/
 .mimosa/
 __pycache__/
 .zcodeignore
+.tmp-*.json
