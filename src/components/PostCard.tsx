@@ -9,12 +9,14 @@ interface PostCardProps {
   likeCount?: number;
   views?: number;
   contentLen?: number;
+  /** 全文搜索命中片段（含 <mark> 高亮，已在服务端转义）；有值时替代摘要展示 */
+  searchSnippet?: string;
 }
 
 import { getParentTag, getChildTags } from "../lib/tags";
 import { formatDateCN, dbDateToISO } from "../lib/datetime";
 
-export default function PostCard({ title, slug, excerpt, tags, createdAt, coverImage, index = 0, likeCount = 0, views = 0, contentLen = 0 }: PostCardProps) {
+export default function PostCard({ title, slug, excerpt, tags, createdAt, coverImage, index = 0, likeCount = 0, views = 0, contentLen = 0, searchSnippet }: PostCardProps) {
   const readMinutes = contentLen ? Math.max(1, Math.ceil(contentLen / 400)) : null;
   const viewsDisplay = views > 9999 ? `${(views / 10000).toFixed(1)} 万` : String(views);
   const tagList: string[] = (() => {
@@ -67,10 +69,15 @@ export default function PostCard({ title, slug, excerpt, tags, createdAt, coverI
           {title}
         </h2>
 
-        {/* Excerpt — serif for editorial feel */}
-        <p className="text-sm text-[var(--color-text-muted)] mb-5 leading-relaxed font-serif line-clamp-3">
-          {excerpt}
-        </p>
+        {/* Excerpt / 搜索命中片段（含高亮标记） */}
+        {searchSnippet ? (
+          <p
+            className="text-sm text-[var(--color-text-muted)] mb-5 leading-relaxed font-serif line-clamp-3 [&_mark]:bg-transparent [&_mark]:text-[var(--color-accent)] [&_mark]:font-semibold"
+            dangerouslySetInnerHTML={{ __html: searchSnippet }}
+          />
+        ) : (
+          <p className="text-sm text-[var(--color-text-muted)] mb-5 leading-relaxed font-serif line-clamp-3">{excerpt}</p>
+        )}
 
         {/* Meta row */}
         <div className="flex items-center justify-between">

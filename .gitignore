@@ -1,7 +1,8 @@
 node_modules/
 dist/
 .astro/
-data/
+# 根锚定：不带斜杠会误伤 src/data/（旅行地图城市坐标）
+/data/
 *.db
 *.db-shm
 *.db-wal

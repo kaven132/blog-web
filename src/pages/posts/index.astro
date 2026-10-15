@@ -4,27 +4,62 @@ import PostCard from "../../components/PostCard";
 import SearchBar from "../../components/SearchBar";
 import TagFilter from "../../components/TagFilter.astro";
 import Pagination from "../../components/Pagination.astro";
-import { db } from "../../db";
+import { db, sqlite } from "../../db";
 import { posts, likes, comments } from "../../db/schema";
 import { eq, desc, sql } from "drizzle-orm";
 import { parseTags, buildTagFacets } from "../../lib/tags";
 
 const searchQuery = Astro.url.searchParams.get("search") || "";
+const q = searchQuery.trim();
+const ql = q.toLowerCase();
+// FTS5 trigram 分词最少 3 字符：≥3 走全文索引（含正文、带相关性与片段），<3 回落 LIKE（标题/摘要/标签）
+const ftsQuery = q.length >= 3 ? q : null;
+
+// FTS5 全文命中：短语查询（双引号包裹防 FTS 语法注入）+ bm25 相关性 + 内容片段高亮占位（[[ ]] 前端还原为 <mark>）
+let ftsHit: Map<number, { snippet: string; rank: number }> | null = null;
+if (ftsQuery) {
+  const rows = sqlite
+    .prepare(
+      `SELECT rowid AS id,
+              snippet(posts_fts, 2, '[[', ']]', '…', 24) AS snippet,
+              bm25(posts_fts, 8.0, 3.0, 1.0) AS rank
+       FROM posts_fts
+       WHERE posts_fts MATCH ?
+         AND rowid IN (SELECT id FROM posts WHERE published = 1)
+       ORDER BY rank`
+    )
+    .all(`"${ftsQuery.replace(/"/g, '""')}"`);
+  ftsHit = new Map(
+    (rows as Array<{ id: number; snippet: string; rank: number }>).map((row) => [
+      Number(row.id),
+      {
+        snippet: String(row.snippet)
+          .replace(/&/g, "&amp;")
+          .replace(/</g, "&lt;")
+          .replace(/>/g, "&gt;")
+          .replace(/\[\[/g, "<mark>")
+          .replace(/\]\]/g, "</mark>"),
+        rank: Number(row.rank),
+      },
+    ])
+  );
+}
 const l1 = Astro.url.searchParams.get("l1") || "";
 const l2 = Astro.url.searchParams.get("l2") || "";
 const l3 = Astro.url.searchParams.get("l3") || "";
 
 // 排序：时间 / 点赞数 / 评论数 / 浏览量 × 升降序（默认时间倒序）；URL 参数白名单校验
 const SORT_KEYS = ["time", "likes", "comments", "views"];
-const sort: string = SORT_KEYS.includes(Astro.url.searchParams.get("sort") || "")
-  ? (Astro.url.searchParams.get("sort") as string)
-  : "time";
+const sortParamRaw = Astro.url.searchParams.get("sort") || "";
+const sort: string = SORT_KEYS.includes(sortParamRaw) ? sortParamRaw : "time";
 const order: string = Astro.url.searchParams.get("order") === "asc" ? "asc" : "desc";
 const sortActive = sort !== "time" || order !== "desc";
+const hasExplicitSort = sortParamRaw !== "";
 
 // 列表只取元数据 + 点赞/评论/浏览计数（评论按篇聚合），不带 content 全文（length 计算字数供阅读时长展示）
 const allPosts = db
   .select({
+    id: posts.id, // 全文搜索命中映射的键（ftsHit 以文章 id 为键）
     title: posts.title,
     slug: posts.slug,
     excerpt: posts.excerpt,
@@ -45,14 +80,17 @@ const allPosts = db
   .all()
   .map((p) => ({ ...p, tagList: parseTags(p.tags) }));
 
-// 搜索：标题/摘要/标签，忽略大小写。注意 tags 要先 parse，
-// 对 JSON 原文 includes 会把引号、方括号也算进匹配
-const q = searchQuery.trim().toLowerCase();
+// 搜索过滤：≥3 字符走 FTS 命中（标题/摘要/正文）并放宽标签命中；<3 字符回落 LIKE（标题/摘要/标签，正文不参与）
 const filtered = allPosts.filter((p) => {
   if (q) {
-    const inTags = p.tagList.some((t) => t.toLowerCase().includes(q));
-    if (!(p.title.toLowerCase().includes(q) || p.excerpt.toLowerCase().includes(q) || inTags)) {
-      return false;
+    if (ftsHit) {
+      const tagHit = p.tagList.some((t) => t.toLowerCase().includes(ql));
+      if (!ftsHit.has(p.id) && !tagHit) return false;
+    } else {
+      const inTags = p.tagList.some((t) => t.toLowerCase().includes(ql));
+      if (!(p.title.toLowerCase().includes(ql) || p.excerpt.toLowerCase().includes(ql) || inTags)) {
+        return false;
+      }
     }
   }
   if (l1 && p.tagList[0] !== l1) return false;
@@ -69,6 +107,10 @@ filtered.sort((a, b) => {
   if (sort === "views") return (a.views - b.views) * dir;
   return a.createdAt < b.createdAt ? -dir : a.createdAt > b.createdAt ? dir : 0;
 });
+// 全文搜索且未显式指定排序时，按 FTS 相关度（bm25，越小越相关）排列
+if (ftsHit && !hasExplicitSort) {
+  filtered.sort((a, b) => (ftsHit.get(a.id)?.rank ?? 1e6) - (ftsHit.get(b.id)?.rank ?? 1e6));
+}
 
 // 分页：计数与筛选基于全量，渲染按页切片
 const PAGE_SIZE = 24;
@@ -126,6 +168,15 @@ const pageTitle = [l1, l2, l3].filter(Boolean).join(" · ") || (searchQuery ? `�
         {searchQuery ? `"${searchQuery}" 的搜索结果` : [l1, l2, l3].filter(Boolean).join(" · ") || "所有文章"}
       </h1>
       <p class="text-sm text-[var(--color-text-muted)] mt-2 font-serif">共 {filtered.length} 篇文章</p>
+      {
+        searchQuery && (
+          <p class="text-[11px] text-[var(--color-text-subtle)] mt-1.5">
+            {ftsQuery
+              ? "全文搜索：标题、摘要与正文均在范围内，命中处已高亮"
+              : "短关键词仅搜索标题、摘要与标签 —— 输入 3 字以上可检索正文"}
+          </p>
+        )
+      }
     </div>
 
     <!-- Sort（点 inactive 项按倒序生效；再点一次切升降序） -->
@@ -198,6 +249,7 @@ const pageTitle = [l1, l2, l3].filter(Boolean).join(" · ") || (searchQuery ? `�
               likeCount={post.likeCount}
               views={post.views}
               contentLen={post.contentLen}
+              searchSnippet={ftsHit?.get(post.id)?.snippet}
               index={i}
             />
           ))}

@@ -24,6 +24,12 @@
   --game-pellet: #d9b48f;
   --game-cell-revealed: #f1ebdf;
 
+  /* ── 旅行地图（暗色在下方 .dark 中覆盖） ── */
+  --map-ocean: #f3efe4;
+  --map-land: #e9e2d2;
+  --map-border: #d8d0bd;
+  --map-graticule: #e6e0d1;
+
   /* ── Typography ──
      Tailwind v4 的字体命名空间是 --font-*，写成 --font-family-* 不会生成
      .font-serif / .font-mono 工具类（工具类会落到 Tailwind 默认字体）。 */
@@ -54,6 +60,10 @@
   --game-wall: #46464f;
   --game-pellet: #cfa87d;
   --game-cell-revealed: #2c2c34;
+  --map-ocean: #232329;
+  --map-land: #2e2e38;
+  --map-border: #45454f;
+  --map-graticule: #3a3a44;
 }
 
 @keyframes fade-in {

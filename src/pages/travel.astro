@@ -1,0 +1,70 @@
+---
+import Layout from "../layouts/Layout.astro";
+import TravelMap from "../components/TravelMap";
+import { db } from "../db";
+import { posts } from "../db/schema";
+import { eq } from "drizzle-orm";
+import { parseTags } from "../lib/tags";
+import { TRAVEL_CITIES } from "../lib/travel-cities";
+import { dbDateToISO } from "../lib/datetime";
+
+export const prerender = false;
+
+// 旅游线文章：标签含「旅游」的已发布文章，按时间倒序
+const travelPosts = db
+  .select({ title: posts.title, slug: posts.slug, createdAt: posts.createdAt, tags: posts.tags })
+  .from(posts)
+  .where(eq(posts.published, true))
+  .all()
+  .map((p) => ({ ...p, tagList: parseTags(p.tags) }))
+  .filter((p) => p.tagList.includes("旅游"))
+  .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+
+// 按城市聚合：城市名 = 标题「：」前缀，坐标查 travel-cities 台账（未登记的城市跳过）
+// 同一城市多篇时 count 累加，latest 取最新一篇
+const cityMap = new Map<
+  string,
+  TravelCity
+>();
+for (const post of travelPosts) {
+  const name = post.title.split("：")[0].trim();
+  const coord = TRAVEL_CITIES[name];
+  if (!coord) continue;
+  const entry = cityMap.get(name);
+  if (entry) {
+    entry.count += 1;
+    continue;
+  }
+  cityMap.set(name, {
+    name,
+    type: coord.type,
+    lng: coord.lng,
+    lat: coord.lat,
+    count: 1,
+    latest: {
+      title: post.title,
+      slug: post.slug,
+      date: post.createdAt.slice(5, 10).replace("-", " 月 ") + " 日",
+      dateISO: post.createdAt,
+    },
+  });
+}
+const cities = [...cityMap.values()].sort((a, b) => b.latest.dateISO.localeCompare(a.latest.dateISO));
+---
+
+<Layout title="旅行地图" description="自动化线走过的每一座城市，都落在这张地图上">
+  <div class="max-w-6xl mx-auto py-10 md:py-14">
+    <!-- Header -->
+    <header class="mb-6 flex items-end justify-between gap-4 flex-wrap">
+      <div>
+        <p class="text-xs font-semibold tracking-[0.15em] uppercase text-[var(--color-text-subtle)] mb-2">Travel Map</p>
+        <h1 class="text-3xl md:text-4xl font-bold tracking-[-0.02em]">旅行地图</h1>
+        <p class="mt-3 text-sm text-[var(--color-text-muted)] font-serif">
+          自动化发文线走过的每一座城市，都落在这张地图上 —— 点图钉读城记。
+        </p>
+      </div>
+    </header>
+
+    <TravelMap client:load cities={cities} />
+  </div>
+</Layout>
