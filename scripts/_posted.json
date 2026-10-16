@@ -44,7 +44,8 @@
     "我们仨",
     "红楼梦",
     "金锁记",
-    "尘埃落定"
+    "尘埃落定",
+    "额尔古纳河右岸"
   ],
   "plugins": [
     "DeepSeek Harness (dsh) — https://github.com/deepseek-ai/deepseek-harness",
@@ -75,7 +76,8 @@
     "dsh-browser — https://github.com/omdsh-dev/dsh-browser",
     "SpecFusion — https://github.com/wxkingstar/SpecFusion",
     "dsh-capability-menu — https://github.com/PKUfudawei/dsh-capability-menu",
-    "dsh-mnemon — https://github.com/omdsh-dev/dsh-mnemon"
+    "dsh-mnemon — https://github.com/omdsh-dev/dsh-mnemon",
+    "dsh-android — https://github.com/ZSeven-W/dsh-android"
   ],
   "skills": [
     "subagent",
