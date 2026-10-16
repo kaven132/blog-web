@@ -173,7 +173,14 @@ export default function TravelMap({ cities }: { cities: TravelCity[] }) {
 
       {/* 地图（viewport g 承载缩放变换；描边不随缩放变粗） */}
       <div className="relative rounded-2xl border border-[var(--color-border)] overflow-hidden bg-[var(--map-ocean)]">
-        <svg ref={svgRef} viewBox={`0 0 ${W} ${H}`} className="block w-full h-auto" role="img" aria-label="旅行城市地图">
+        {/* 缩放后可平移：抓手光标提示可拖，按住变握拳；100% 时无平移空间用默认光标 */}
+        <svg
+          ref={svgRef}
+          viewBox={`0 0 ${W} ${H}`}
+          className={`block w-full h-auto select-none ${transform.k > 1 ? "cursor-grab active:cursor-grabbing" : "cursor-default"}`}
+          role="img"
+          aria-label="旅行城市地图"
+        >
           <g transform={`translate(${transform.x}, ${transform.y}) scale(${transform.k})`}>
             <path d={graticulePath} fill="none" stroke="var(--map-graticule)" strokeWidth="0.5" vectorEffect="non-scaling-stroke" />
             <path d={landPath} fill="var(--map-land)" />

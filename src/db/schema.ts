@@ -63,3 +63,15 @@ export const credentials = sqliteTable("credentials", {
     .notNull()
     .default(sql`(CURRENT_TIMESTAMP)`),
 });
+
+/** 网页游戏云端存档：每用户每游戏一条，data 为 base64 的 .sol 文件字节（Flash SharedObject） */
+export const gameSaves = sqliteTable("game_saves", {
+  userId: integer("user_id").notNull(), // 单管理员体系恒为 credentials.id=1
+  game: text("game").notNull(), // 游戏标识（如 kakutoumusume）
+  data: text("data").notNull(), // base64(.sol)
+  size: integer("size").notNull().default(0), // 解码后字节数，列表展示用
+  updatedAt: text("updated_at")
+    .notNull()
+    .default(sql`(CURRENT_TIMESTAMP)`),
+});
+

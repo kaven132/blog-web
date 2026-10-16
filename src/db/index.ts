@@ -23,6 +23,16 @@ try {
   sqlite.exec("ALTER TABLE comments ADD COLUMN parent_id INTEGER");
 } catch { /* 列已存在 */ }
 
+// 游戏云端存档（每用户每游戏一条）
+sqlite.exec(`CREATE TABLE IF NOT EXISTS game_saves (
+  user_id INTEGER NOT NULL,
+  game TEXT NOT NULL,
+  data TEXT NOT NULL,
+  size INTEGER NOT NULL DEFAULT 0,
+  updated_at TEXT NOT NULL DEFAULT (CURRENT_TIMESTAMP),
+  PRIMARY KEY (user_id, game)
+)`);
+
 // ── 全文搜索（FTS5 trigram）：外部内容表 + 触发器同步，正文可搜、中文子串命中 ──
 // trigram 按 3 字滑窗切词：中文 ≥3 字的查询走 MATCH（快、带相关性与高亮片段），
 // <3 字由查询层回落 LIKE。触发器保证自动化脚本直写库时索引也不漏。
