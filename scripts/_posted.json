@@ -45,7 +45,10 @@
     "红楼梦",
     "金锁记",
     "尘埃落定",
-    "额尔古纳河右岸"
+    "额尔古纳河右岸",
+    "雪国",
+    "鼠疫",
+    "棋王"
   ],
   "plugins": [
     "DeepSeek Harness (dsh) — https://github.com/deepseek-ai/deepseek-harness",
@@ -77,7 +80,10 @@
     "SpecFusion — https://github.com/wxkingstar/SpecFusion",
     "dsh-capability-menu — https://github.com/PKUfudawei/dsh-capability-menu",
     "dsh-mnemon — https://github.com/omdsh-dev/dsh-mnemon",
-    "dsh-android — https://github.com/ZSeven-W/dsh-android"
+    "dsh-android — https://github.com/ZSeven-W/dsh-android",
+    "easyeda-agent — https://github.com/zhoushoujianwork/easyeda-agent",
+    "Argo — https://github.com/taxueseek/argo",
+    "qa-skills — https://github.com/fishzjp/qa-skills"
   ],
   "skills": [
     "subagent",

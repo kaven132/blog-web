@@ -91,6 +91,28 @@ export default function TravelMap({ cities }: { cities: TravelCity[] }) {
   const visible = cities.filter((c) => filter === "全部" || c.type === filter);
   const selected = visible.find((c) => c.name === selectedName) ?? visible[0] ?? null;
 
+  // 文字搜索：城市名模糊匹配（不区分大小写），最多展示 8 条
+  const [query, setQuery] = useState("");
+  const [searchOpen, setSearchOpen] = useState(false);
+  const q = query.trim().toLowerCase();
+  const matches = q ? cities.filter((c) => c.name.toLowerCase().includes(q)).slice(0, 8) : [];
+
+  // 定位：选中城市 + 平移缩放到视口中心（scale 4；受缩放约束自动修正）
+  const focusCity = useCallback(
+    (c: TravelCity) => {
+      setSelectedName(c.name);
+      // 分类联动：目标城市被当前筛选隐藏时切回「全部」
+      setFilter((f) => (f === "全部" || f === c.type ? f : "全部"));
+      const pt = projection([c.lng, c.lat]);
+      if (!pt || !svgRef.current || !zoomRef.current) return;
+      const z = zoomRef.current;
+      const sel = select(svgRef.current);
+      sel.call(z.scaleTo, 6);
+      sel.call(z.translateTo, pt[0], pt[1]);
+    },
+    [projection]
+  );
+
   const pin = (c: TravelCity) => {
     const pt = projection([c.lng, c.lat]);
     if (!pt) return null;
@@ -173,6 +195,60 @@ export default function TravelMap({ cities }: { cities: TravelCity[] }) {
 
       {/* 地图（viewport g 承载缩放变换；描边不随缩放变粗） */}
       <div className="relative rounded-2xl border border-[var(--color-border)] overflow-hidden bg-[var(--map-ocean)]">
+        {/* 文字搜索：悬浮地图左上角，快速定位城市 */}
+        <div className="absolute top-3 left-3 z-20 w-52 sm:w-64">
+          <input
+            type="text"
+            value={query}
+            onChange={(e) => {
+              setQuery(e.target.value);
+              setSearchOpen(true);
+            }}
+            onFocus={() => setSearchOpen(true)}
+            onBlur={() => setTimeout(() => setSearchOpen(false), 150)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" && matches[0]) {
+                focusCity(matches[0]);
+                setQuery("");
+                setSearchOpen(false);
+              } else if (e.key === "Escape") {
+                setSearchOpen(false);
+              }
+            }}
+            placeholder="🔍 搜索城市…"
+            className="w-full rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)]/95 backdrop-blur px-3.5 py-2 text-sm text-[var(--color-text)] placeholder:text-[var(--color-text-subtle)] shadow-md focus:outline-none focus:border-[var(--color-accent)]/60 transition-colors"
+            aria-label="搜索城市快速定位"
+          />
+          {searchOpen && query.trim() !== "" && (
+            matches.length > 0 ? (
+              <ul className="absolute z-30 mt-1 w-full max-h-56 overflow-y-auto rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)]/97 backdrop-blur shadow-lg py-1">
+                {matches.map((c) => (
+                  <li key={c.name}>
+                    <button
+                      type="button"
+                      className="w-full px-3.5 py-2 text-left text-sm text-[var(--color-text)] hover:bg-[var(--color-accent-muted)] hover:text-[var(--color-accent)] transition-colors flex items-center justify-between gap-3"
+                      onMouseDown={(e) => e.preventDefault()}
+                      onClick={() => {
+                        focusCity(c);
+                        setQuery("");
+                        setSearchOpen(false);
+                      }}
+                    >
+                      <span className="font-medium">{c.name}</span>
+                      <span className="text-xs text-[var(--color-text-subtle)] tabular-nums">
+                        {c.type} · {c.count} 篇
+                      </span>
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <div className="absolute z-30 mt-1 w-full rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)]/97 backdrop-blur px-3.5 py-2.5 text-sm text-[var(--color-text-subtle)]">
+                没有匹配的城市
+              </div>
+            )
+          )}
+        </div>
         {/* 缩放后可平移：抓手光标提示可拖，按住变握拳；100% 时无平移空间用默认光标 */}
         <svg
           ref={svgRef}
