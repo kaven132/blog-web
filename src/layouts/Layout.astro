@@ -74,6 +74,10 @@ const userAvatar = row?.avatar || "";
           const saved = localStorage.getItem("theme");
           const dark = saved ? saved === "dark" : window.matchMedia("(prefers-color-scheme: dark)").matches;
           document.documentElement.classList.toggle("dark", dark);
+          // 主题色板：珊瑚红（默认）/青/紫/琥珀/玫红，存于 localStorage["theme-color"]
+          const color = localStorage.getItem("theme-color");
+          if (color && color !== "coral") document.documentElement.dataset.theme = color;
+          else delete document.documentElement.dataset.theme;
         } catch {}
       })();
     </script>

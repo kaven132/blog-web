@@ -66,6 +66,34 @@
   --map-graticule: #3a3a44;
 }
 
+/* ── 主题色板：html[data-theme] 覆盖 accent 三件套（默认珊瑚红=无 data-theme）。
+   暗色下 muted 透明度略高（.dark[data-theme] 再覆盖一次）。
+   Layout 进页前脚本从 localStorage 定档，TopNav 调色按钮切换。 ── */
+html[data-theme="teal"] {
+  --color-accent: oklch(56% 0.11 195);
+  --color-accent-hover: oklch(48% 0.11 195);
+  --color-accent-muted: oklch(56% 0.11 195 / 0.09);
+}
+html[data-theme="violet"] {
+  --color-accent: oklch(55% 0.2 300);
+  --color-accent-hover: oklch(47% 0.2 300);
+  --color-accent-muted: oklch(55% 0.2 300 / 0.09);
+}
+html[data-theme="amber"] {
+  --color-accent: oklch(62% 0.15 70);
+  --color-accent-hover: oklch(53% 0.15 70);
+  --color-accent-muted: oklch(62% 0.15 70 / 0.1);
+}
+html[data-theme="rose"] {
+  --color-accent: oklch(58% 0.19 5);
+  --color-accent-hover: oklch(50% 0.19 5);
+  --color-accent-muted: oklch(58% 0.19 5 / 0.09);
+}
+.dark[data-theme="teal"] { --color-accent-muted: oklch(56% 0.11 195 / 0.17); }
+.dark[data-theme="violet"] { --color-accent-muted: oklch(55% 0.2 300 / 0.17); }
+.dark[data-theme="amber"] { --color-accent-muted: oklch(62% 0.15 70 / 0.18); }
+.dark[data-theme="rose"] { --color-accent-muted: oklch(58% 0.19 5 / 0.17); }
+
 @keyframes fade-in {
   from { opacity: 0; }
   to { opacity: 1; }

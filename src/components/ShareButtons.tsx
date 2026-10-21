@@ -8,11 +8,22 @@ import QRCode from "qrcode";
  * - 更多：走系统分享面板（仅支持的浏览器显示，移动端 / 新版 Edge-Chrome）
  * 深浅色：二维码白底深码保证可扫，弹层走站点 token。
  */
-export default function ShareButtons({ title }: { title: string }) {
+interface ShareButtonsProps {
+  title: string;
+  /** 封面图（应传入同源 URL——远程图先经 /api/img 代理，避免 Canvas 跨域污染） */
+  coverImage?: string;
+  /** 发布日期（展示用中文日期） */
+  date?: string;
+}
+
+export default function ShareButtons({ title, coverImage, date }: ShareButtonsProps) {
   const [qrOpen, setQrOpen] = useState(false);
   const [qrData, setQrData] = useState("");
   const [copied, setCopied] = useState(false);
   const [canWebShare, setCanWebShare] = useState(false);
+  const [cardOpen, setCardOpen] = useState(false);
+  const [cardData, setCardData] = useState("");
+  const [cardBusy, setCardBusy] = useState(false);
   const popRef = useRef<HTMLDivElement>(null);
   const wrapRef = useRef<HTMLDivElement>(null);
 
@@ -58,6 +69,97 @@ export default function ShareButtons({ title }: { title: string }) {
     }
   }, [title]);
 
+  /** 分享卡片：Canvas 绘制 900x1200 竖版（封面 + 标题 + 日期作者 + 二维码） */
+  const generateCard = useCallback(async () => {
+    if (cardBusy) return;
+    setCardBusy(true);
+    try {
+      const W = 900, H = 1200;
+      const cv = document.createElement("canvas");
+      cv.width = W; cv.height = H;
+      const ctx = cv.getContext("2d");
+      if (!ctx) throw new Error("no 2d context");
+
+      // 底色与内容区留白
+      ctx.fillStyle = "#faf6f0";
+      ctx.fillRect(0, 0, W, H);
+
+      // 封面（900x500 cover 裁剪）；无封面或加载失败 → 主题色渐变 + 站名
+      const coverH = 500;
+      let coverDrawn = false;
+      if (coverImage) {
+        try {
+          const img = await new Promise<HTMLImageElement>((res, rej) => {
+            const im = new Image();
+            im.onload = () => res(im);
+            im.onerror = () => rej(new Error("cover failed"));
+            im.src = coverImage;
+          });
+          const scale = Math.max(W / img.width, coverH / img.height);
+          const dw = img.width * scale, dh = img.height * scale;
+          ctx.drawImage(img, (W - dw) / 2, (coverH - dh) / 2, dw, dh);
+          coverDrawn = true;
+        } catch { /* 回退渐变 */ }
+      }
+      if (!coverDrawn) {
+        const grad = ctx.createLinearGradient(0, 0, W, coverH);
+        grad.addColorStop(0, "#e8907a");
+        grad.addColorStop(1, "#d94040");
+        ctx.fillStyle = grad;
+        ctx.fillRect(0, 0, W, coverH);
+        ctx.fillStyle = "rgba(255,255,255,0.92)";
+        ctx.font = "700 64px 'DM Sans', 'Noto Sans SC', sans-serif";
+        ctx.textAlign = "center";
+        ctx.fillText("Kaven", W / 2, coverH / 2 + 22);
+        ctx.textAlign = "left";
+      }
+
+      // 标题：最多 3 行，超出省略
+      ctx.fillStyle = "#1d1c1a";
+      ctx.font = "700 46px 'Noto Sans SC', sans-serif";
+      let line = "", lines: string[] = [];
+      for (const ch of title) {
+        if (ctx.measureText(line + ch).width > W - 120) {
+          lines.push(line);
+          line = ch;
+          if (lines.length === 3) break;
+        } else line += ch;
+      }
+      if (lines.length < 3 && line) lines.push(line);
+      if (lines.length === 3) { const l3 = lines[2]; while (l3 && ctx.measureText(l3 + "…").width > W - 120) lines[2] = lines[2].slice(0, -1); lines[2] += "…"; }
+      let ty = coverH + 100;
+      for (const l of lines) { ctx.fillText(l, 60, ty); ty += 64; }
+
+      // 日期与作者
+      ctx.font = "26px 'Noto Sans SC', sans-serif";
+      ctx.fillStyle = "#8a857c";
+      ctx.fillText(`${date ? date + "  ·  " : ""}Kaven 的个人网页`, 60, ty + 24);
+
+      // 分隔线
+      ctx.strokeStyle = "#e5ded2";
+      ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.moveTo(60, H - 280); ctx.lineTo(W - 60, H - 280); ctx.stroke();
+
+      // 二维码 + 扫码提示
+      const qr = await QRCode.toDataURL(pageUrl(), { width: 340, margin: 1, color: { dark: "#1d1c1a" } });
+      const qimg = await new Promise<HTMLImageElement>((res) => { const im = new Image(); im.onload = () => res(im); im.src = qr; });
+      ctx.drawImage(qimg, 60, H - 240, 180, 180);
+      ctx.fillStyle = "#1d1c1a";
+      ctx.font = "600 30px 'Noto Sans SC', sans-serif";
+      ctx.fillText("扫码阅读全文", 275, H - 130);
+      ctx.font = "24px 'Noto Sans SC', sans-serif";
+      ctx.fillStyle = "#8a857c";
+      ctx.fillText("Kaven 的个人网页", 275, H - 88);
+
+      setCardData(cv.toDataURL("image/png"));
+      setCardOpen(true);
+    } catch {
+      alert("分享图生成失败，请重试");
+    } finally {
+      setCardBusy(false);
+    }
+  }, [title, coverImage, date]);
+
   const btn =
     "inline-flex items-center gap-1.5 px-3.5 py-2 rounded-full text-xs font-medium text-[var(--color-text-muted)] bg-[var(--color-bg)] border border-[var(--color-border)] hover:border-[var(--color-accent)]/40 hover:text-[var(--color-accent)] transition-all";
 
@@ -102,6 +204,30 @@ export default function ShareButtons({ title }: { title: string }) {
           </svg>
           更多
         </button>
+      )}
+
+      <button type="button" onClick={generateCard} className={btn} title="生成分享卡片" disabled={cardBusy}>
+        <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth={1.8} viewBox="0 0 24 24" aria-hidden="true">
+          <path strokeLinecap="round" strokeLinejoin="round" d="M6.827 6.175A2.31 2.31 0 0 1 5.186 7.23c-.38.054-.757.112-1.134.175C2.999 7.58 2.25 8.507 2.25 9.574V18a2.25 2.25 0 0 0 2.25 2.25h15A2.25 2.25 0 0 0 21.75 18V9.574c0-1.067-.75-1.994-1.802-2.169a47.865 47.865 0 0 0-1.134-.175 2.31 2.31 0 0 1-1.64-1.055l-.822-1.316a2.192 2.192 0 0 0-1.736-1.039 48.774 48.774 0 0 0-5.232 0 2.192 2.192 0 0 0-1.736 1.039l-.821 1.316Z" />
+          <path strokeLinecap="round" strokeLinejoin="round" d="M16.5 12.75a4.5 4.5 0 1 1-9 0 4.5 4.5 0 0 1 9 0ZM18.75 10.5h.008v.008h-.008V10.5Z" />
+        </svg>
+        {cardBusy ? "生成中…" : "分享图"}
+      </button>
+
+      {cardOpen && cardData && (
+        <div className="fixed inset-0 z-[400] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4" onClick={() => setCardOpen(false)}>
+          <div className="max-h-[92vh] flex flex-col items-center gap-3" onClick={(e) => e.stopPropagation()}>
+            <img src={cardData} alt="文章分享卡片" className="max-h-[76vh] w-auto rounded-xl shadow-2xl" />
+            <div className="flex items-center gap-3">
+              <a href={cardData} download="kaven-blog-share.png" className="px-4 py-2 text-sm font-semibold rounded-lg bg-[var(--color-accent)] text-white hover:bg-[var(--color-accent-hover)] transition-colors">
+                保存图片
+              </a>
+              <button type="button" onClick={() => setCardOpen(false)} className="px-4 py-2 text-sm font-medium rounded-lg bg-white/10 text-white border border-white/30 hover:bg-white/20 transition-colors">
+                关闭
+              </button>
+            </div>
+          </div>
+        </div>
       )}
 
       {copied && (

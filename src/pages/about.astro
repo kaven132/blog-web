@@ -55,6 +55,16 @@ const fonts = [
         这是一个使用现代前端技术栈构建的个人技术博客，也是探索最新 Web 开发实践的实验场 ——
         从 SSR 渲染、群岛注水到自动化发文，站上每一处细节都 open to read。
       </p>
+      <div class="mt-5 flex gap-5 text-sm">
+        <a href="/about-site" class="inline-flex items-center gap-1.5 text-[var(--color-accent)] hover:underline font-medium">
+          关于本站
+          <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M13.5 4.5 21 12l-7.5 7.5M21 12H3" /></svg>
+        </a>
+        <a href="/archive" class="inline-flex items-center gap-1.5 text-[var(--color-text-muted)] hover:text-[var(--color-accent)] transition-colors">
+          文章归档
+          <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M13.5 4.5 21 12l-7.5 7.5M21 12H3" /></svg>
+        </a>
+      </div>
       <div class="mt-7 flex gap-8">
         <div>
           <p class="text-2xl font-bold tabular-nums">{postCount}<span class="text-sm font-medium text-[var(--color-text-subtle)] ml-1">篇</span></p>

@@ -25,7 +25,43 @@ export default function TopNav({ onToggleSidebar, sidebarOpen, authed, userName 
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [loginOpen, setLoginOpen] = useState(false);
   const [logoutConfirmOpen, setLogoutConfirmOpen] = useState(false);
+  const [paletteOpen, setPaletteOpen] = useState(false);
+  const paletteRef = useRef<HTMLDivElement>(null);
+  const [themeColor, setThemeColor] = useState("coral");
   const dropdownRef = useRef<HTMLDivElement>(null);
+
+  // 主题色初值（挂载后读，避免 SSR 不一致）
+  useEffect(() => {
+    try {
+      const c = localStorage.getItem("theme-color");
+      if (c) setThemeColor(c);
+    } catch { /* ignore */ }
+  }, []);
+
+  // 点外部收起调色弹层
+  useEffect(() => {
+    if (!paletteOpen) return;
+    const onDown = (e: MouseEvent) => {
+      if (paletteRef.current && !paletteRef.current.contains(e.target as Node)) setPaletteOpen(false);
+    };
+    document.addEventListener("mousedown", onDown);
+    return () => document.removeEventListener("mousedown", onDown);
+  }, [paletteOpen]);
+
+  const applyThemeColor = (c: string) => {
+    setThemeColor(c);
+    if (c === "coral") delete document.documentElement.dataset.theme;
+    else document.documentElement.dataset.theme = c;
+    try { localStorage.setItem("theme-color", c); } catch { /* ignore */ }
+  };
+
+  const palette = [
+    { id: "coral", name: "珊瑚", css: "#d94040" },
+    { id: "teal", name: "青碧", css: "#0e8f96" },
+    { id: "violet", name: "黛紫", css: "#8b5bd6" },
+    { id: "amber", name: "琥珀", css: "#d69a2d" },
+    { id: "rose", name: "玫红", css: "#d64f6e" },
+  ];
 
   useEffect(() => {
     const onOutsideClick = (e: MouseEvent) => {
@@ -105,6 +141,47 @@ export default function TopNav({ onToggleSidebar, sidebarOpen, authed, userName 
                 <path strokeLinecap="round" strokeLinejoin="round" d="M21.752 15.002A9.72 9.72 0 0 1 18 15.75c-5.385 0-9.75-4.365-9.75-9.75 0-1.33.266-2.597.748-3.752A9.753 9.753 0 0 0 3 11.25C3 16.635 7.365 21 12.75 21a9.753 9.753 0 0 0 9.002-5.998Z" />
               </svg>
             </button>
+
+            {/* 主题色切换：调色弹层 */}
+            <div className="relative" ref={paletteRef}>
+              <button
+                onClick={() => setPaletteOpen((v) => !v)}
+                aria-label="切换主题色"
+                title="切换主题色"
+                className="w-8 h-8 flex items-center justify-center rounded-lg text-[var(--color-text-subtle)] hover:text-[var(--color-text)] hover:bg-[var(--color-bg)] transition-all"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={1.8} viewBox="0 0 24 24" aria-hidden="true">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 21a9 9 0 1 1 9-9c0 1.657-1.343 3-3 3h-1.5a1.875 1.875 0 0 0-1.4 3.125 1.874 1.874 0 0 1-1.4 3.125A9 9 0 0 1 12 21Zm-4.5-11a1.25 1.25 0 1 0 0-2.5 1.25 1.25 0 0 0 0 2.5Zm4-1.5a1.25 1.25 0 1 0 0-2.5 1.25 1.25 0 0 0 0 2.5Zm4 1.5a1.25 1.25 0 1 0 0-2.5 1.25 1.25 0 0 0 0 2.5Z" />
+                </svg>
+              </button>
+              {paletteOpen && (
+                <div className="absolute right-0 top-full mt-2 z-40 bg-[var(--color-surface)] border border-[var(--color-border)] rounded-xl shadow-lg p-3 w-[168px]">
+                  <p className="text-[10px] font-semibold tracking-widest uppercase text-[var(--color-text-subtle)] mb-2">主题色</p>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    {palette.map((c) => (
+                      <button
+                        key={c.id}
+                        type="button"
+                        onClick={() => applyThemeColor(c.id)}
+                        title={c.name}
+                        aria-label={`主题色：${c.name}`}
+                        className={`w-7 h-7 rounded-full flex items-center justify-center border-2 transition-transform hover:scale-110 ${themeColor === c.id ? "border-[var(--color-text)] scale-110" : "border-transparent"}`}
+                        style={{ background: c.css }}
+                      >
+                        {themeColor === c.id && (
+                          <svg className="w-3.5 h-3.5 text-white" fill="none" stroke="currentColor" strokeWidth={2.5} viewBox="0 0 24 24" aria-hidden="true">
+                            <path strokeLinecap="round" strokeLinejoin="round" d="m4.5 12.75 6 6 9-13.5" />
+                          </svg>
+                        )}
+                      </button>
+                    ))}
+                  </div>
+                  <p className="text-[10px] text-[var(--color-text-subtle)] mt-2">
+                    {palette.find((c) => c.id === themeColor)?.name ?? "珊瑚"}主题
+                  </p>
+                </div>
+              )}
+            </div>
 
             {loggedIn ? (
               <div className="flex items-center gap-2">

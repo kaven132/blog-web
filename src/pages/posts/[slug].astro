@@ -174,7 +174,7 @@ const viewsDisplay = postViews > 9999 ? `${(postViews / 10000).toFixed(1)} 万` 
         这篇文章对你有帮助吗？
       </p>
       <LikeButton client:load postId={post.id} initialCount={postLikes?.count || 0} />
-      <ShareButtons client:load title={post.title} />
+      <ShareButtons client:load title={post.title} coverImage={post.coverImage} date={formatDateCN(post.createdAt)} />
     </div>
 
     <!-- Prev / Next -->
