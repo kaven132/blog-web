@@ -48,7 +48,8 @@
     "额尔古纳河右岸",
     "雪国",
     "鼠疫",
-    "棋王"
+    "棋王",
+    "变形记"
   ],
   "plugins": [
     "DeepSeek Harness (dsh) — https://github.com/deepseek-ai/deepseek-harness",
@@ -83,7 +84,8 @@
     "dsh-android — https://github.com/ZSeven-W/dsh-android",
     "easyeda-agent — https://github.com/zhoushoujianwork/easyeda-agent",
     "Argo — https://github.com/taxueseek/argo",
-    "qa-skills — https://github.com/fishzjp/qa-skills"
+    "qa-skills — https://github.com/fishzjp/qa-skills",
+    "dsh-industry-research — https://github.com/PerryLink/dsh-industry-research"
   ],
   "skills": [
     "subagent",
@@ -106,5 +108,6 @@
     "Claude Code /init 命令",
     "Claude Code Git 集成（/commit、/pr、/commit-push-pr）"
   ],
-  "_note": "本文件现在只归书籍线（automation 5cff0944）使用：books + plugins 是它的去重键。旅游线的城市去重与类别台账已迁到 scripts/_travel-state.json，不要在本文件里再维护 cities；两线同时改同一个文件会丢更新。skills 是 2026-08-19 前的旧键，保留仅作存档，不要再追加。"
+  "_note": "本文件现在只归书籍线（automation 5cff0944）使用：books + plugins 是它的去重键。旅游线的城市去重与类别台账已迁到 scripts/_travel-state.json，不要在本文件里再维护 cities；两线同时改同一个文件会丢更新。skills 是 2026-08-19 前的旧键，保留仅作存档，不要再追加。",
+  "models": []
 }

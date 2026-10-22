@@ -66,6 +66,49 @@
   --map-graticule: #3a3a44;
 }
 
+
+/* ── 术语悬停提示：正文首次出现的术语带虚线下划线，悬停/点击弹解释卡片 ── */
+.prose .term,
+.term {
+  border-bottom: 1px dashed var(--color-accent);
+  cursor: help;
+  text-decoration: none;
+}
+.term-card {
+  position: fixed;
+  z-index: 320;
+  max-width: 320px;
+  padding: 10px 14px;
+  border-radius: 12px;
+  background: oklch(20% 0.01 260 / 0.96);
+  color: oklch(92% 0.005 260);
+  font-size: 13px;
+  line-height: 1.65;
+  box-shadow: 0 8px 24px -6px rgba(0, 0, 0, 0.35);
+  pointer-events: none;
+  opacity: 0;
+  transform: translateY(4px);
+  transition: opacity 0.15s ease, transform 0.15s ease;
+}
+.term-card.show {
+  opacity: 1;
+  transform: translateY(0);
+}
+.term-card b {
+  display: block;
+  color: #ffb3a7;
+  margin-bottom: 2px;
+  font-size: 13px;
+}
+
+/* ── TTS 朗读：当前段落高亮 ── */
+.prose .tts-active {
+  background: var(--color-accent-muted);
+  border-radius: 6px;
+  box-shadow: 0 0 0 6px var(--color-accent-muted);
+  transition: background 0.3s ease;
+}
+
 /* ── 主题色板：html[data-theme] 覆盖 accent 三件套（默认珊瑚红=无 data-theme）。
    暗色下 muted 透明度略高（.dark[data-theme] 再覆盖一次）。
    Layout 进页前脚本从 localStorage 定档，TopNav 调色按钮切换。 ── */

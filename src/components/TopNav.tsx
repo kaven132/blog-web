@@ -29,12 +29,20 @@ export default function TopNav({ onToggleSidebar, sidebarOpen, authed, userName 
   const paletteRef = useRef<HTMLDivElement>(null);
   const [themeColor, setThemeColor] = useState("coral");
   const dropdownRef = useRef<HTMLDivElement>(null);
+  // 设置下拉：深色模式 / 主题色 / TTS 听全文（文章页）整合到一处
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const settingsRef = useRef<HTMLDivElement>(null);
+  const [darkNow, setDarkNow] = useState(false);
+  const [hasTTS, setHasTTS] = useState(false);
+  const [ttsLabel, setTtsLabel] = useState("听全文");
+  const [ttsRate, setTtsRate] = useState("1x");
 
   // 主题色初值（挂载后读，避免 SSR 不一致）
   useEffect(() => {
     try {
       const c = localStorage.getItem("theme-color");
       if (c) setThemeColor(c);
+      setDarkNow(document.documentElement.classList.contains("dark"));
     } catch { /* ignore */ }
   }, []);
 
@@ -48,11 +56,42 @@ export default function TopNav({ onToggleSidebar, sidebarOpen, authed, userName 
     return () => document.removeEventListener("mousedown", onDown);
   }, [paletteOpen]);
 
+  // 打开设置面板时同步各开关状态（TTS 仅文章页存在）
+  useEffect(() => {
+    if (!settingsOpen) return;
+    const ttsBtn = document.getElementById("tts-btn");
+    setHasTTS(Boolean(ttsBtn));
+    if (ttsBtn) setTtsLabel(ttsBtn.textContent || "听全文");
+    const rateBtn = document.getElementById("tts-rate");
+    if (rateBtn) setTtsRate(rateBtn.textContent || "1x");
+    setDarkNow(document.documentElement.classList.contains("dark"));
+  }, [settingsOpen]);
+
+  // 面板打开期间轮询 TTS 状态（朗读/暂停按钮文字实时变化）
+  useEffect(() => {
+    if (!hasTTS || !settingsOpen) return;
+    const id = setInterval(() => {
+      const b = document.getElementById("tts-btn");
+      if (b) setTtsLabel(b.textContent || "听全文");
+      const r = document.getElementById("tts-rate");
+      if (r) setTtsRate(r.textContent || "1x");
+    }, 1000);
+    return () => clearInterval(id);
+  }, [hasTTS, settingsOpen]);
+
   const applyThemeColor = (c: string) => {
     setThemeColor(c);
     if (c === "coral") delete document.documentElement.dataset.theme;
     else document.documentElement.dataset.theme = c;
     try { localStorage.setItem("theme-color", c); } catch { /* ignore */ }
+  };
+
+  // 从页面 TTS 控件同步面板文案（听全文/暂停、语速）
+  const syncTTS = () => {
+    const b = document.getElementById("tts-btn");
+    if (b) setTtsLabel(b.textContent || "听全文");
+    const r = document.getElementById("tts-rate");
+    if (r) setTtsRate(r.textContent || "1x");
   };
 
   const palette = [
@@ -120,65 +159,98 @@ export default function TopNav({ onToggleSidebar, sidebarOpen, authed, userName 
               ))}
             </nav>
 
-            {/* 深色模式切换：图标由 .dark class 驱动自动换形，选择存 localStorage */}
-            <button
-              onClick={() => {
-                const dark = document.documentElement.classList.toggle("dark");
-                try {
-                  localStorage.setItem("theme", dark ? "dark" : "light");
-                } catch {
-                  /* ignore */
-                }
-              }}
-              aria-label="切换深色模式"
-              title="切换深色模式"
-              className="w-8 h-8 flex items-center justify-center rounded-lg text-[var(--color-text-subtle)] hover:text-[var(--color-text)] hover:bg-[var(--color-bg)] transition-all"
-            >
-              <svg className="w-4 h-4 dark:hidden" fill="none" stroke="currentColor" strokeWidth={1.8} viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" d="M12 3v2.25m6.364.386-1.591 1.591M21 12h-2.25m-.386 6.364-1.591-1.591M12 18.75V21m-4.773-4.227-1.591 1.591M5.25 12h2.25m-.386-6.364L7.859 7.859M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z" />
-              </svg>
-              <svg className="w-4 h-4 hidden dark:block" fill="none" stroke="currentColor" strokeWidth={1.8} viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" d="M21.752 15.002A9.72 9.72 0 0 1 18 15.75c-5.385 0-9.75-4.365-9.75-9.75 0-1.33.266-2.597.748-3.752A9.753 9.753 0 0 0 3 11.25C3 16.635 7.365 21 12.75 21a9.753 9.753 0 0 0 9.002-5.998Z" />
-              </svg>
-            </button>
-
-            {/* 主题色切换：调色弹层 */}
-            <div className="relative" ref={paletteRef}>
+            {/* 设置：深色模式 / 主题色 / TTS 听全文（文章页）整合到一个下拉 */}
+            <div className="relative" ref={settingsRef}>
               <button
-                onClick={() => setPaletteOpen((v) => !v)}
-                aria-label="切换主题色"
-                title="切换主题色"
-                className="w-8 h-8 flex items-center justify-center rounded-lg text-[var(--color-text-subtle)] hover:text-[var(--color-text)] hover:bg-[var(--color-bg)] transition-all"
+                onClick={() => setSettingsOpen((v) => !v)}
+                aria-label="显示设置"
+                title="显示设置"
+                className={`w-8 h-8 flex items-center justify-center rounded-lg text-[var(--color-text-subtle)] hover:text-[var(--color-text)] hover:bg-[var(--color-bg)] transition-all ${settingsOpen ? "text-[var(--color-accent)] bg-[var(--color-accent-muted)]" : ""}`}
               >
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={1.8} viewBox="0 0 24 24" aria-hidden="true">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 21a9 9 0 1 1 9-9c0 1.657-1.343 3-3 3h-1.5a1.875 1.875 0 0 0-1.4 3.125 1.874 1.874 0 0 1-1.4 3.125A9 9 0 0 1 12 21Zm-4.5-11a1.25 1.25 0 1 0 0-2.5 1.25 1.25 0 0 0 0 2.5Zm4-1.5a1.25 1.25 0 1 0 0-2.5 1.25 1.25 0 0 0 0 2.5Zm4 1.5a1.25 1.25 0 1 0 0-2.5 1.25 1.25 0 0 0 0 2.5Z" />
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M9.594 3.94c.09-.542.56-.94 1.11-.94h2.593c.55 0 1.02.398 1.11.94l.213 1.281c.063.374.313.686.645.87.074.04.147.083.22.127.325.196.72.257 1.075.124l1.217-.456a1.125 1.125 0 0 1 1.37.49l1.296 2.247a1.125 1.125 0 0 1-.26 1.431l-1.003.827c-.293.241-.438.613-.43.992a7.723 7.723 0 0 1 0 .255c-.008.38.137.751.43.992l1.004.827c.424.35.534.955.26 1.43l-1.298 2.247a1.125 1.125 0 0 1-1.369.491l-1.217-.456c-.355-.133-.75-.072-1.076.124a6.47 6.47 0 0 1-.22.128c-.331.183-.581.495-.644.869l-.213 1.281c-.09.543-.56.94-1.11.94h-2.594c-.55 0-1.019-.398-1.11-.94l-.213-1.281c-.062-.374-.312-.686-.644-.87a6.52 6.52 0 0 1-.22-.127c-.325-.196-.72-.257-1.076-.124l-1.217.456a1.125 1.125 0 0 1-1.369-.49l-1.297-2.247a1.125 1.125 0 0 1 .26-1.431l1.004-.827c.292-.24.437-.613.43-.991a6.932 6.932 0 0 1 0-.255c.007-.38-.138-.751-.43-.992l-1.004-.827a1.125 1.125 0 0 1-.26-1.43l1.297-2.247a1.125 1.125 0 0 1 1.37-.491l1.216.456c.356.133.751.072 1.076-.124.072-.044.146-.086.22-.128.332-.183.582-.495.644-.869l.214-1.28Z" />
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z" />
                 </svg>
               </button>
-              {paletteOpen && (
-                <div className="absolute right-0 top-full mt-2 z-40 bg-[var(--color-surface)] border border-[var(--color-border)] rounded-xl shadow-lg p-3 w-[168px]">
-                  <p className="text-[10px] font-semibold tracking-widest uppercase text-[var(--color-text-subtle)] mb-2">主题色</p>
-                  <div className="flex items-center gap-2 flex-wrap">
-                    {palette.map((c) => (
+              {settingsOpen && (
+                <div className="absolute right-0 top-full mt-2 z-40 w-60 bg-[var(--color-surface)] border border-[var(--color-border)] rounded-xl shadow-lg p-3 text-sm">
+                  <p className="text-[10px] font-semibold tracking-widest uppercase text-[var(--color-text-subtle)] mb-2">显示设置</p>
+
+                  {hasTTS && (
+                    <>
                       <button
-                        key={c.id}
                         type="button"
-                        onClick={() => applyThemeColor(c.id)}
-                        title={c.name}
-                        aria-label={`主题色：${c.name}`}
-                        className={`w-7 h-7 rounded-full flex items-center justify-center border-2 transition-transform hover:scale-110 ${themeColor === c.id ? "border-[var(--color-text)] scale-110" : "border-transparent"}`}
-                        style={{ background: c.css }}
+                        onClick={() => {
+                          document.getElementById("tts-btn")?.click();
+                          setTimeout(syncTTS, 300);
+                        }}
+                        className="w-full flex items-center gap-2.5 px-2 py-2 rounded-lg hover:bg-[var(--color-bg)] transition-colors text-[var(--color-text)]"
                       >
-                        {themeColor === c.id && (
-                          <svg className="w-3.5 h-3.5 text-white" fill="none" stroke="currentColor" strokeWidth={2.5} viewBox="0 0 24 24" aria-hidden="true">
-                            <path strokeLinecap="round" strokeLinejoin="round" d="m4.5 12.75 6 6 9-13.5" />
-                          </svg>
-                        )}
+                        <span>🔊</span>
+                        <span className="flex-1 text-left font-medium">{ttsLabel}</span>
                       </button>
-                    ))}
+                      <button
+                        type="button"
+                        onClick={() => {
+                          document.getElementById("tts-rate")?.click();
+                          setTimeout(syncTTS, 300);
+                        }}
+                        className="w-full flex items-center gap-2.5 px-2 py-2 rounded-lg hover:bg-[var(--color-bg)] transition-colors text-[var(--color-text-muted)]"
+                      >
+                        <span className="w-[18px] text-center">⏩</span>
+                        <span className="flex-1 text-left">朗读语速</span>
+                        <span className="text-xs tabular-nums text-[var(--color-text-subtle)]">{ttsRate}</span>
+                      </button>
+                      <div className="my-2 h-px bg-[var(--color-border)]" />
+                    </>
+                  )}
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const dark = document.documentElement.classList.toggle("dark");
+                      try {
+                        localStorage.setItem("theme", dark ? "dark" : "light");
+                      } catch {
+                        /* ignore */
+                      }
+                      setDarkNow(dark);
+                    }}
+                    className="w-full flex items-center gap-2.5 px-2 py-2 rounded-lg hover:bg-[var(--color-bg)] transition-colors text-[var(--color-text)]"
+                  >
+                    <span>{darkNow ? "🌙" : "☀️"}</span>
+                    <span className="flex-1 text-left font-medium">深色模式</span>
+                    <span className="text-xs text-[var(--color-text-subtle)]">{darkNow ? "开" : "关"}</span>
+                  </button>
+
+                  <div className="px-2 pt-2">
+                    <div className="flex items-center gap-2 mb-2">
+                      <span>🎨</span>
+                      <span className="text-[var(--color-text)] font-medium">主题色</span>
+                      <span className="text-xs text-[var(--color-text-subtle)] ml-auto">
+                        {palette.find((c) => c.id === themeColor)?.name ?? "珊瑚"}
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-2 flex-wrap">
+                      {palette.map((c) => (
+                        <button
+                          key={c.id}
+                          type="button"
+                          onClick={() => applyThemeColor(c.id)}
+                          title={c.name}
+                          aria-label={`主题色：${c.name}`}
+                          className={`w-7 h-7 rounded-full flex items-center justify-center border-2 transition-transform hover:scale-110 ${themeColor === c.id ? "border-[var(--color-text)] scale-110" : "border-transparent"}`}
+                          style={{ background: c.css }}
+                        >
+                          {themeColor === c.id && (
+                            <svg className="w-3.5 h-3.5 text-white" fill="none" stroke="currentColor" strokeWidth={2.5} viewBox="0 0 24 24" aria-hidden="true">
+                              <path strokeLinecap="round" strokeLinejoin="round" d="m4.5 12.75 6 6 9-13.5" />
+                            </svg>
+                          )}
+                        </button>
+                      ))}
+                    </div>
                   </div>
-                  <p className="text-[10px] text-[var(--color-text-subtle)] mt-2">
-                    {palette.find((c) => c.id === themeColor)?.name ?? "珊瑚"}主题
-                  </p>
                 </div>
               )}
             </div>
