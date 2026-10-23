@@ -78,6 +78,12 @@ const userAvatar = row?.avatar || "";
           const color = localStorage.getItem("theme-color");
           if (color && color !== "coral") document.documentElement.dataset.theme = color;
           else delete document.documentElement.dataset.theme;
+          // 阅读偏好：正文字号 / 字体风格 / 护眼模式
+          const fs = localStorage.getItem("font-size");
+          if (fs && fs !== "normal") document.documentElement.dataset.fontSize = fs;
+          const font = localStorage.getItem("font-style");
+          if (font && font !== "serif") document.documentElement.dataset.font = font;
+          if (localStorage.getItem("eye-comfort") === "on") document.documentElement.dataset.eye = "on";
         } catch {}
       })();
     </script>

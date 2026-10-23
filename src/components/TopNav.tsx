@@ -36,6 +36,12 @@ export default function TopNav({ onToggleSidebar, sidebarOpen, authed, userName 
   const [hasTTS, setHasTTS] = useState(false);
   const [ttsLabel, setTtsLabel] = useState("听全文");
   const [ttsRate, setTtsRate] = useState("1x");
+  const [ttsVoices, setTtsVoices] = useState([]);
+  const [ttsVoice, setTtsVoice] = useState("");
+  // 阅读偏好：正文字号 / 字体风格 / 护眼模式
+  const [fontSize, setFontSize] = useState("normal");
+  const [fontStyle, setFontStyle] = useState("serif");
+  const [eyeOn, setEyeOn] = useState(false);
 
   // 主题色初值（挂载后读，避免 SSR 不一致）
   useEffect(() => {
@@ -43,7 +49,29 @@ export default function TopNav({ onToggleSidebar, sidebarOpen, authed, userName 
       const c = localStorage.getItem("theme-color");
       if (c) setThemeColor(c);
       setDarkNow(document.documentElement.classList.contains("dark"));
+      // 阅读偏好与音色选择
+      const fs = localStorage.getItem("font-size");
+      if (fs) setFontSize(fs);
+      const f = localStorage.getItem("font-style");
+      if (f) setFontStyle(f);
+      setEyeOn(localStorage.getItem("eye-comfort") === "on");
+      const v = localStorage.getItem("tts-voice");
+      if (v) setTtsVoice(v);
     } catch { /* ignore */ }
+  }, []);
+
+  // 系统中文音色列表（异步加载，onvoiceschanged 兜底刷新）
+  useEffect(() => {
+    if (!("speechSynthesis" in window)) return;
+    const load = () => {
+      const zh = window.speechSynthesis.getVoices().filter((v) => /^zh/i.test(v.lang));
+      setTtsVoices(zh);
+    };
+    load();
+    window.speechSynthesis.onvoiceschanged = load;
+    return () => {
+      window.speechSynthesis.onvoiceschanged = null;
+    };
   }, []);
 
   // 点外部收起调色弹层
@@ -61,7 +89,7 @@ export default function TopNav({ onToggleSidebar, sidebarOpen, authed, userName 
     if (!settingsOpen) return;
     const ttsBtn = document.getElementById("tts-btn");
     setHasTTS(Boolean(ttsBtn));
-    if (ttsBtn) setTtsLabel(ttsBtn.textContent || "听全文");
+    if (ttsBtn) setTtsLabel(cleanTTSLabel(ttsBtn.textContent) || "听全文");
     const rateBtn = document.getElementById("tts-rate");
     if (rateBtn) setTtsRate(rateBtn.textContent || "1x");
     setDarkNow(document.documentElement.classList.contains("dark"));
@@ -72,7 +100,7 @@ export default function TopNav({ onToggleSidebar, sidebarOpen, authed, userName 
     if (!hasTTS || !settingsOpen) return;
     const id = setInterval(() => {
       const b = document.getElementById("tts-btn");
-      if (b) setTtsLabel(b.textContent || "听全文");
+      if (b) setTtsLabel(cleanTTSLabel(b.textContent) || "听全文");
       const r = document.getElementById("tts-rate");
       if (r) setTtsRate(r.textContent || "1x");
     }, 1000);
@@ -86,10 +114,37 @@ export default function TopNav({ onToggleSidebar, sidebarOpen, authed, userName 
     try { localStorage.setItem("theme-color", c); } catch { /* ignore */ }
   };
 
+  // 阅读偏好应用：写 html data 属性（Layout 进页前脚本定档同款）+ localStorage
+  const applyFontSize = (v: string) => {
+    setFontSize(v);
+    if (v === "normal") delete document.documentElement.dataset.fontSize;
+    else document.documentElement.dataset.fontSize = v;
+    try { localStorage.setItem("font-size", v); } catch { /* ignore */ }
+  };
+  const applyFontStyle = (v: string) => {
+    setFontStyle(v);
+    if (v === "serif") delete document.documentElement.dataset.font;
+    else document.documentElement.dataset.font = v;
+    try { localStorage.setItem("font-style", v); } catch { /* ignore */ }
+  };
+  const applyEye = (on: boolean) => {
+    setEyeOn(on);
+    if (on) document.documentElement.dataset.eye = "on";
+    else delete document.documentElement.dataset.eye;
+    try { localStorage.setItem("eye-comfort", on ? "on" : "off"); } catch { /* ignore */ }
+  };
+  const applyTtsVoice = (uri: string) => {
+    setTtsVoice(uri);
+    try { localStorage.setItem("tts-voice", uri); } catch { /* ignore */ }
+  };
+
+  // 页面 TTS 按钮文字自带 emoji 图标，同步到面板时清洗掉避免重复
+  const cleanTTSLabel = (t: string | null | undefined) => (t || "").replace(/[^A-Za-z0-9\u4e00-\u9fa5 ]/g, "").trim();
+
   // 从页面 TTS 控件同步面板文案（听全文/暂停、语速）
   const syncTTS = () => {
     const b = document.getElementById("tts-btn");
-    if (b) setTtsLabel(b.textContent || "听全文");
+    if (b) setTtsLabel(cleanTTSLabel(b.textContent) || "听全文");
     const r = document.getElementById("tts-rate");
     if (r) setTtsRate(r.textContent || "1x");
   };
@@ -187,7 +242,7 @@ export default function TopNav({ onToggleSidebar, sidebarOpen, authed, userName 
                         className="w-full flex items-center gap-2.5 px-2 py-2 rounded-lg hover:bg-[var(--color-bg)] transition-colors text-[var(--color-text)]"
                       >
                         <span>🔊</span>
-                        <span className="flex-1 text-left font-medium">{ttsLabel}</span>
+                        <span className="flex-1 text-left font-medium">{cleanTTSLabel(ttsLabel) || "听全文"}</span>
                       </button>
                       <button
                         type="button"
@@ -201,6 +256,23 @@ export default function TopNav({ onToggleSidebar, sidebarOpen, authed, userName 
                         <span className="flex-1 text-left">朗读语速</span>
                         <span className="text-xs tabular-nums text-[var(--color-text-subtle)]">{ttsRate}</span>
                       </button>
+                      <div className="w-full flex items-center gap-2.5 px-2 py-1.5">
+                        <span className="w-[18px] text-center">🎙</span>
+                        <span className="flex-1 text-left">音色</span>
+                        <select
+                          value={ttsVoice}
+                          onChange={(e) => applyTtsVoice(e.target.value)}
+                          className="max-w-[130px] text-xs rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] text-[var(--color-text)] px-1.5 py-1 focus:outline-none focus:border-[var(--color-accent)]/60"
+                          aria-label="朗读音色"
+                        >
+                          <option value="">系统默认</option>
+                          {ttsVoices.map((v) => (
+                            <option key={v.voiceURI} value={v.voiceURI}>
+                              {v.name}（{v.lang}）
+                            </option>
+                          ))}
+                        </select>
+                      </div>
                       <div className="my-2 h-px bg-[var(--color-border)]" />
                     </>
                   )}
@@ -222,6 +294,66 @@ export default function TopNav({ onToggleSidebar, sidebarOpen, authed, userName 
                     <span className="flex-1 text-left font-medium">深色模式</span>
                     <span className="text-xs text-[var(--color-text-subtle)]">{darkNow ? "开" : "关"}</span>
                   </button>
+
+                  {/* 阅读偏好：字号 / 字体 / 护眼（仅文章页，配合正文生效） */}
+                  <div className="mt-2 pt-2 border-t border-[var(--color-border)]">
+                    <div className="flex items-center gap-2 mb-2">
+                      <span>📖</span>
+                      <span className="text-[var(--color-text)] font-medium">阅读</span>
+                    </div>
+
+                    <div className="flex items-center justify-between gap-2 px-2 py-1.5">
+                      <span className="text-[var(--color-text-muted)]">正文字号</span>
+                      <div className="flex gap-1">
+                        {[
+                          { id: "small", label: "A-" },
+                          { id: "normal", label: "标" },
+                          { id: "large", label: "A+" },
+                        ].map((o) => (
+                          <button
+                            key={o.id}
+                            type="button"
+                            onClick={() => applyFontSize(o.id)}
+                            aria-label={`字号：${o.label}`}
+                            className={`px-2 py-0.5 rounded-md text-xs font-medium border transition-colors ${fontSize === o.id ? "bg-[var(--color-accent)] text-white border-[var(--color-accent)]" : "border-[var(--color-border)] text-[var(--color-text-muted)] hover:border-[var(--color-accent)]/40"}`}
+                          >
+                            {o.label}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div className="flex items-center justify-between gap-2 px-2 py-1.5">
+                      <span className="text-[var(--color-text-muted)]">正文字体</span>
+                      <div className="flex gap-1">
+                        {[
+                          { id: "serif", label: "衬线" },
+                          { id: "sans", label: "无衬线" },
+                        ].map((o) => (
+                          <button
+                            key={o.id}
+                            type="button"
+                            onClick={() => applyFontStyle(o.id)}
+                            className={`px-2 py-0.5 rounded-md text-xs font-medium border transition-colors ${fontStyle === o.id ? "bg-[var(--color-accent)] text-white border-[var(--color-accent)]" : "border-[var(--color-border)] text-[var(--color-text-muted)] hover:border-[var(--color-accent)]/40"}`}
+                          >
+                            {o.label}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div className="flex items-center justify-between gap-2 px-2 py-1.5">
+                      <span className="text-[var(--color-text-muted)]">护眼模式</span>
+                      <button
+                        type="button"
+                        onClick={() => applyEye(!eyeOn)}
+                        aria-label="切换护眼模式"
+                        className={`w-10 h-5 rounded-full relative transition-colors ${eyeOn ? "bg-[var(--color-accent)]" : "bg-[var(--color-border)]"}`}
+                      >
+                        <span className={`absolute top-0.5 w-4 h-4 rounded-full bg-white shadow transition-all ${eyeOn ? "left-[22px]" : "left-0.5"}`} />
+                      </button>
+                    </div>
+                  </div>
 
                   <div className="px-2 pt-2">
                     <div className="flex items-center gap-2 mb-2">

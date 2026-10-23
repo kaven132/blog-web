@@ -109,6 +109,29 @@
   transition: background 0.3s ease;
 }
 
+/* ── 阅读偏好：字号 / 字体 / 护眼（设置面板写入 html data 属性，全站生效） ── */
+/* 正文字号：zoom 缩放文章列（rem 字号基于 html，改根字号会影响全站，故用 zoom） */
+html[data-font-size="small"] .prose { zoom: 0.9; }
+html[data-font-size="large"] .prose { zoom: 1.12; }
+html[data-font-size="xlarge"] .prose { zoom: 1.25; }
+
+/* 正文字体：无衬线偏好（覆盖 .prose 的衬线设定；标题本就是无衬线） */
+html[data-font="sans"] .prose,
+html[data-font="sans"] .prose p,
+html[data-font="sans"] .prose li,
+html[data-font="sans"] .prose blockquote {
+  font-family: var(--font-sans);
+}
+
+/* 护眼模式：减少蓝光——色温整体偏暖黄（暗色下自动无效） */
+html[data-eye="on"]:not(.dark) {
+  --color-bg: #f3ecd4;
+  --color-surface: #f9f4e3;
+  --color-code-bg: #ece2c2;
+  --map-ocean: #f0e8cd;
+  --map-land: #eae0bd;
+}
+
 /* ── 主题色板：html[data-theme] 覆盖 accent 三件套（默认珊瑚红=无 data-theme）。
    暗色下 muted 透明度略高（.dark[data-theme] 再覆盖一次）。
    Layout 进页前脚本从 localStorage 定档，TopNav 调色按钮切换。 ── */

@@ -183,7 +183,7 @@ const viewsDisplay = postViews > 9999 ? `${(postViews / 10000).toFixed(1)} 万` 
       <span id="tts-status" class="text-xs text-[var(--color-text-subtle)]"></span>
     </div>
     {/* TTS 听全文：控制入口在导航「设置」下拉（TopNav），此处仅保留状态显示 */}
-    <div class="flex items-center mb-5 -mt-2 text-sm" id="tts-bar" hidden>
+    <div id="tts-bar" hidden>
       <button
         type="button"
         id="tts-btn"
@@ -519,8 +519,15 @@ const viewsDisplay = postViews > 9999 ? `${(postViews / 10000).toFixed(1)} 万` 
           for (const k of Object.keys(TERMS)) LUT[k.toLowerCase()] = k;
           const keys = Object.keys(TERMS).sort((a, b) => b.length - a.length);
           const esc = (t) => t.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-          const testRe = new RegExp("(" + keys.map(esc).join("|") + ")", "i");
-          const globalRe = new RegExp("(" + keys.map(esc).join("|") + ")", "gi");
+          // 首尾是英文字母/数字的术语加词边界：避免 GitHub 内的 git、agent 内的 age 这类子串误标
+          const wrapBoundary = (k) => {
+            const e = esc(k);
+            const head = /^[A-Za-z0-9]/.test(k) ? "\\b" : "";
+            const tail = /[A-Za-z0-9]$/.test(k) ? "\\b" : "";
+            return head + e + tail;
+          };
+          const testRe = new RegExp("(" + keys.map(wrapBoundary).join("|") + ")", "i");
+          const globalRe = new RegExp("(" + keys.map(wrapBoundary).join("|") + ")", "gi");
 
           // TreeWalker 收集含术语的文本节点（跳过代码/链接/已标注）
           const walker = document.createTreeWalker(prose, NodeFilter.SHOW_TEXT, {
@@ -533,11 +540,11 @@ const viewsDisplay = postViews > 9999 ? `${(postViews / 10000).toFixed(1)} 万` 
           const nodes = [];
           while (walker.nextNode()) nodes.push(walker.currentNode);
 
-          for (const node of nodes) {
-            const frag = document.createDocumentFragment();
-            const text = node.textContent;
-            globalRe.lastIndex = 0;
+          // 网址段保护：URL 文本整体跳过术语标注（避免 github.com 里的 git 等被误标）
+          const urlRe = /(https?:\/\/\S+|www\.\S+)/gi;
+          const annotate = (text, frag) => {
             let last = 0;
+            globalRe.lastIndex = 0;
             let m;
             while ((m = globalRe.exec(text))) {
               if (m.index > last) frag.appendChild(document.createTextNode(text.slice(last, m.index)));
@@ -550,8 +557,23 @@ const viewsDisplay = postViews > 9999 ? `${(postViews / 10000).toFixed(1)} 万` 
               last = m.index + m[0].length;
             }
             if (last < text.length) frag.appendChild(document.createTextNode(text.slice(last)));
+          };
+          const annotateNode = (node) => {
+            const frag = document.createDocumentFragment();
+            const text = node.textContent;
+            let pos = 0;
+            urlRe.lastIndex = 0;
+            let um;
+            while ((um = urlRe.exec(text))) {
+              annotate(text.slice(pos, um.index), frag);
+              frag.appendChild(document.createTextNode(text.slice(um.index, urlRe.lastIndex)));
+              pos = urlRe.lastIndex;
+            }
+            annotate(text.slice(pos), frag);
             node.parentNode.replaceChild(frag, node);
-          }
+          };
+
+          for (const node of nodes) annotateNode(node);
 
           // 悬停卡片：全局委托 + 惰性创建（转场后 DOM 重建也不受影响）
           let tip = null;
@@ -648,6 +670,13 @@ const viewsDisplay = postViews > 9999 ? `${(postViews / 10000).toFixed(1)} 万` 
           };
           const pickVoice = () => {
             const vs = synth.getVoices();
+            // 用户在设置面板选过音色则优先（按 voiceURI 与名称双匹配，防跨会话 URI 变化）
+            let pref = null;
+            try { pref = localStorage.getItem("tts-voice"); } catch { /* ignore */ }
+            if (pref) {
+              const m = vs.find((v) => v.voiceURI === pref || v.name === pref);
+              if (m) return m;
+            }
             return vs.find((v) => /^zh(-|_)?CN/i.test(v.lang)) || vs.find((v) => /^zh/i.test(v.lang)) || null;
           };
           const stop = (msg) => {
@@ -715,6 +744,7 @@ const viewsDisplay = postViews > 9999 ? `${(postViews / 10000).toFixed(1)} 万` 
             }
             S.playing = true;
             btn.textContent = "⏸ 暂停";
+            statusEl.textContent = ""; // 清掉「已暂停」等残留状态文字
             speakNext();
           });
 
