@@ -60,12 +60,32 @@ export default function TopNav({ onToggleSidebar, sidebarOpen, authed, userName 
     } catch { /* ignore */ }
   }, []);
 
-  // 系统中文音色列表（异步加载，onvoiceschanged 兜底刷新）
+  // 音色列表：普通话与粤语各保留一女一男，共四个选项。
+  // 按音色名推断性别（微软官方中文音色命名规律），每组优先女声在前。
+  const LANG_LABEL = { "zh-cn": "普通话", "zh-hk": "粤语" };
+  const FEMALE_RE = /xiaoxiao|huihui|yaoyao|hiumaan|hiugaai|hsiaoyu|meijia/i;
+  const MALE_RE = /kangkang|yunxi|yunjian|yunyang|wanlung|danny/i;
   useEffect(() => {
     if (!("speechSynthesis" in window)) return;
     const load = () => {
-      const zh = window.speechSynthesis.getVoices().filter((v) => /^zh/i.test(v.lang));
-      setTtsVoices(zh);
+      const groups = {};
+      for (const v of window.speechSynthesis.getVoices()) {
+        const langKey = v.lang.toLowerCase().replace("_", "-").split("-")[0] === "zh" ? v.lang.toLowerCase().replace("_", "-") : "";
+        if (!LANG_LABEL[langKey]) continue;
+        (groups[langKey] = groups[langKey] || []).push(v);
+      }
+      const out = [];
+      for (const langKey of Object.keys(LANG_LABEL)) {
+        const g = (groups[langKey] || []).slice(0, 4);
+        const female = g.find((v) => FEMALE_RE.test(v.name));
+        const male = g.find((v) => v !== female && !FEMALE_RE.test(v.name));
+        [female && { v: female, gd: "女声" }, male && { v: male, gd: "男声" }]
+          .filter(Boolean)
+          .forEach(({ v, gd }) => {
+            out.push({ uri: v.voiceURI || v.name, label: `${LANG_LABEL[langKey]} · ${gd}` });
+          });
+      }
+      setTtsVoices(out.filter((v, i, arr) => arr.findIndex((x) => x.label === v.label) === i));
     };
     load();
     window.speechSynthesis.onvoiceschanged = load;
@@ -267,15 +287,75 @@ export default function TopNav({ onToggleSidebar, sidebarOpen, authed, userName 
                         >
                           <option value="">系统默认</option>
                           {ttsVoices.map((v) => (
-                            <option key={v.voiceURI} value={v.voiceURI}>
-                              {v.name}（{v.lang}）
+                            <option key={v.uri} value={v.uri}>
+                              {v.label}
                             </option>
                           ))}
                         </select>
                       </div>
                       <div className="my-2 h-px bg-[var(--color-border)]" />
+
+                      {/* 阅读偏好：字号 / 字体 / 护眼（仅文章页，配合正文生效） */}
+                      <div className="mt-2 pt-2 border-t border-[var(--color-border)]">
+                        <div className="flex items-center gap-2 mb-2">
+                          <span>📖</span>
+                          <span className="text-[var(--color-text)] font-medium">阅读</span>
+                        </div>
+
+                        <div className="flex items-center justify-between gap-2 px-2 py-1.5">
+                          <span className="text-[var(--color-text-muted)]">正文字号</span>
+                          <div className="flex gap-1">
+                            {[
+                              { id: "small", label: "A-" },
+                              { id: "normal", label: "标" },
+                              { id: "large", label: "A+" },
+                            ].map((o) => (
+                              <button
+                                key={o.id}
+                                type="button"
+                                onClick={() => applyFontSize(o.id)}
+                                aria-label={`字号：${o.label}`}
+                                className={`px-2 py-0.5 rounded-md text-xs font-medium border transition-colors ${fontSize === o.id ? "bg-[var(--color-accent)] text-white border-[var(--color-accent)]" : "border-[var(--color-border)] text-[var(--color-text-muted)] hover:border-[var(--color-accent)]/40"}`}
+                              >
+                                {o.label}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+
+                        <div className="flex items-center justify-between gap-2 px-2 py-1.5">
+                          <span className="text-[var(--color-text-muted)]">正文字体</span>
+                          <div className="flex gap-1">
+                            {[
+                              { id: "serif", label: "衬线" },
+                              { id: "sans", label: "无衬线" },
+                            ].map((o) => (
+                              <button
+                                key={o.id}
+                                type="button"
+                                onClick={() => applyFontStyle(o.id)}
+                                className={`px-2 py-0.5 rounded-md text-xs font-medium border transition-colors ${fontStyle === o.id ? "bg-[var(--color-accent)] text-white border-[var(--color-accent)]" : "border-[var(--color-border)] text-[var(--color-text-muted)] hover:border-[var(--color-accent)]/40"}`}
+                              >
+                                {o.label}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+
+                      </div>
                     </>
                   )}
+
+                  {/* 护眼模式：全站背景色效果，所有页面可用 */}
+                  <button
+                    type="button"
+                    onClick={() => applyEye(!eyeOn)}
+                    className="w-full flex items-center gap-2.5 px-2 py-2 rounded-lg hover:bg-[var(--color-bg)] transition-colors text-[var(--color-text)]"
+                  >
+                    <span>🌿</span>
+                    <span className="flex-1 text-left font-medium">护眼模式</span>
+                    <span className="text-xs text-[var(--color-text-subtle)]">{eyeOn ? "开" : "关"}</span>
+                  </button>
 
                   <button
                     type="button"
@@ -294,66 +374,6 @@ export default function TopNav({ onToggleSidebar, sidebarOpen, authed, userName 
                     <span className="flex-1 text-left font-medium">深色模式</span>
                     <span className="text-xs text-[var(--color-text-subtle)]">{darkNow ? "开" : "关"}</span>
                   </button>
-
-                  {/* 阅读偏好：字号 / 字体 / 护眼（仅文章页，配合正文生效） */}
-                  <div className="mt-2 pt-2 border-t border-[var(--color-border)]">
-                    <div className="flex items-center gap-2 mb-2">
-                      <span>📖</span>
-                      <span className="text-[var(--color-text)] font-medium">阅读</span>
-                    </div>
-
-                    <div className="flex items-center justify-between gap-2 px-2 py-1.5">
-                      <span className="text-[var(--color-text-muted)]">正文字号</span>
-                      <div className="flex gap-1">
-                        {[
-                          { id: "small", label: "A-" },
-                          { id: "normal", label: "标" },
-                          { id: "large", label: "A+" },
-                        ].map((o) => (
-                          <button
-                            key={o.id}
-                            type="button"
-                            onClick={() => applyFontSize(o.id)}
-                            aria-label={`字号：${o.label}`}
-                            className={`px-2 py-0.5 rounded-md text-xs font-medium border transition-colors ${fontSize === o.id ? "bg-[var(--color-accent)] text-white border-[var(--color-accent)]" : "border-[var(--color-border)] text-[var(--color-text-muted)] hover:border-[var(--color-accent)]/40"}`}
-                          >
-                            {o.label}
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-
-                    <div className="flex items-center justify-between gap-2 px-2 py-1.5">
-                      <span className="text-[var(--color-text-muted)]">正文字体</span>
-                      <div className="flex gap-1">
-                        {[
-                          { id: "serif", label: "衬线" },
-                          { id: "sans", label: "无衬线" },
-                        ].map((o) => (
-                          <button
-                            key={o.id}
-                            type="button"
-                            onClick={() => applyFontStyle(o.id)}
-                            className={`px-2 py-0.5 rounded-md text-xs font-medium border transition-colors ${fontStyle === o.id ? "bg-[var(--color-accent)] text-white border-[var(--color-accent)]" : "border-[var(--color-border)] text-[var(--color-text-muted)] hover:border-[var(--color-accent)]/40"}`}
-                          >
-                            {o.label}
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-
-                    <div className="flex items-center justify-between gap-2 px-2 py-1.5">
-                      <span className="text-[var(--color-text-muted)]">护眼模式</span>
-                      <button
-                        type="button"
-                        onClick={() => applyEye(!eyeOn)}
-                        aria-label="切换护眼模式"
-                        className={`w-10 h-5 rounded-full relative transition-colors ${eyeOn ? "bg-[var(--color-accent)]" : "bg-[var(--color-border)]"}`}
-                      >
-                        <span className={`absolute top-0.5 w-4 h-4 rounded-full bg-white shadow transition-all ${eyeOn ? "left-[22px]" : "left-0.5"}`} />
-                      </button>
-                    </div>
-                  </div>
 
                   <div className="px-2 pt-2">
                     <div className="flex items-center gap-2 mb-2">

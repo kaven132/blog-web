@@ -67,24 +67,33 @@ const userAvatar = row?.avatar || "";
     <meta name="twitter:description" content={desc} />
     {ogImageAbs && <meta name="twitter:image" content={ogImageAbs} />}
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
-    <!-- 深色模式在样式加载前定档：优先本地选择，未选择跟随系统，避免首屏闪白/闪黑 -->
+    <!-- 外观偏好定档：深色/主题色/字号/字体/护眼，全部走 localStorage；
+         apply 同时挂 astro:after-swap——ClientRouter 转场会用新页面的 SSR html 属性
+         覆盖当前值导致偏好丢失（实测踩坑），转场完成后需重新应用 -->
     <script is:inline>
       (() => {
-        try {
-          const saved = localStorage.getItem("theme");
-          const dark = saved ? saved === "dark" : window.matchMedia("(prefers-color-scheme: dark)").matches;
-          document.documentElement.classList.toggle("dark", dark);
-          // 主题色板：珊瑚红（默认）/青/紫/琥珀/玫红，存于 localStorage["theme-color"]
-          const color = localStorage.getItem("theme-color");
-          if (color && color !== "coral") document.documentElement.dataset.theme = color;
-          else delete document.documentElement.dataset.theme;
-          // 阅读偏好：正文字号 / 字体风格 / 护眼模式
-          const fs = localStorage.getItem("font-size");
-          if (fs && fs !== "normal") document.documentElement.dataset.fontSize = fs;
-          const font = localStorage.getItem("font-style");
-          if (font && font !== "serif") document.documentElement.dataset.font = font;
-          if (localStorage.getItem("eye-comfort") === "on") document.documentElement.dataset.eye = "on";
-        } catch {}
+        const apply = () => {
+          try {
+            const saved = localStorage.getItem("theme");
+            const dark = saved ? saved === "dark" : window.matchMedia("(prefers-color-scheme: dark)").matches;
+            document.documentElement.classList.toggle("dark", dark);
+            // 主题色板：珊瑚红（默认）/青/紫/琥珀/玫红，存于 localStorage["theme-color"]
+            const color = localStorage.getItem("theme-color");
+            if (color && color !== "coral") document.documentElement.dataset.theme = color;
+            else delete document.documentElement.dataset.theme;
+            // 阅读偏好：正文字号 / 字体风格 / 护眼模式
+            const fs = localStorage.getItem("font-size");
+            if (fs && fs !== "normal") document.documentElement.dataset.fontSize = fs;
+            else delete document.documentElement.dataset.fontSize;
+            const font = localStorage.getItem("font-style");
+            if (font && font !== "serif") document.documentElement.dataset.font = font;
+            else delete document.documentElement.dataset.font;
+            if (localStorage.getItem("eye-comfort") === "on") document.documentElement.dataset.eye = "on";
+            else delete document.documentElement.dataset.eye;
+          } catch {}
+        };
+        apply();
+        document.addEventListener("astro:after-swap", apply);
       })();
     </script>
   </head>
