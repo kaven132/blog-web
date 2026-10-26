@@ -1,7 +1,17 @@
 import { useState, type ReactNode } from "react";
 import TopNav from "./TopNav";
+import TabBar from "./TabBar";
 import ProfileCard from "./ProfileCard";
 import NewsPanel from "./NewsPanel";
+
+// 移动端侧栏的页面导航（与 TopNav.navLinks 保持一致）
+const NAV_LINKS = [
+  { href: "/", label: "首页" },
+  { href: "/posts", label: "文章" },
+  { href: "/travel", label: "旅行地图" },
+  { href: "/games", label: "小游戏" },
+  { href: "/about", label: "关于" },
+];
 
 interface AppShellProps {
   children: ReactNode;
@@ -59,20 +69,44 @@ export default function AppShell({ children, authed, userName, userAvatar }: App
               </button>
             </div>
             <ProfileCard authed={authed} />
+            <nav className="px-3 pt-1 pb-2 border-b border-[var(--color-border)]">
+              {NAV_LINKS.map((l) => (
+                <a
+                  key={l.href}
+                  href={l.href}
+                  onClick={() => setSidebarOpen(false)}
+                  className="flex items-center justify-between px-3 py-2.5 rounded-lg text-sm font-medium text-[var(--color-text-muted)] hover:text-[var(--color-accent)] hover:bg-[var(--color-bg)] transition-colors"
+                >
+                  {l.label}
+                  <svg className="w-3.5 h-3.5 opacity-40" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24" aria-hidden="true">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="m8.25 4.5 7.5 7.5-7.5 7.5" />
+                  </svg>
+                </a>
+              ))}
+            </nav>
             <div className="p-3 pb-4"><NewsPanel /></div>
           </div>
         </div>
       )}
 
+      {/* ── Mobile tab bar（<xl 显示，按手机操作逻辑的底部导航） ── */}
+      <TabBar />
+
       {/* ── Footer ── */}
-      <footer className="mt-auto mb-6">
+      <footer className="mt-auto mb-6 pb-16 xl:pb-6">
         <div className={`w-full max-w-[var(--spacing-container)] mx-auto ${PAD}`}>
           <div className="border-t border-[var(--color-border)] pt-5 flex flex-col sm:flex-row items-center justify-between gap-2">
             <p className="text-[11px] text-[var(--color-text-subtle)] tracking-wide uppercase font-medium">
               &copy; {new Date().getFullYear()} kaven的个人网页
             </p>
-            <p className="text-[11px] text-[var(--color-text-subtle)]">
-              Astro SSR · React Islands · Tailwind v4 · Drizzle ORM
+            <p className="text-[11px] text-[var(--color-text-subtle)] flex items-center gap-3">
+              <a href="/rss.xml" className="inline-flex items-center gap-1 hover:text-[var(--color-accent)] transition-colors" title="RSS 订阅">
+                <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                  <path strokeWidth={2} d="M6.18 20.82a2.18 2.18 0 1 1 0-4.36 2.18 2.18 0 0 1 0 4.36ZM4 13.18a6.82 6.82 0 0 1 6.82 6.82h2.73A9.55 9.55 0 0 0 4 10.45V13.18Zm0-5.45a12.27 12.27 0 0 1 12.27 12.27h2.73A15 15 0 0 0 4 5v2.73Z" />
+                </svg>
+                RSS
+              </a>
+              <span>Astro SSR · React Islands · Tailwind v4 · Drizzle ORM</span>
             </p>
           </div>
         </div>

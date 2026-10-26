@@ -375,6 +375,17 @@ export default function TopNav({ onToggleSidebar, sidebarOpen, authed, userName 
                     <span className="text-xs text-[var(--color-text-subtle)]">{darkNow ? "开" : "关"}</span>
                   </button>
 
+                  {/* 护眼模式：全站背景色效果，所有页面可用 */}
+                  <button
+                    type="button"
+                    onClick={() => applyEye(!eyeOn)}
+                    className="w-full flex items-center gap-2.5 px-2 py-2 rounded-lg hover:bg-[var(--color-bg)] transition-colors text-[var(--color-text)]"
+                  >
+                    <span>🌿</span>
+                    <span className="flex-1 text-left font-medium">护眼模式</span>
+                    <span className="text-xs text-[var(--color-text-subtle)]">{eyeOn ? "开" : "关"}</span>
+                  </button>
+
                   <div className="px-2 pt-2">
                     <div className="flex items-center gap-2 mb-2">
                       <span>🎨</span>

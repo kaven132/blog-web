@@ -67,6 +67,7 @@ const userAvatar = row?.avatar || "";
     <meta name="twitter:description" content={desc} />
     {ogImageAbs && <meta name="twitter:image" content={ogImageAbs} />}
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="alternate" type="application/rss+xml" title="kaven的个人网页" href="/rss.xml" />
     <!-- 外观偏好定档：深色/主题色/字号/字体/护眼，全部走 localStorage；
          apply 同时挂 astro:after-swap——ClientRouter 转场会用新页面的 SSR html 属性
          覆盖当前值导致偏好丢失（实测踩坑），转场完成后需重新应用 -->
