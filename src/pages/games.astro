@@ -3,6 +3,7 @@ import Layout from "../layouts/Layout.astro";
 import GameLauncher from "../components/games/GameLauncher";
 import { AUTH_COOKIE, isAuthed } from "../lib/auth";
 import { FLASH_GAMES } from "../lib/flash-games";
+import { RPG_GAMES } from "../lib/rpg-games";
 import { statSync } from "node:fs";
 
 /**
@@ -97,6 +98,15 @@ const games = [
             class="px-4 py-1.5 rounded-full text-sm font-medium transition-colors text-[var(--color-text-muted)] hover:text-[var(--color-text)]"
           >
             Flash
+          </button>
+          <button
+            type="button"
+            role="tab"
+            aria-selected="false"
+            data-cat-tab="rpg"
+            class="px-4 py-1.5 rounded-full text-sm font-medium transition-colors text-[var(--color-text-muted)] hover:text-[var(--color-text)]"
+          >
+            RPG
           </button>
         </div>
       )
@@ -251,6 +261,60 @@ const games = [
       </p>
     </div>
     </section>
+
+    {
+      authed && (
+        <section data-cat-panel="rpg" class="hidden">
+          <div class="grid gap-5 sm:grid-cols-2">
+            {RPG_GAMES.map((g, i) => (
+              <a
+                href={`/games/${g.id}`}
+                class={`group block bg-[var(--color-surface)] border border-[var(--color-border)] hover:border-[var(--color-border-hover)] rounded-2xl overflow-hidden transition-all duration-300 animate-[slide-up_0.5s_ease-out_both] ${
+                  i === 0 ? "" : "[animation-delay:100ms]"
+                }`}
+              >
+                <!-- 预览区（游戏截图，经登录端点伺服） -->
+                <div class="relative h-36 bg-[var(--color-bg)] border-b border-[var(--color-border)] overflow-hidden">
+                  <img
+                    src={`/games/${g.id}/web/preview.png?v=${previewV(g.id)}`}
+                    alt={`${g.title} 游戏截图`}
+                    class="absolute inset-0 h-full w-full object-cover object-top transition-transform duration-500 group-hover:scale-[1.03]"
+                    loading="lazy"
+                  />
+                  <!-- 状态角标 -->
+                  <span class="absolute top-3 right-3 inline-flex items-center gap-1.5 rounded-full bg-[var(--color-surface)]/90 backdrop-blur border border-[var(--color-border)] px-2.5 py-1 text-[11px] font-medium text-[var(--color-text-muted)]">
+                    <span class="w-1.5 h-1.5 rounded-full bg-[var(--color-accent)] animate-pulse" />
+                    可玩 · 存档云同步
+                  </span>
+                </div>
+                <!-- 信息区 -->
+                <div class="p-5">
+                  <div class="flex items-baseline gap-2.5">
+                    <h2 class="text-lg font-bold text-[var(--color-text)]">{g.title}</h2>
+                    <span class="text-[11px] font-mono tracking-[0.18em] uppercase text-[var(--color-text-subtle)]">RPG Maker · Browser</span>
+                  </div>
+                  <p class="mt-2 text-sm text-[var(--color-text-muted)] leading-relaxed">{g.desc}</p>
+                  <div class="mt-3 flex flex-wrap gap-1.5">
+                    {g.tags.map((tag) => (
+                      <span class="px-2 py-0.5 rounded-full bg-[var(--color-bg)] border border-[var(--color-border)] text-[11px] font-medium text-[var(--color-text-muted)]">
+                        {tag}
+                      </span>
+                    ))}
+                  </div>
+                  <div class="mt-4 pt-4 border-t border-[var(--color-border)] flex items-center justify-between">
+                    <span class="text-xs text-[var(--color-text-subtle)]">{g.footer}</span>
+                    <span class="inline-flex items-center gap-1 text-sm font-medium text-[var(--color-accent)]">
+                      进入游戏
+                      <span class="transition-transform duration-300 group-hover:translate-x-0.5">→</span>
+                    </span>
+                  </div>
+                </div>
+              </a>
+            ))}
+          </div>
+        </section>
+      )
+    }
 
     {
       authed && (

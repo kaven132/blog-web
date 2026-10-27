@@ -1,0 +1,214 @@
+---
+/**
+ * RPG Maker 网页游戏（静态托管 + iframe）页面主体 —— 由 /games/[id].astro 按 kind 分发渲染。
+ * 存档：RPG Maker MV 浏览器模式写 localStorage（键带游戏专属前缀，见 rpg-games.ts 说明），
+ * 同步方式 = 把前缀下所有键打包成一个 JSON 上云，与 Flash 的单 sol 同库（game_saves）。
+ */
+interface Props {
+  game: import("../../lib/rpg-games").RpgGame;
+}
+const { game } = Astro.props;
+---
+
+  <article class="py-12 md:py-16 max-w-4xl mx-auto">
+    <header class="mb-6 animate-[slide-up_0.5s_ease-out_both]">
+      <p class="text-xs font-semibold tracking-[0.15em] uppercase text-[var(--color-text-subtle)] mb-3">RPG Game · Browser</p>
+      <h1 class="text-3xl md:text-4xl font-bold tracking-[-0.02em] mb-3">{game.title} <span class="text-lg text-[var(--color-text-subtle)] font-normal">{game.orig}</span></h1>
+      <p class="text-base text-[var(--color-text-muted)] leading-relaxed font-serif">
+        浏览器原生运行（RPG Maker 引擎），无需模拟器。鼠标 / 键盘操作，游戏过程全自动全屏按需加载资源。
+        登录状态下游玩进度自动云同步 —— 换电脑也能续玩。
+      </p>
+      <a href="/games" class="inline-flex items-center gap-1 text-sm text-[var(--color-text-muted)] hover:text-[var(--color-accent)] transition-colors mt-3">
+        <span>←</span> 返回小游戏
+      </a>
+    </header>
+
+    <!-- 存档同步栏（页面仅登录可见，进度随账号走；data-* 供脚本读取游戏标识） -->
+    <div id="sync-bar" class="mb-4 flex items-center gap-2 flex-wrap text-sm" data-game={game.id} data-prefix={game.savePrefix}>
+      <span id="sync-status" class="text-[var(--color-text-subtle)] font-mono text-xs">存档同步：初始化…</span>
+      <span class="flex-1"></span>
+      <button type="button" id="btn-upload" class="px-3 py-1.5 text-xs font-semibold rounded-lg border border-[var(--color-border)] text-[var(--color-text-muted)] hover:text-[var(--color-accent)] hover:border-[var(--color-accent)]/40 transition-colors">上传存档</button>
+      <button type="button" id="btn-restore" class="px-3 py-1.5 text-xs font-semibold rounded-lg border border-[var(--color-border)] text-[var(--color-text-muted)] hover:text-[var(--color-accent)] hover:border-[var(--color-accent)]/40 transition-colors">从云端恢复</button>
+      <button type="button" id="btn-download" class="px-3 py-1.5 text-xs font-semibold rounded-lg border border-[var(--color-border)] text-[var(--color-text-muted)] hover:text-[var(--color-accent)] hover:border-[var(--color-accent)]/40 transition-colors">下载存档</button>
+      <label class="px-3 py-1.5 text-xs font-semibold rounded-lg border border-[var(--color-border)] text-[var(--color-text-muted)] hover:text-[var(--color-accent)] hover:border-[var(--color-accent)]/40 transition-colors cursor-pointer">
+        导入存档<input type="file" id="file-import" accept=".json" class="hidden" />
+      </label>
+    </div>
+
+    <!-- 游戏舞台：同源 iframe（RPG Maker 资源 XHR 与 localStorage 都依赖同源） -->
+    <div class="rounded-2xl overflow-hidden border border-[var(--color-border)] bg-black animate-[slide-up_0.5s_ease-out_both] [animation-delay:100ms]">
+      <iframe
+        id="game-frame"
+        src={`/games/${game.id}/web/${game.entry}`}
+        class="block w-full aspect-[816/624] bg-black"
+        allow="autoplay"
+        title={game.title}
+      ></iframe>
+    </div>
+
+    <p class="text-xs text-[var(--color-text-subtle)] mt-4 leading-relaxed">
+      本页面为个人收藏性质的本地游玩用途，游戏版权归原作者所有，请勿二次分发；
+      {game.footer}，图片与音频由引擎按需流式加载。
+    </p>
+  </article>
+
+<script data-astro-rerun>
+  // RPG Maker 存档云同步（页面转场后需重执行，data-astro-rerun 不做 TS 编译——只写纯 JS）
+  (() => {
+    const bar = document.getElementById("sync-bar");
+    const GAME_ID = bar ? bar.dataset.game : "";
+    const SAVE_PREFIX = bar ? bar.dataset.prefix : "";
+    const authed = document.getElementById("btn-upload") !== null;
+    const statusEl = document.getElementById("sync-status");
+    const setStatus = (t) => { if (statusEl) statusEl.textContent = "存档同步：" + t; };
+    if (!GAME_ID || !SAVE_PREFIX) { setStatus("配置缺失"); return; }
+
+    // ── 打包/解包：SAVE_PREFIX 开头的所有 localStorage 键 ──
+    const collectKeys = () => {
+      const ks = [];
+      for (let i = 0; i < localStorage.length; i++) {
+        const k = localStorage.key(i);
+        if (k && k.startsWith(SAVE_PREFIX)) ks.push(k);
+      }
+      return ks;
+    };
+    const packSave = () => {
+      const obj = {};
+      for (const k of collectKeys()) obj[k] = localStorage.getItem(k);
+      return JSON.stringify(obj);
+    };
+    // utf8 安全的 base64（存档值是 LZString 压缩串，纯 ASCII，但打包 JSON 走 utf8 保险）
+    const b64encode = (s) => btoa(unescape(encodeURIComponent(s)));
+    const b64decode = (b) => decodeURIComponent(escape(atob(b)));
+    const hasLocalSave = () => collectKeys().length > 0;
+
+    // ── 归属标记：登录态强制以云端档为准覆盖本地；未登录遇到其他账号残留即清空 ──
+    const OWNER_KEY = SAVE_PREFIX + "#owner";
+    const setOwner = (o) => localStorage.setItem(OWNER_KEY, o);
+    const getOwner = () => localStorage.getItem(OWNER_KEY);
+    const clearLocalSave = () => {
+      for (const k of collectKeys()) localStorage.removeItem(k);
+    };
+
+    let lastSynced = null;
+
+    // ── 云端操作 ──
+    const cloudGet = () =>
+      fetch("/api/game-save?game=" + GAME_ID, { headers: { Accept: "application/json" } }).then((r) => (r.ok ? r.json() : null));
+    const cloudPut = (b64) =>
+      fetch("/api/game-save", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ game: GAME_ID, data: b64 }),
+      });
+
+    // 启动顺序：先同步云端（登录时云端档强制生效），游戏 iframe 在页面加载时即开始 ——
+    // iframe 与本脚本同批执行，存档写入发生在玩家存档时， boot 的覆盖只发生在进入游戏前
+    const boot = async () => {
+      if (authed) {
+        try {
+          const cloud = await cloudGet();
+          if (cloud && cloud.data) {
+            const obj = JSON.parse(b64decode(cloud.data));
+            Object.entries(obj).forEach(([k, v]) => localStorage.setItem(k, v));
+            lastSynced = cloud.data;
+            setOwner("admin");
+            setStatus("已同步账号存档（" + cloud.size + " 字节）");
+          } else if (cloud) {
+            clearLocalSave();
+            setOwner("admin");
+            setStatus("账号暂无存档 —— 已初始化空白进度");
+          } else {
+            setStatus("云端状态获取失败");
+          }
+        } catch {
+          setStatus("云端状态获取失败");
+        }
+      } else {
+        if (getOwner() !== "anon") {
+          clearLocalSave();
+          setOwner("anon");
+        }
+        setStatus("未登录 —— 游玩进度保存在本浏览器，登录后云同步到账号");
+      }
+    };
+
+    // ── 自动上传：定期 + 离开页面时，本地打包结果与上次同步不一致就推 ──
+    const uploadIfChanged = async () => {
+      if (!authed) return false;
+      if (!hasLocalSave()) return false;
+      const packed = b64encode(packSave());
+      if (packed === lastSynced) return false;
+      try {
+        const res = await cloudPut(packed);
+        if (res && res.ok) {
+          lastSynced = packed;
+          setStatus("已自动上传存档 " + new Date().toLocaleTimeString());
+          return true;
+        }
+      } catch { /* 离线时静默，下次再试 */ }
+      return false;
+    };
+
+    boot();
+    setInterval(uploadIfChanged, 60000);
+    window.addEventListener("beforeunload", () => { uploadIfChanged(); });
+    document.addEventListener("visibilitychange", () => { if (document.visibilityState === "hidden") uploadIfChanged(); });
+
+    // ── 手动按钮 ──
+    document.getElementById("btn-upload")?.addEventListener("click", async () => {
+      setStatus("上传中…");
+      const ok = await uploadIfChanged();
+      if (!ok) {
+        if (!hasLocalSave()) setStatus("本地还没有存档（游戏内存档后自动上传）");
+        else setStatus("云端已是最新");
+      }
+    });
+
+    document.getElementById("btn-restore")?.addEventListener("click", async () => {
+      setStatus("恢复中…");
+      try {
+        const cloud = await cloudGet();
+        if (cloud && cloud.data) {
+          const obj = JSON.parse(b64decode(cloud.data));
+          Object.entries(obj).forEach(([k, v]) => localStorage.setItem(k, v));
+          setStatus("已恢复，正在刷新…");
+          setTimeout(() => location.reload(), 600);
+        } else {
+          setStatus("云端暂无存档");
+        }
+      } catch {
+        setStatus("恢复失败，请稍后再试");
+      }
+    });
+
+    document.getElementById("btn-download")?.addEventListener("click", () => {
+      if (!hasLocalSave()) { setStatus("本地还没有存档"); return; }
+      const url = URL.createObjectURL(new Blob([packSave()], { type: "application/json" }));
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = GAME_ID + "-save.json";
+      a.click();
+      URL.revokeObjectURL(url);
+      setStatus("已导出存档 JSON");
+    });
+
+    document.getElementById("file-import")?.addEventListener("change", (ev) => {
+      const file = ev.target.files && ev.target.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = () => {
+        try {
+          const obj = JSON.parse(reader.result);
+          Object.entries(obj).forEach(([k, v]) => localStorage.setItem(k, String(v)));
+          setStatus("已导入 " + file.name + "，正在刷新…");
+          setTimeout(() => location.reload(), 600);
+        } catch {
+          setStatus("导入失败：不是有效的存档 JSON");
+        }
+      };
+      reader.readAsText(file);
+      ev.target.value = "";
+    });
+  })();
+</script>

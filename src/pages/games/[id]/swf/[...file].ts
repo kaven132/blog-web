@@ -16,6 +16,7 @@ export const prerender = false;
 const MIME: Record<string, string> = {
   ".swf": "application/x-shockwave-flash",
   ".png": "image/png",
+  ".mp3": "audio/mpeg",
 };
 
 export const GET: APIRoute = async ({ params, cookies }) => {
@@ -31,7 +32,9 @@ export const GET: APIRoute = async ({ params, cookies }) => {
   const mime = MIME[path.extname(rel).toLowerCase()];
   if (!mime) return new Response(null, { status: 404 });
 
-  const GAME_ROOT = path.resolve("./data/games", game.id);
+  // 游戏数据根：默认在项目树外（与项目平级的 blog2-gamedata），可用环境变量覆盖
+  const GAMES_ROOT = path.resolve(process.env.GAME_DATA_ROOT || path.join("..", "blog2-gamedata", "games"));
+  const GAME_ROOT = path.join(GAMES_ROOT, game.id);
   const full = path.resolve(GAME_ROOT, rel);
   if (!full.startsWith(GAME_ROOT + path.sep)) return new Response(null, { status: 404 });
   if (!existsSync(full) || !statSync(full).isFile()) return new Response(null, { status: 404 });
