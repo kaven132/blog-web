@@ -224,10 +224,10 @@ export default function TopNav({ onToggleSidebar, sidebarOpen, authed, userName 
 
           {/* Right */}
           <div className="flex items-center gap-1">
-            <nav className="hidden sm:flex items-center gap-1">
+            <nav className="hidden xl:flex items-center gap-1">
               {navLinks.map((link) => (
                 <a key={link.href} href={link.href}
-                  className="relative px-3 py-1.5 text-sm font-medium rounded-lg text-[var(--color-text-muted)] hover:text-[var(--color-text)] hover:bg-[var(--color-bg)] transition-all duration-200"
+                  className="relative whitespace-nowrap px-3 py-1.5 text-sm font-medium rounded-lg text-[var(--color-text-muted)] hover:text-[var(--color-text)] hover:bg-[var(--color-bg)] transition-all duration-200"
                 >
                   {link.label}
                 </a>
@@ -409,7 +409,7 @@ export default function TopNav({ onToggleSidebar, sidebarOpen, authed, userName 
 
             {loggedIn ? (
               <div className="flex items-center gap-2">
-                <a href="/admin" className="px-3 py-1.5 text-sm font-medium rounded-lg bg-[var(--color-accent)] text-white hover:bg-[var(--color-accent-hover)] transition-colors">
+                <a href="/admin" className="whitespace-nowrap px-3 py-1.5 text-sm font-medium rounded-lg bg-[var(--color-accent)] text-white hover:bg-[var(--color-accent-hover)] transition-colors">
                   文章管理
                 </a>
                 <div className="relative" ref={dropdownRef}>

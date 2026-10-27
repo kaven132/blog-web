@@ -2,7 +2,8 @@ import { useEffect, useState } from "react";
 import { House, Newspaper, Map, Gamepad2, Info } from "lucide-react";
 
 /**
- * 移动端底部标签栏（<sm 显示）：顶栏导航链接（≥sm 显示）在窄屏收起时的替代导航。
+ * 移动端底部标签栏（<xl 显示）：顶栏导航链接（≥xl 显示）在中等与窄屏收起时的替代导航，
+ * 与顶栏链接严格互斥 —— 任何宽度下两套导航恰好出现一套。
  * 图标用 Lucide 线性风格；当前路由高亮；预留 iOS 安全区内边距。
  */
 
@@ -30,7 +31,7 @@ export default function TabBar() {
 
   return (
     <nav
-      className="sm:hidden fixed bottom-0 inset-x-0 z-[70] bg-[var(--color-surface)]/95 backdrop-blur-xl border-t border-[var(--color-border)]"
+      className="xl:hidden fixed bottom-0 inset-x-0 z-[70] bg-[var(--color-surface)]/95 backdrop-blur-xl border-t border-[var(--color-border)]"
       style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
       aria-label="移动端导航"
     >

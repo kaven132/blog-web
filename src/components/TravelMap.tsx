@@ -32,9 +32,16 @@ type TypeFilter = "全部" | "国内" | "国际";
 export default function TravelMap({ cities }: { cities: TravelCity[] }) {
   const [filter, setFilter] = useState<TypeFilter>("全部");
   const [selectedName, setSelectedName] = useState<string | null>(null);
+  // 窄屏城市卡展开态：默认收成小按钮，每次选中图钉自动展开
+  const [cardOpen, setCardOpen] = useState(false);
   const svgRef = useRef<SVGSVGElement>(null);
   const zoomRef = useRef<ZoomBehavior<SVGSVGElement, unknown> | undefined>(undefined);
   const [transform, setTransform] = useState<ZoomTransform>(zoomIdentity);
+
+  // 选中图钉自动展开窄屏城市卡；取消选中则收回按钮
+  useEffect(() => {
+    setCardOpen(!!selectedName);
+  }, [selectedName]);
 
   // 投影与路径：按剔除南极洲后的国界范围适配画布
   const { projection, landPath, coastPath, bordersPath, graticulePath, nameLabels } = useMemo(() => {
@@ -319,21 +326,60 @@ export default function TravelMap({ cities }: { cities: TravelCity[] }) {
           </g>
         </svg>
 
-        {/* 选中城市卡 */}
+        {/* 选中城市卡：≥md 常驻右上角；<md 收成小按钮（选中图钉自动展开），避免遮挡地图 */}
         {selected && (
-          <div className="absolute top-4 right-4 w-64 bg-[var(--color-surface)] border border-[var(--color-border)] rounded-xl p-4 shadow-lg">
-            <span className="inline-block text-[10px] font-bold px-2 py-0.5 rounded-full bg-[var(--color-accent)] text-white mb-1.5">
-              {selected.type}
-            </span>
-            <h3 className="text-base font-bold text-[var(--color-text)]">{selected.name}</h3>
-            <p className="text-xs text-[var(--color-text-muted)] leading-snug mt-1">{selected.latest.title}</p>
-            <a
-              href={`/posts/${encodeURIComponent(selected.latest.slug)}`}
-              className="inline-block mt-2 text-xs font-medium text-[var(--color-accent)] hover:underline"
-            >
-              阅读全文 →
-            </a>
-          </div>
+          <>
+            <div className="hidden md:block absolute top-4 right-4 w-64 bg-[var(--color-surface)] border border-[var(--color-border)] rounded-xl p-4 shadow-lg">
+              <span className="inline-block text-[10px] font-bold px-2 py-0.5 rounded-full bg-[var(--color-accent)] text-white mb-1.5">
+                {selected.type}
+              </span>
+              <h3 className="text-base font-bold text-[var(--color-text)]">{selected.name}</h3>
+              <p className="text-xs text-[var(--color-text-muted)] leading-snug mt-1">{selected.latest.title}</p>
+              <a
+                href={`/posts/${encodeURIComponent(selected.latest.slug)}`}
+                className="inline-block mt-2 text-xs font-medium text-[var(--color-accent)] hover:underline"
+              >
+                阅读全文 →
+              </a>
+            </div>
+            <div className="md:hidden absolute top-3 right-3 z-20">
+              {cardOpen ? (
+                <div className="w-52 bg-[var(--color-surface)] border border-[var(--color-border)] rounded-xl p-3 shadow-lg">
+                  <div className="flex items-start justify-between gap-2">
+                    <span className="inline-block text-[10px] font-bold px-2 py-0.5 rounded-full bg-[var(--color-accent)] text-white">
+                      {selected.type}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => setCardOpen(false)}
+                      aria-label="收起城市卡"
+                      className="w-5 h-5 flex items-center justify-center rounded text-[var(--color-text-subtle)] hover:text-[var(--color-text)] hover:bg-[var(--color-bg)] transition-colors -mt-0.5 -mr-1"
+                    >
+                      ×
+                    </button>
+                  </div>
+                  <h3 className="text-sm font-bold text-[var(--color-text)] mt-1">{selected.name}</h3>
+                  <p className="text-xs text-[var(--color-text-muted)] leading-snug mt-0.5">{selected.latest.title}</p>
+                  <a
+                    href={`/posts/${encodeURIComponent(selected.latest.slug)}`}
+                    className="inline-block mt-1.5 text-xs font-medium text-[var(--color-accent)] hover:underline"
+                  >
+                    阅读全文 →
+                  </a>
+                </div>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => setCardOpen(true)}
+                  className="flex items-center gap-1 max-w-44 px-2.5 py-1 rounded-full bg-[var(--color-surface)]/95 backdrop-blur border border-[var(--color-border)] shadow text-xs font-medium text-[var(--color-text)] hover:border-[var(--color-accent)] transition-colors"
+                >
+                  <span className="w-1.5 h-1.5 rounded-full bg-[var(--color-accent)] flex-shrink-0" />
+                  <span className="truncate">{selected.name}</span>
+                  <span aria-hidden="true">›</span>
+                </button>
+              )}
+            </div>
+          </>
         )}
 
         {/* 缩放控制 */}
