@@ -4,15 +4,6 @@ import TabBar from "./TabBar";
 import ProfileCard from "./ProfileCard";
 import NewsPanel from "./NewsPanel";
 
-// 移动端侧栏的页面导航（与 TopNav.navLinks 保持一致）
-const NAV_LINKS = [
-  { href: "/", label: "首页" },
-  { href: "/posts", label: "文章" },
-  { href: "/travel", label: "旅行地图" },
-  { href: "/games", label: "小游戏" },
-  { href: "/about", label: "关于" },
-];
-
 interface AppShellProps {
   children: ReactNode;
   /** 服务端读 cookie 得出的登录态，避免客户端再发 /api/auth/me，也消除「登录」按钮闪烁 */
@@ -69,21 +60,6 @@ export default function AppShell({ children, authed, userName, userAvatar }: App
               </button>
             </div>
             <ProfileCard authed={authed} />
-            <nav className="px-3 pt-1 pb-2 border-b border-[var(--color-border)]">
-              {NAV_LINKS.map((l) => (
-                <a
-                  key={l.href}
-                  href={l.href}
-                  onClick={() => setSidebarOpen(false)}
-                  className="flex items-center justify-between px-3 py-2.5 rounded-lg text-sm font-medium text-[var(--color-text-muted)] hover:text-[var(--color-accent)] hover:bg-[var(--color-bg)] transition-colors"
-                >
-                  {l.label}
-                  <svg className="w-3.5 h-3.5 opacity-40" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24" aria-hidden="true">
-                    <path strokeLinecap="round" strokeLinejoin="round" d="m8.25 4.5 7.5 7.5-7.5 7.5" />
-                  </svg>
-                </a>
-              ))}
-            </nav>
             <div className="p-3 pb-4"><NewsPanel /></div>
           </div>
         </div>

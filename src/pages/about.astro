@@ -10,7 +10,7 @@ const commentCount = db.select({ n: sql<number>`count(*)` }).from(comments).get(
 const likeCount = db.select({ n: sql<number>`coalesce(sum(${likes.count}), 0)` }).from(likes).get()?.n ?? 0;
 
 const techStack = [
-  { glyph: "◆", label: "框架", title: "Astro 5 SSR", desc: "服务端动态渲染，Node standalone 部署，首屏直出无需等待。" },
+  { glyph: "◆", label: "框架", title: "Astro 6 SSR", desc: "服务端动态渲染，Node standalone（@astrojs/node 10）部署，首屏直出无需等待。" },
   { glyph: "◉", label: "UI", title: "React 19 Islands", desc: "群岛架构：静态 HTML 里按需注水，只有交互组件携带 JS。" },
   { glyph: "○", label: "样式", title: "Tailwind CSS v4", desc: "CSS 优先的 @theme 配置，oklch 色彩空间，Oxide 引擎。" },
   { glyph: "△", label: "语言", title: "TypeScript 5", desc: "strict 模式全量类型约束，页面、接口与脚本共享类型。" },
@@ -19,15 +19,17 @@ const techStack = [
 ];
 
 const features = [
-  "Markdown 文章与封面插图",
-  "实时搜索 · 标签筛选 · 分页",
-  "点赞与评论互动",
-  "头像裁切上传与个人名片",
-  "RSS 资讯聚合（国内 / 国外 / 科技 / 游戏）",
-  "HMAC 签名 Cookie 登录态",
-  "阅读进度指示器",
-  "自动化发文流水线",
-  "小游戏板块（方块 / 贪吃蛇 / 2048 / 扫雷 / 吃豆人）",
+  "Markdown 文章 · 封面插图 · 目录 TOC · 上下篇",
+  "全文搜索（FTS5）· 标签筛选 · 浏览量排序 · 分页",
+  "点赞与盖楼评论 · 表情选择器",
+  "RSS 全文订阅（rss.xml）",
+  "资讯栏聚合（国内 / 国外 / 科技 / 游戏）",
+  "TTS 听全文 · 术语悬停释义",
+  "阅读偏好：字号 / 字体 / 护眼 / 音色 / 深色 / 主题色",
+  "HMAC 签名登录态 · 键盘快捷键",
+  "旅行地图 · 图片按需转 WebP",
+  "小游戏板块（俄罗斯方块 / 贪吃蛇 / 2048 / 扫雷 / 吃豆人）",
+  "Flash 游戏馆（Ruffle 模拟器 · 登录云存档）",
 ];
 
 const palette = [
@@ -142,7 +144,7 @@ const fonts = [
       <div class="bg-[var(--color-surface)] border border-[var(--color-border)] rounded-2xl p-6 sm:p-7 flex flex-col sm:flex-row sm:items-center gap-4 sm:justify-between">
         <div>
           <h3 class="font-semibold text-[var(--color-text)] mb-1">劳逸结合</h3>
-          <p class="text-sm text-[var(--color-text-muted)]">写完代码来一局俄罗斯方块或贪吃蛇 —— 小游戏板块已经开工。</p>
+          <p class="text-sm text-[var(--color-text-muted)]">内置五款经典小游戏，另有 Flash 游戏馆 —— Ruffle 模拟器网页运行，登录后进度云同步。</p>
         </div>
         <a
           href="/games"

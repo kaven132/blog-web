@@ -1,11 +1,26 @@
 ---
 import Layout from "../layouts/Layout.astro";
 import GameLauncher from "../components/games/GameLauncher";
+import { AUTH_COOKIE, isAuthed } from "../lib/auth";
+import { FLASH_GAMES } from "../lib/flash-games";
+import { statSync } from "node:fs";
 
 /**
- * 小游戏聚合页 —— 五款均已可玩（GameLauncher 岛屿弹窗对局）；
- * 新游戏上线：实现组件 → GameLauncher 加分支 → 下方 games 数组加一张卡片。
+ * 小游戏聚合页 —— 「内置」五款（GameLauncher 岛屿弹窗对局）+「Flash」分类（仅登录可见：
+ * 独立页面运行 + 账号云存档，涉及存档归属所以不对匿名暴露入口与内容）；
+ * 新游戏上线：内置款实现组件 → GameLauncher 加分支 → games 数组加卡片；Flash 款在 flash-games 注册表加一项。
  */
+
+const authed = isAuthed(Astro.cookies.get(AUTH_COOKIE)?.value);
+
+// 预览图版本号（取 mtime）：SWF 端点是 immutable 永久缓存，换图后靠版本参数破缓存
+const previewV = (id: string) => {
+  try {
+    return String(Math.floor(statSync(`./data/games/${id}/preview.png`).mtimeMs));
+  } catch {
+    return "0";
+  }
+};
 
 const games = [
   {
@@ -46,18 +61,49 @@ const games = [
 ];
 ---
 
-<Layout title="小游戏" description="休息一下 —— 五款经典小游戏，打开浏览器就能来一局">
+<Layout title="小游戏" description="休息一下 —— 内置经典与 Flash 怀旧小游戏，打开浏览器就能来一局">
   <article class="py-12 md:py-16">
     <!-- Header -->
     <header class="mb-10 animate-[slide-up_0.5s_ease-out_both]">
       <p class="text-xs font-semibold tracking-[0.15em] uppercase text-[var(--color-text-subtle)] mb-3">Games</p>
       <h1 class="text-3xl md:text-4xl font-bold tracking-[-0.02em] mb-4">小游戏</h1>
       <p class="text-base text-[var(--color-text-muted)] leading-relaxed font-serif max-w-xl">
-        写代码之余放松一下。五款经典小游戏全部上线，不用装 App，打开浏览器就能来一局。
+        写代码之余放松一下。内置经典小游戏打开就能来一局；Flash 区收录模拟器运行的怀旧款（需登录，进度随账号走）。
       </p>
     </header>
 
-    <!-- Game cards -->
+    <!-- 分类切换（Flash 分类仅登录用户可见，SSR 渲染门槛） -->
+    {
+      authed && (
+        <div
+          class="mb-6 inline-flex rounded-full border border-[var(--color-border)] bg-[var(--color-surface)] p-1 animate-[slide-up_0.5s_ease-out_both]"
+          role="tablist"
+          aria-label="游戏分类"
+        >
+          <button
+            type="button"
+            role="tab"
+            aria-selected="true"
+            data-cat-tab="builtin"
+            class="px-4 py-1.5 rounded-full text-sm font-medium transition-colors bg-[var(--color-accent)] text-white"
+          >
+            内置小游戏
+          </button>
+          <button
+            type="button"
+            role="tab"
+            aria-selected="false"
+            data-cat-tab="flash"
+            class="px-4 py-1.5 rounded-full text-sm font-medium transition-colors text-[var(--color-text-muted)] hover:text-[var(--color-text)]"
+          >
+            Flash
+          </button>
+        </div>
+      )
+    }
+
+    <!-- 内置小游戏 -->
+    <section data-cat-panel="builtin">
     <div class="grid gap-5 sm:grid-cols-2">
       {games.map((game, i) => (
         <div
@@ -204,5 +250,84 @@ const games = [
         更多小游戏排队开发中 —— 有想玩的经典款？欢迎在文章评论区留言点名。
       </p>
     </div>
+    </section>
+
+    {
+      authed && (
+        <section data-cat-panel="flash" class="hidden">
+          <div class="grid gap-5 sm:grid-cols-2">
+            {FLASH_GAMES.map((g, i) => (
+              <a
+                href={`/games/${g.id}`}
+                class={`group block bg-[var(--color-surface)] border border-[var(--color-border)] hover:border-[var(--color-border-hover)] rounded-2xl overflow-hidden transition-all duration-300 animate-[slide-up_0.5s_ease-out_both] ${
+                  i === 0 ? "" : "[animation-delay:100ms]"
+                }`}
+              >
+                <!-- 预览区（游戏截图，经登录端点伺服） -->
+                <div class="relative h-36 bg-[var(--color-bg)] border-b border-[var(--color-border)] overflow-hidden">
+                  <img
+                    src={`/games/${g.id}/swf/preview.png?v=${previewV(g.id)}`}
+                    alt={`${g.title} 游戏截图`}
+                    class="absolute inset-0 h-full w-full object-cover transition-transform duration-500 group-hover:scale-[1.03]"
+                    loading="lazy"
+                  />
+                  <!-- 状态角标 -->
+                  <span class="absolute top-3 right-3 inline-flex items-center gap-1.5 rounded-full bg-[var(--color-surface)]/90 backdrop-blur border border-[var(--color-border)] px-2.5 py-1 text-[11px] font-medium text-[var(--color-text-muted)]">
+                    <span class="w-1.5 h-1.5 rounded-full bg-[var(--color-accent)] animate-pulse" />
+                    可玩 · 存档云同步
+                  </span>
+                </div>
+                <!-- 信息区 -->
+                <div class="p-5">
+                  <div class="flex items-baseline gap-2.5">
+                    <h2 class="text-lg font-bold text-[var(--color-text)]">{g.title}</h2>
+                    <span class="text-[11px] font-mono tracking-[0.18em] uppercase text-[var(--color-text-subtle)]">Flash · Ruffle</span>
+                  </div>
+                  <p class="mt-2 text-sm text-[var(--color-text-muted)] leading-relaxed">{g.desc}</p>
+                  <div class="mt-3 flex flex-wrap gap-1.5">
+                    {g.tags.map((tag) => (
+                      <span class="px-2 py-0.5 rounded-full bg-[var(--color-bg)] border border-[var(--color-border)] text-[11px] font-medium text-[var(--color-text-muted)]">
+                        {tag}
+                      </span>
+                    ))}
+                  </div>
+                  <div class="mt-4 pt-4 border-t border-[var(--color-border)] flex items-center justify-between">
+                    <span class="text-xs text-[var(--color-text-subtle)]">{g.footer}</span>
+                    <span class="inline-flex items-center gap-1 text-sm font-medium text-[var(--color-accent)]">
+                      进入游戏
+                      <span class="transition-transform duration-300 group-hover:translate-x-0.5">→</span>
+                    </span>
+                  </div>
+                </div>
+              </a>
+            ))}
+          </div>
+        </section>
+      )
+    }
+
+    <script data-astro-rerun>
+      // 分类切换（纯 JS：data-astro-rerun 不做 TS 编译）
+      (() => {
+        document.querySelectorAll("[data-cat-tab]").forEach((btn) => {
+          if (btn.dataset.catBound) return;
+          btn.dataset.catBound = "1";
+          btn.addEventListener("click", () => {
+            const cat = btn.getAttribute("data-cat-tab");
+            document.querySelectorAll("[data-cat-tab]").forEach((b) => {
+              const on = b.getAttribute("data-cat-tab") === cat;
+              b.setAttribute("aria-selected", on ? "true" : "false");
+              b.classList.toggle("bg-[var(--color-accent)]", on);
+              b.classList.toggle("text-white", on);
+              b.classList.toggle("text-[var(--color-text-muted)]", !on);
+              b.classList.toggle("hover:text-[var(--color-text)]", !on);
+            });
+            document.querySelectorAll("[data-cat-panel]").forEach((p) => {
+              p.classList.toggle("hidden", p.getAttribute("data-cat-panel") !== cat);
+            });
+          });
+        });
+      })();
+    </script>
   </article>
 </Layout>
