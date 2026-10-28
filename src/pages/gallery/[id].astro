@@ -1,0 +1,386 @@
+---
+import Layout from "../../layouts/Layout.astro";
+import LikeButton from "../../components/LikeButton";
+import { db } from "../../db";
+import { galleries, galleryPhotos, galleryLikes, galleryComments } from "../../db/schema";
+import { asc, eq, sql } from "drizzle-orm";
+import { parseCategoryPath, categoryLabel } from "../../lib/gallery-categories";
+
+export const prerender = false;
+
+const id = Number(Astro.params.id);
+const gallery = Number.isInteger(id) && id > 0
+  ? db.select().from(galleries).where(eq(galleries.id, id)).get()
+  : undefined;
+if (!gallery) return Astro.redirect("/gallery");
+
+// 浏览量：浏览页每次渲染 +1（先取旧值用于展示，再自增）
+const galleryViews = gallery.views;
+db.update(galleries)
+  .set({ views: sql`${galleries.views} + 1` })
+  .where(eq(galleries.id, gallery.id))
+  .run();
+const viewsDisplay = galleryViews > 9999 ? `${(galleryViews / 10000).toFixed(1)} 万` : String(galleryViews);
+
+const photos = db
+  .select({ path: galleryPhotos.path })
+  .from(galleryPhotos)
+  .where(eq(galleryPhotos.galleryId, gallery.id))
+  .orderBy(asc(galleryPhotos.sort), asc(galleryPhotos.id))
+  .all()
+  .map((p) => p.path);
+
+const galleryLike = db.select().from(galleryLikes).where(eq(galleryLikes.galleryId, gallery.id)).get();
+const galleryCommentRows = db
+  .select()
+  .from(galleryComments)
+  .where(eq(galleryComments.galleryId, gallery.id))
+  .orderBy(galleryComments.createdAt)
+  .all();
+
+// 评论盖楼：与文章页同款（顶层 + 一层回复归并）
+const rootComments = galleryCommentRows.filter((c) => c.parentId === null);
+const repliesOf = (cid: number) => galleryCommentRows.filter((c) => c.parentId === cid);
+const authorOf = (cid: number | null) => galleryCommentRows.find((c) => c.id === cid)?.author;
+---
+
+<Layout title={`${gallery.title} · 相册`} description={gallery.description || `${gallery.title} —— ${photos.length} 张照片`}>
+  <article class="py-10 md:py-14 max-w-5xl mx-auto">
+    <!-- Header -->
+    <header class="mb-6 animate-[slide-up_0.5s_ease-out_both]">
+      <p class="text-xs font-semibold tracking-[0.15em] uppercase text-[var(--color-text-subtle)] mb-3">Gallery · {categoryLabel(parseCategoryPath(gallery.category))}</p>
+      <h1 class="text-3xl md:text-4xl font-bold tracking-[-0.02em] mb-3">{gallery.title}</h1>
+      {gallery.description && <p class="text-base text-[var(--color-text-muted)] leading-relaxed font-serif max-w-2xl">{gallery.description}</p>}
+      <div class="mt-4 flex items-center gap-4 text-sm flex-wrap">
+        <a href="/gallery" class="inline-flex items-center gap-1 text-[var(--color-text-muted)] hover:text-[var(--color-accent)] transition-colors">
+          <span aria-hidden="true">←</span> 返回相册
+        </a>
+        <span class="text-[var(--color-text-subtle)]">共 {photos.length} 张 · {viewsDisplay} 次浏览 · 键盘 ←/→ 可翻页</span>
+      </div>
+    </header>
+
+    {photos.length === 0 ? (
+      <div class="rounded-2xl border border-dashed border-[var(--color-border)] p-10 text-center text-sm text-[var(--color-text-subtle)]">
+        这个相册还没有照片
+      </div>
+    ) : (
+      <div id="viewer-root" data-photos={JSON.stringify(photos)}>
+        <!-- 大图舞台 -->
+        <div id="viewer-stage" class="relative rounded-2xl overflow-hidden bg-black select-none animate-[slide-up_0.5s_ease-out_both]">
+          <img id="viewer-img" src={photos[0]} alt="" class="block w-full max-h-[70vh] object-contain mx-auto" draggable="false" />
+          <!-- 左右切换 -->
+          {photos.length > 1 && (
+            <>
+              <button type="button" id="btn-prev" aria-label="上一张"
+                class="absolute left-3 top-1/2 -translate-y-1/2 w-10 h-10 flex items-center justify-center rounded-full bg-black/50 text-white text-xl leading-none hover:bg-black/70 transition-colors">‹</button>
+              <button type="button" id="btn-next" aria-label="下一张"
+                class="absolute right-3 top-1/2 -translate-y-1/2 w-10 h-10 flex items-center justify-center rounded-full bg-black/50 text-white text-xl leading-none hover:bg-black/70 transition-colors">›</button>
+            </>
+          )}
+          <!-- 计数 -->
+          <span id="viewer-counter" class="absolute bottom-3 right-3 rounded-full bg-black/50 text-white text-xs px-2.5 py-1 font-mono"></span>
+        </div>
+
+        <!-- 缩略图条 -->
+        {photos.length > 1 && (
+          <div id="viewer-thumbs" class="mt-3 flex gap-2 overflow-x-auto scrollbar-none pb-1">
+            {photos.map((p, i) => (
+              <button type="button" data-thumb={i} class="flex-shrink-0 rounded-lg overflow-hidden border-2 border-transparent transition-colors" aria-label={`第 ${i + 1} 张`}>
+                <img src={p} alt="" class="h-14 w-auto block" loading="lazy" draggable="false" />
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
+    )}
+
+    <!-- 点赞 + 评论区（与文章页同构） -->
+    <section id="comments" class="mt-12 max-w-2xl mx-auto">
+      <div class="flex flex-col items-center gap-5 mb-12">
+        <p class="text-xs text-[var(--color-text-subtle)] uppercase tracking-widest font-semibold">
+          喜欢这个相册吗？
+        </p>
+        <LikeButton client:load target="gallery" galleryId={gallery.id} initialCount={galleryLike?.count || 0} />
+      </div>
+
+      <div class="flex items-center gap-3 mb-8">
+        <h2 class="text-lg font-bold tracking-[-0.01em]">评论</h2>
+        <span class="text-xs font-semibold px-2 py-0.5 rounded-full bg-[var(--color-border)] text-[var(--color-text-subtle)]">
+          {galleryCommentRows.length}
+        </span>
+      </div>
+
+      {
+        rootComments.length === 0 ? (
+          <p class="text-center py-10 text-sm text-[var(--color-text-subtle)] font-serif">
+            暂无评论，成为第一个留言的人
+          </p>
+        ) : (
+          <div class="space-y-3 mb-10">
+            {rootComments.map((comment) => {
+              const replies = repliesOf(comment.id);
+              return (
+                <div class="bg-[var(--color-surface)] border border-[var(--color-border)] rounded-xl p-4 hover:border-[var(--color-border-hover)] transition-colors duration-200">
+                  <div class="flex items-center gap-2.5 mb-2.5">
+                    <div class="w-7 h-7 rounded-full bg-[var(--color-accent-muted)] text-[var(--color-accent)] flex items-center justify-center text-xs font-bold">
+                      {comment.author.charAt(0)}
+                    </div>
+                    <span class="font-semibold text-sm text-[var(--color-text)]">{comment.author}</span>
+                    <span class="text-xs text-[var(--color-text-subtle)]">
+                      {new Date(comment.createdAt).toLocaleDateString("zh-CN", {
+                        month: "short",
+                        day: "numeric",
+                      })}
+                    </span>
+                    <button
+                      type="button"
+                      data-reply-to={comment.id}
+                      data-reply-author={comment.author}
+                      class="ml-auto text-xs text-[var(--color-text-subtle)] hover:text-[var(--color-accent)] transition-colors"
+                    >
+                      回复
+                    </button>
+                  </div>
+                  <p class="text-sm text-[var(--color-text-muted)] leading-relaxed pl-9">{comment.content}</p>
+
+                  {replies.length > 0 && (
+                    <div class="mt-3 pl-9 space-y-3">
+                      {replies.map((reply) => {
+                        const target = authorOf(reply.parentId);
+                        return (
+                          <div class="bg-[var(--color-bg)] rounded-lg p-3">
+                            <div class="flex items-center gap-2 mb-1.5">
+                              <span class="font-semibold text-xs text-[var(--color-text)]">{reply.author}</span>
+                              {target && (
+                                <span class="text-[11px] text-[var(--color-text-subtle)]">
+                                  回复 @{target}
+                                </span>
+                              )}
+                              <span class="text-[11px] text-[var(--color-text-subtle)]">
+                                {new Date(reply.createdAt).toLocaleDateString("zh-CN", {
+                                  month: "short",
+                                  day: "numeric",
+                                })}
+                              </span>
+                            </div>
+                            <p class="text-sm text-[var(--color-text-muted)] leading-relaxed">{reply.content}</p>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        )
+      }
+
+      <!-- 评论表单 -->
+      <form method="POST" action="/api/comment" class="space-y-3">
+        <input type="hidden" name="galleryId" value={gallery.id} />
+        <input type="hidden" name="parentId" value="" />
+        <div
+          id="reply-notice"
+          class="hidden items-center gap-2 text-xs text-[var(--color-text-muted)] bg-[var(--color-bg)] border border-[var(--color-border)] rounded-lg px-3 py-2"
+        >
+          <span>
+            回复 <span id="reply-notice-author" class="font-semibold text-[var(--color-accent)]" />
+          </span>
+          <button type="button" id="reply-cancel" class="text-[var(--color-text-subtle)] hover:text-[var(--color-text)] transition-colors">
+            取消
+          </button>
+        </div>
+        <div class="flex flex-col sm:flex-row gap-3">
+          <input
+            type="text"
+            name="author"
+            id="comment-author"
+            placeholder="昵称"
+            maxlength="20"
+            required
+            class="sm:w-28 px-3.5 py-2.5 text-sm rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] text-[var(--color-text)] placeholder:text-[var(--color-text-subtle)]/50 focus:outline-none focus:border-[var(--color-accent)] transition-all duration-300"
+          />
+          <div class="flex-1 flex gap-2.5">
+            <input
+              type="text"
+              name="content"
+              id="comment-content"
+              placeholder="写下你的想法..."
+              maxlength="500"
+              required
+              class="flex-1 px-3.5 py-2.5 text-sm rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] text-[var(--color-text)] placeholder:text-[var(--color-text-subtle)]/50 focus:outline-none focus:border-[var(--color-accent)] transition-all duration-300"
+            />
+            <div class="relative">
+              <button
+                type="button"
+                id="emoji-toggle"
+                aria-label="插入表情"
+                title="插入表情"
+                class="w-10 h-full flex items-center justify-center rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] text-[var(--color-text-subtle)] hover:text-[var(--color-accent)] hover:border-[var(--color-accent)] transition-all duration-300"
+              >
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24" aria-hidden="true">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M15.182 15.182a4.5 4.5 0 0 1-6.364 0M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0ZM9.75 9.75c0 .414-.168.75-.375.75S9 10.164 9 9.75 9.168 9 9.375 9s.375.336.375.75Zm-.375 3.75c0 .414.168.75.375.75s.375-.336.375-.75-.168-.75-.375-.75-.375.336-.375.75Zm6.75-3.75c0 .414.168.75.375.75s.375-.336.375-.75-.168-.75-.375-.75-.375.336-.375.75Z" />
+                </svg>
+              </button>
+              <div
+                id="emoji-pop"
+                class="hidden absolute bottom-full right-0 mb-2 w-[248px] p-2 rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] shadow-lg z-10 grid grid-cols-8 gap-0.5"
+              >
+                {
+                  [
+                    "😀", "😄", "😁", "😆", "😊", "😍", "🤩", "😎",
+                    "🤔", "😅", "😮", "😭", "😢", "😡", "🤯", "😴",
+                    "🥳", "🤗", "🙄", "😤", "🫡", "🤝", "👍", "👎",
+                    "👏", "🙏", "💪", "❤️", "🔥", "✨", "🎉", "🚀",
+                  ].map((e) => (
+                    <button type="button" data-emoji={e} class="w-7 h-7 rounded-md text-base leading-none hover:bg-[var(--color-bg)] transition-colors">
+                      {e}
+                    </button>
+                  ))
+                }
+              </div>
+            </div>
+            <button
+              type="submit"
+              class="px-5 py-2.5 text-sm font-semibold rounded-xl bg-[var(--color-accent)] text-white hover:bg-[var(--color-accent-hover)] transition-colors duration-200 active:scale-[0.97]"
+            >
+              发送
+            </button>
+          </div>
+        </div>
+      </form>
+
+      <script data-astro-rerun>
+        // 评论表单增强：昵称记忆（localStorage）+ 回复定位与取消 + 表情选择器（与文章页同款）
+        (() => {
+          const form = document.querySelector('form[action="/api/comment"]');
+          if (!form) return;
+          const authorInput = form.querySelector('input[name="author"]');
+          const parentInput = form.querySelector('input[name="parentId"]');
+          const notice = form.querySelector("#reply-notice");
+          const noticeAuthor = form.querySelector("#reply-notice-author");
+          const cancelBtn = form.querySelector("#reply-cancel");
+
+          const clearReply = () => {
+            if (parentInput) parentInput.value = "";
+            notice?.classList.add("hidden");
+            notice?.classList.remove("flex");
+          };
+
+          try {
+            const saved = localStorage.getItem("comment-author");
+            if (saved && authorInput && !authorInput.value) authorInput.value = saved;
+          } catch {}
+
+          form.addEventListener("submit", () => {
+            try {
+              if (authorInput) localStorage.setItem("comment-author", authorInput.value);
+            } catch {}
+          });
+
+          for (const btn of document.querySelectorAll("[data-reply-to]")) {
+            btn.addEventListener("click", () => {
+              if (!parentInput || !notice) return;
+              parentInput.value = btn.dataset.replyTo ?? "";
+              if (noticeAuthor) noticeAuthor.textContent = `@${btn.dataset.replyAuthor ?? ""}`;
+              notice.classList.remove("hidden");
+              notice.classList.add("flex");
+              form.scrollIntoView({ behavior: "smooth", block: "center" });
+              form.querySelector('input[name="content"]')?.focus();
+            });
+          }
+          cancelBtn?.addEventListener("click", clearReply);
+
+          // 表情选择器：点击插入到光标处，点外部 / Esc / 选中后收起
+          const emojiToggle = form.querySelector("#emoji-toggle");
+          const emojiPop = form.querySelector("#emoji-pop");
+          const contentInput = form.querySelector('input[name="content"]');
+          const closeEmoji = () => emojiPop?.classList.add("hidden");
+          if (emojiToggle && emojiPop && contentInput) {
+            emojiToggle.addEventListener("click", (e) => {
+              e.stopPropagation();
+              emojiPop.classList.toggle("hidden");
+              if (!emojiPop.classList.contains("hidden")) contentInput.focus();
+            });
+            emojiPop.addEventListener("click", (e) => {
+              // data-astro-rerun 脚本按 is:inline 原样内联，不经过 TS 编译——只能写纯 JS
+              const btn = e.target instanceof Element ? e.target.closest("[data-emoji]") : null;
+              if (!btn) return;
+              const emoji = btn.getAttribute("data-emoji") ?? "";
+              const s = contentInput.selectionStart ?? contentInput.value.length;
+              const en = contentInput.selectionEnd ?? s;
+              contentInput.value = contentInput.value.slice(0, s) + emoji + contentInput.value.slice(en);
+              contentInput.selectionStart = contentInput.selectionEnd = s + emoji.length;
+              contentInput.focus();
+              closeEmoji();
+            });
+            document.addEventListener("click", (e) => {
+              if (!emojiPop.contains(e.target) && !emojiToggle.contains(e.target)) closeEmoji();
+            });
+            document.addEventListener("keydown", (e) => {
+              if (e.key === "Escape") closeEmoji();
+            });
+          }
+        })();
+      </script>
+  </article>
+
+<script data-astro-rerun>
+  // 相册浏览：左右切换 + 键盘 + 触屏滑动 + 相邻预加载（data-astro-rerun 不做 TS 编译——只写纯 JS）
+  (() => {
+    const root = document.getElementById("viewer-root");
+    if (!root) return;
+    const photos = JSON.parse(root.dataset.photos || "[]");
+    if (photos.length === 0) return;
+
+    const img = document.getElementById("viewer-img");
+    const counter = document.getElementById("viewer-counter");
+    const btnPrev = document.getElementById("btn-prev");
+    const btnNext = document.getElementById("btn-next");
+    const thumbs = Array.from(document.querySelectorAll("[data-thumb]"));
+    let idx = 0;
+
+    const render = () => {
+      if (img) {
+        img.src = photos[idx];
+        img.alt = "第 " + (idx + 1) + " 张";
+      }
+      if (counter) counter.textContent = (idx + 1) + " / " + photos.length;
+      thumbs.forEach((t, i) => {
+        t.classList.toggle("border-[var(--color-accent)]", i === idx);
+        t.classList.toggle("opacity-50", i !== idx && photos.length > 1);
+      });
+      const active = thumbs[idx];
+      if (active && active.scrollIntoView) active.scrollIntoView({ block: "nearest", inline: "nearest", behavior: "smooth" });
+      // 相邻预加载
+      [idx - 1, idx + 1].forEach((n) => {
+        if (n >= 0 && n < photos.length) { const p = new Image(); p.src = photos[n]; }
+      });
+    };
+    const go = (d) => {
+      if (photos.length < 2) return;
+      idx = (idx + d + photos.length) % photos.length;
+      render();
+    };
+
+    if (btnPrev) btnPrev.addEventListener("click", () => go(-1));
+    if (btnNext) btnNext.addEventListener("click", () => go(1));
+    thumbs.forEach((t, i) => t.addEventListener("click", () => { idx = i; render(); }));
+    document.addEventListener("keydown", (e) => {
+      if (e.key === "ArrowLeft") go(-1);
+      if (e.key === "ArrowRight") go(1);
+    });
+    // 触屏左右滑动
+    let touchX = null;
+    root.addEventListener("touchstart", (e) => { touchX = e.touches[0].clientX; }, { passive: true });
+    root.addEventListener("touchend", (e) => {
+      if (touchX === null) return;
+      const dx = e.changedTouches[0].clientX - touchX;
+      if (Math.abs(dx) > 40) go(dx < 0 ? 1 : -1);
+      touchX = null;
+    }, { passive: true });
+
+    render();
+  })();
+</script>

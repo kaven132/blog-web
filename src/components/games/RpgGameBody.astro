@@ -4,10 +4,21 @@
  * 存档：RPG Maker MV 浏览器模式写 localStorage（键带游戏专属前缀，见 rpg-games.ts 说明），
  * 同步方式 = 把前缀下所有键打包成一个 JSON 上云，与 Flash 的单 sol 同库（game_saves）。
  */
+import { statSync } from "node:fs";
+
 interface Props {
   game: import("../../lib/rpg-games").RpgGame;
 }
 const { game } = Astro.props;
+
+// 入口文件版本号（mtime）：入口端点是长缓存，改游戏入口文件后靠版本参数破缓存
+const entryV = (() => {
+  try {
+    return String(Math.floor(statSync(`../blog2-gamedata/games/${game.id}/www/${game.entry}`).mtimeMs));
+  } catch {
+    return "0";
+  }
+})();
 ---
 
   <article class="py-12 md:py-16 max-w-4xl mx-auto">
@@ -35,13 +46,25 @@ const { game } = Astro.props;
       </label>
     </div>
 
+    <!-- 播放控制：音量 / 双全屏 -->
+    <div class="mb-4 flex items-center gap-3 flex-wrap text-sm">
+      <span class="flex items-center gap-2 text-[var(--color-text-muted)]">
+        <span aria-hidden="true">🔊</span>
+        <input id="vol-slider" type="range" min="0" max="100" step="1" value="100" class="w-32 accent-[var(--color-accent)]" aria-label="游戏音量" />
+      </span>
+      <span class="flex-1"></span>
+      <button type="button" id="btn-webfs" class="px-3 py-1.5 text-xs font-semibold rounded-lg border border-[var(--color-border)] text-[var(--color-text-muted)] hover:text-[var(--color-accent)] hover:border-[var(--color-accent)]/40 transition-colors">网页全屏</button>
+      <button type="button" id="btn-osfs" class="px-3 py-1.5 text-xs font-semibold rounded-lg border border-[var(--color-border)] text-[var(--color-text-muted)] hover:text-[var(--color-accent)] hover:border-[var(--color-accent)]/40 transition-colors">屏幕全屏</button>
+    </div>
+
     <!-- 游戏舞台：同源 iframe（RPG Maker 资源 XHR 与 localStorage 都依赖同源） -->
-    <div class="rounded-2xl overflow-hidden border border-[var(--color-border)] bg-black animate-[slide-up_0.5s_ease-out_both] [animation-delay:100ms]">
+    <div id="game-wrap" class="rounded-2xl overflow-hidden border border-[var(--color-border)] bg-black animate-[slide-up_0.5s_ease-out_both] [animation-delay:100ms]">
       <iframe
         id="game-frame"
-        src={`/games/${game.id}/web/${game.entry}`}
+        src={`/games/${game.id}/web/${game.entry}?v=${entryV}`}
         class="block w-full aspect-[816/624] bg-black"
-        allow="autoplay"
+        allow="autoplay; fullscreen"
+        allowfullscreen
         title={game.title}
       ></iframe>
     </div>
@@ -51,6 +74,15 @@ const { game } = Astro.props;
       {game.footer}，图片与音频由引擎按需流式加载。
     </p>
   </article>
+
+<style is:global>
+  /* 网页全屏：舞台脱离文档流铺满视口，游戏内缩放样式会自动撑满 */
+  #game-wrap.web-full { position: fixed; inset: 0; z-index: 80; background: #000; border: none; border-radius: 0; }
+  #game-wrap.web-full > iframe { width: 100% !important; height: 100% !important; aspect-ratio: auto !important; }
+  body.web-full-lock { overflow: hidden; }
+  /* 屏幕全屏：iframe 铺满全屏，游戏内缩放样式自动适配 */
+  #game-frame:fullscreen { width: 100vw; height: 100vh; background: #000; }
+</style>
 
 <script data-astro-rerun>
   // RPG Maker 存档云同步（页面转场后需重执行，data-astro-rerun 不做 TS 编译——只写纯 JS）
@@ -151,6 +183,63 @@ const { game } = Astro.props;
     };
 
     boot();
+
+    // ── 播放控制：音量 / 网页全屏 / 屏幕全屏 ──
+    const VOL_KEY = "game-volume";
+    const wrapEl = document.getElementById("game-wrap");
+    const frameEl = document.getElementById("game-frame");
+    const volSlider = document.getElementById("vol-slider");
+    const btnWebFs = document.getElementById("btn-webfs");
+    const btnOsFs = document.getElementById("btn-osfs");
+    const getVolume = () => {
+      const v = Number(localStorage.getItem(VOL_KEY));
+      return Number.isFinite(v) && v >= 0 && v <= 100 ? v : 100;
+    };
+    // RPG Maker MV 音量标的是 0-100：BGM/BGS/ME/SE 四通道一并设置
+    const applyVolume = () => {
+      const w = frameEl && frameEl.contentWindow;
+      if (!w || !w.AudioManager) return false;
+      try {
+        const v = getVolume();
+        w.AudioManager.bgmVolume = v;
+        w.AudioManager.bgsVolume = v;
+        w.AudioManager.meVolume = v;
+        w.AudioManager.seVolume = v;
+        return true;
+      } catch { return false; }
+    };
+    volSlider.value = getVolume();
+    volSlider.addEventListener("input", () => {
+      localStorage.setItem(VOL_KEY, volSlider.value);
+      applyVolume();
+    });
+    // 游戏 iframe 异步启动，AudioManager 就绪前重试应用
+    let volTries = 0;
+    const volTimer = setInterval(() => {
+      if (applyVolume() || ++volTries >= 15) clearInterval(volTimer);
+    }, 1000);
+
+    const isWebFull = () => wrapEl.classList.contains("web-full");
+    const setWebFull = (on) => {
+      wrapEl.classList.toggle("web-full", on);
+      document.body.classList.toggle("web-full-lock", on);
+      btnWebFs.textContent = on ? "退出网页全屏" : "网页全屏";
+    };
+    btnWebFs.addEventListener("click", () => setWebFull(!isWebFull()));
+    document.addEventListener("keydown", (e) => {
+      if (e.key === "Escape" && isWebFull() && !document.fullscreenElement) setWebFull(false);
+    });
+    btnOsFs.addEventListener("click", () => {
+      try {
+        if (document.fullscreenElement) { document.exitFullscreen(); return; }
+        const req = frameEl.requestFullscreen && frameEl.requestFullscreen();
+        if (req && req.catch) req.catch(() => setStatus("浏览器拒绝了全屏请求"));
+      } catch { setStatus("当前环境不支持屏幕全屏"); }
+    });
+    document.addEventListener("fullscreenchange", () => {
+      btnOsFs.textContent = document.fullscreenElement ? "退出屏幕全屏" : "屏幕全屏";
+    });
+
     setInterval(uploadIfChanged, 60000);
     window.addEventListener("beforeunload", () => { uploadIfChanged(); });
     document.addEventListener("visibilitychange", () => { if (document.visibilityState === "hidden") uploadIfChanged(); });

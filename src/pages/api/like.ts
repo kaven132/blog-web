@@ -1,11 +1,43 @@
 import type { APIRoute } from "astro";
 import { db } from "../../db";
-import { likes, posts } from "../../db/schema";
+import { likes, posts, galleries, galleryLikes } from "../../db/schema";
 import { eq, sql } from "drizzle-orm";
 
 export const POST: APIRoute = async ({ request }) => {
   try {
-    const { postId } = await request.json();
+    const body = await request.json();
+    const postId = typeof body?.postId === "number" ? body.postId : undefined;
+    const galleryId = typeof body?.galleryId === "number" ? body.galleryId : undefined;
+
+    // 相册点赞：与文章同款原子累加（gallery_likes.gallery_id 主键天然去重）
+    if (galleryId !== undefined) {
+      if (!Number.isInteger(galleryId) || galleryId <= 0) {
+        return new Response(JSON.stringify({ error: "无效的请求" }), {
+          status: 400,
+          headers: { "Content-Type": "application/json" },
+        });
+      }
+      const exists = db.select({ id: galleries.id }).from(galleries).where(eq(galleries.id, galleryId)).get();
+      if (!exists) {
+        return new Response(JSON.stringify({ error: "相册不存在" }), {
+          status: 404,
+          headers: { "Content-Type": "application/json" },
+        });
+      }
+      const rows = db
+        .insert(galleryLikes)
+        .values({ galleryId, count: 1 })
+        .onConflictDoUpdate({
+          target: galleryLikes.galleryId,
+          set: { count: sql`${galleryLikes.count} + 1` },
+        })
+        .returning()
+        .all();
+      return new Response(JSON.stringify({ count: rows[0]?.count ?? 1 }), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      });
+    }
 
     if (!postId || typeof postId !== "number" || !Number.isInteger(postId)) {
       return new Response(JSON.stringify({ error: "无效的请求" }), {

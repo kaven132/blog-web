@@ -1,25 +1,30 @@
 import { useState, useCallback, useEffect } from "react";
 
 interface LikeButtonProps {
-  postId: number;
+  /** 文章点赞（与 galleryId 二选一） */
+  postId?: number;
+  /** 相册点赞（与 postId 二选一） */
+  galleryId?: number;
   initialCount: number;
 }
 
-export default function LikeButton({ postId, initialCount }: LikeButtonProps) {
+export default function LikeButton({ postId, galleryId, initialCount }: LikeButtonProps) {
   const [count, setCount] = useState(initialCount);
   const [liked, setLiked] = useState(false);
   const [loading, setLoading] = useState(false);
   const [animating, setAnimating] = useState(false);
 
+  const storageKey = galleryId !== undefined ? `liked:gallery:${galleryId}` : `liked:${postId}`;
+
   // 已点赞状态落到 localStorage：刷新/再次访问不会「已点赞」变回未点，
   // 防止无意识重复点赞把计数刷虚高（服务端本身没有按用户去重）
   useEffect(() => {
     try {
-      if (localStorage.getItem(`liked:${postId}`) === "1") setLiked(true);
+      if (localStorage.getItem(storageKey) === "1") setLiked(true);
     } catch {
       // 隐私模式等拿不到 localStorage 就退回无记忆行为
     }
-  }, [postId]);
+  }, [storageKey]);
 
   const handleLike = useCallback(async () => {
     if (liked || loading) return;
@@ -30,14 +35,14 @@ export default function LikeButton({ postId, initialCount }: LikeButtonProps) {
       const res = await fetch("/api/like", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ postId }),
+        body: JSON.stringify(galleryId !== undefined ? { galleryId } : { postId }),
       });
       if (res.ok) {
         const data = await res.json();
         setCount(data.count);
         setLiked(true);
         try {
-          localStorage.setItem(`liked:${postId}`, "1");
+          localStorage.setItem(storageKey, "1");
         } catch {
           // ignore
         }
@@ -47,7 +52,7 @@ export default function LikeButton({ postId, initialCount }: LikeButtonProps) {
     } finally {
       setLoading(false);
     }
-  }, [postId, liked, loading]);
+  }, [galleryId, postId, liked, loading, storageKey]);
 
   return (
     <button

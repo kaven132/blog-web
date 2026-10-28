@@ -34,6 +34,17 @@ const { game, ruffleVersion } = Astro.props;
       </label>
     </div>
 
+    <!-- 播放控制：音量 / 双全屏 -->
+    <div class="mb-4 flex items-center gap-3 flex-wrap text-sm">
+      <span class="flex items-center gap-2 text-[var(--color-text-muted)]">
+        <span aria-hidden="true">🔊</span>
+        <input id="vol-slider" type="range" min="0" max="100" step="1" value="100" class="w-32 accent-[var(--color-accent)]" aria-label="游戏音量" />
+      </span>
+      <span class="flex-1"></span>
+      <button type="button" id="btn-webfs" class="px-3 py-1.5 text-xs font-semibold rounded-lg border border-[var(--color-border)] text-[var(--color-text-muted)] hover:text-[var(--color-accent)] hover:border-[var(--color-accent)]/40 transition-colors">网页全屏</button>
+      <button type="button" id="btn-osfs" class="px-3 py-1.5 text-xs font-semibold rounded-lg border border-[var(--color-border)] text-[var(--color-text-muted)] hover:text-[var(--color-accent)] hover:border-[var(--color-accent)]/40 transition-colors">屏幕全屏</button>
+    </div>
+
     <!-- Ruffle 舞台（player 由脚本动态创建，避免自定义元素注册时序问题） -->
     <div id="stage" class="rounded-2xl overflow-hidden border border-[var(--color-border)] bg-black animate-[slide-up_0.5s_ease-out_both] [animation-delay:100ms]"></div>
 
@@ -42,6 +53,16 @@ const { game, ruffleVersion } = Astro.props;
       {game.footer}，剧情场景按需加载。
     </p>
   </article>
+
+<style is:global>
+  /* 网页全屏：舞台脱离文档流铺满视口，播放器保持 4:3 居中 */
+  #stage.web-full { position: fixed; inset: 0; z-index: 80; display: flex; align-items: center; justify-content: center; background: #000; border: none; border-radius: 0; }
+  #stage.web-full > ruffle-player { width: auto !important; height: 100% !important; aspect-ratio: 4 / 3 !important; }
+  body.web-full-lock { overflow: hidden; }
+  /* 屏幕全屏：Fullscreen API 元素铺满，播放器同样 4:3 居中 */
+  #stage:fullscreen { display: flex; align-items: center; justify-content: center; background: #000; }
+  #stage:fullscreen > ruffle-player { width: auto !important; height: 100% !important; aspect-ratio: 4 / 3 !important; }
+</style>
 
 <script src={`/ruffle/ruffle.js?v=${ruffleVersion}`} data-astro-rerun></script>
 <script data-astro-rerun>
@@ -158,6 +179,7 @@ const { game, ruffleVersion } = Astro.props;
         document.getElementById("stage").appendChild(player);
         // base 指向 SWF 目录：游戏内 sub/xxx.swf 相对路径按 SWF 而非页面 URL 解析
         await player.load({ url: "/games/" + GAME_ID + "/swf/main.swf", base: "/games/" + GAME_ID + "/swf/", allowScriptAccess: false });
+        applyVolume();
         setStatus((statusEl.textContent || "").replace("存档同步：", "") + " · 游戏已就绪");
       } catch (e) {
         setStatus(e && e.message === "runtime-timeout" ? "模拟器加载超时 —— 请检查网络后刷新重试" : "游戏加载失败，请刷新重试");
@@ -181,6 +203,64 @@ const { game, ruffleVersion } = Astro.props;
     };
 
     boot();
+
+    // ── 崩溃自动恢复：Ruffle nightly 偶发核心递归崩溃（Maximum call stack size exceeded，
+    // 结局画廊回放/特定场景触发，实例随后死锁白屏）。捕获后自动刷新恢复；
+    // sessionStorage 防循环刷新（一次会话只自动恢复一次，再崩则转手动提示）。──
+    window.addEventListener("error", (e) => {
+      const msg = String((e && e.message) || "");
+      if (!/Maximum call stack size exceeded/i.test(msg)) return;
+      if (sessionStorage.getItem("ruffle-crash-reloaded")) {
+        setStatus("模拟器遇到已知缺陷崩溃了 —— 请手动刷新页面恢复");
+        return;
+      }
+      sessionStorage.setItem("ruffle-crash-reloaded", "1");
+      setStatus("模拟器遇到已知缺陷，正在自动恢复…");
+      setTimeout(() => location.reload(), 1000);
+    });
+
+    // ── 播放控制：音量 / 网页全屏 / 屏幕全屏 ──
+    const VOL_KEY = "game-volume";
+    const stageEl = document.getElementById("stage");
+    const volSlider = document.getElementById("vol-slider");
+    const btnWebFs = document.getElementById("btn-webfs");
+    const btnOsFs = document.getElementById("btn-osfs");
+    const getVolume = () => {
+      const v = Number(localStorage.getItem(VOL_KEY));
+      return Number.isFinite(v) && v >= 0 && v <= 100 ? v : 100;
+    };
+    const applyVolume = () => {
+      const player = stageEl && stageEl.querySelector("ruffle-player");
+      if (!player) return;
+      try { player.volume = getVolume() / 100; } catch { /* API 不可用时静默 */ }
+    };
+    volSlider.value = getVolume();
+    volSlider.addEventListener("input", () => {
+      localStorage.setItem(VOL_KEY, volSlider.value);
+      applyVolume();
+    });
+
+    const isWebFull = () => stageEl.classList.contains("web-full");
+    const setWebFull = (on) => {
+      stageEl.classList.toggle("web-full", on);
+      document.body.classList.toggle("web-full-lock", on);
+      btnWebFs.textContent = on ? "退出网页全屏" : "网页全屏";
+    };
+    btnWebFs.addEventListener("click", () => setWebFull(!isWebFull()));
+    document.addEventListener("keydown", (e) => {
+      if (e.key === "Escape" && isWebFull() && !document.fullscreenElement) setWebFull(false);
+    });
+    btnOsFs.addEventListener("click", () => {
+      try {
+        if (document.fullscreenElement) { document.exitFullscreen(); return; }
+        const req = stageEl.requestFullscreen && stageEl.requestFullscreen();
+        if (req && req.catch) req.catch(() => setStatus("浏览器拒绝了全屏请求"));
+      } catch { setStatus("当前环境不支持屏幕全屏"); }
+    });
+    document.addEventListener("fullscreenchange", () => {
+      btnOsFs.textContent = document.fullscreenElement ? "退出屏幕全屏" : "屏幕全屏";
+    });
+
     setInterval(uploadIfChanged, 60000);
     window.addEventListener("beforeunload", () => { uploadIfChanged(); });
     document.addEventListener("visibilitychange", () => { if (document.visibilityState === "hidden") uploadIfChanged(); });

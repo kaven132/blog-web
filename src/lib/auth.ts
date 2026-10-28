@@ -1,7 +1,19 @@
 import { createHmac, timingSafeEqual, scryptSync, randomBytes } from "node:crypto";
+import { readFileSync } from "node:fs";
 import { db } from "../db";
 import { credentials } from "../db/schema";
 import { eq } from "drizzle-orm";
+
+// astro preview 与生产 node 入口都不会把 .env 注入 process.env，这里显式加载一次
+// （仅补齐 process.env 里缺失的键，外部注入的环境变量优先；.env 已被 .gitignore 排除）
+try {
+  for (const line of readFileSync(".env", "utf-8").split("\n")) {
+    const m = line.match(/^\s*([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(.+?)\s*$/);
+    if (m && process.env[m[1]] === undefined) process.env[m[1]] = m[2].replace(/^["']|["']$/g, "");
+  }
+} catch {
+  /* 无 .env 文件时使用外部注入的环境变量 */
+}
 
 export const AUTH_COOKIE = "auth";
 

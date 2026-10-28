@@ -75,3 +75,48 @@ export const gameSaves = sqliteTable("game_saves", {
     .default(sql`(CURRENT_TIMESTAMP)`),
 });
 
+/** 相册：分类型存放照片的相册，封面取 photos 中的第一张 */
+export const galleries = sqliteTable("galleries", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  title: text("title").notNull(),
+  category: text("category").notNull().default("other"), // 分类标识，见 lib/gallery-categories
+  description: text("description").notNull().default(""),
+  views: integer("views").notNull().default(0), // 浏览量：浏览页每次渲染 +1
+  sort: integer("sort").notNull().default(0),
+  createdAt: text("created_at")
+    .notNull()
+    .default(sql`(CURRENT_TIMESTAMP)`),
+});
+
+/** 相册点赞：每相册一行，原子累加（与文章 likes 同款并发方案） */
+export const galleryLikes = sqliteTable("gallery_likes", {
+  galleryId: integer("gallery_id")
+    .primaryKey()
+    .references(() => galleries.id, { onDelete: "cascade" }),
+  count: integer("count").notNull().default(0),
+});
+
+/** 相册评论：盖楼回复（只做一层），随相册级联删除 */
+export const galleryComments = sqliteTable("gallery_comments", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  galleryId: integer("gallery_id")
+    .notNull()
+    .references(() => galleries.id, { onDelete: "cascade" }),
+  parentId: integer("parent_id"), // 回复目标（仅一层：必须是顶层评论）
+  author: text("author").notNull().default("匿名"),
+  content: text("content").notNull(),
+  createdAt: text("created_at")
+    .notNull()
+    .default(sql`(CURRENT_TIMESTAMP)`),
+});
+
+/** 相册内的照片：路径指向 /uploads/ 下的图片，sort 顺序即浏览顺序 */
+export const galleryPhotos = sqliteTable("gallery_photos", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  galleryId: integer("gallery_id")
+    .notNull()
+    .references(() => galleries.id, { onDelete: "cascade" }),
+  path: text("path").notNull(),
+  sort: integer("sort").notNull().default(0),
+});
+

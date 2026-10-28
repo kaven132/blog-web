@@ -60,7 +60,8 @@ export default function AppShell({ children, authed, userName, userAvatar }: App
               </button>
             </div>
             <ProfileCard authed={authed} />
-            <div className="p-3 pb-4"><NewsPanel /></div>
+            {/* pb 需大于底部标签栏高度（含安全区），否则资讯栏底部的来源切换会被标签栏盖住滚不出来 */}
+            <div className="p-3 pb-24"><NewsPanel /></div>
           </div>
         </div>
       )}

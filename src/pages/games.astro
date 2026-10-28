@@ -14,10 +14,10 @@ import { statSync } from "node:fs";
 
 const authed = isAuthed(Astro.cookies.get(AUTH_COOKIE)?.value);
 
-// 预览图版本号（取 mtime）：SWF 端点是 immutable 永久缓存，换图后靠版本参数破缓存
+// 预览图版本号（取 mtime）：预览端点是 immutable 永久缓存，换图后靠版本参数破缓存
 const previewV = (id: string) => {
   try {
-    return String(Math.floor(statSync(`./data/games/${id}/preview.png`).mtimeMs));
+    return String(Math.floor(statSync(`../blog2-gamedata/games/${id}/preview.png`).mtimeMs));
   } catch {
     return "0";
   }

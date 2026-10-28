@@ -5,6 +5,7 @@ import ConfirmDialog from "./ConfirmDialog";
 const navLinks = [
   { href: "/", label: "首页" },
   { href: "/posts", label: "文章" },
+  { href: "/gallery", label: "相册" },
   { href: "/travel", label: "旅行地图" },
   { href: "/games", label: "小游戏" },
   { href: "/about", label: "关于" },
@@ -410,7 +411,7 @@ export default function TopNav({ onToggleSidebar, sidebarOpen, authed, userName 
             {loggedIn ? (
               <div className="flex items-center gap-2">
                 <a href="/admin" className="whitespace-nowrap px-3 py-1.5 text-sm font-medium rounded-lg bg-[var(--color-accent)] text-white hover:bg-[var(--color-accent-hover)] transition-colors">
-                  文章管理
+                  内容管理
                 </a>
                 <div className="relative" ref={dropdownRef}>
                   {/* 头像按钮：点击弹下拉（账户设置 / 退出登录）；有头像显示头像，无则回退首字母 */}

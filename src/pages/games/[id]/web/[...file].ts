@@ -68,7 +68,8 @@ export const GET: APIRoute = async ({ params, cookies }) => {
     headers: {
       "Content-Type": mime,
       "Content-Length": String(size),
-      "Cache-Control": "public, max-age=31536000, immutable",
+      // 入口 HTML 用 no-cache（改动即刻生效），其余资源 immutable 长缓存
+      "Cache-Control": rel === game.entry ? "no-cache" : "public, max-age=31536000, immutable",
     },
   });
 };

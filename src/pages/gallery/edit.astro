@@ -1,0 +1,226 @@
+---
+import Layout from "../../layouts/Layout.astro";
+import { db } from "../../db";
+import { galleries, galleryPhotos } from "../../db/schema";
+import { asc, eq } from "drizzle-orm";
+import { AUTH_COOKIE, isAuthed } from "../../lib/auth";
+import { parseCategoryPath, GALLERY_CATEGORY_SUGGESTIONS } from "../../lib/gallery-categories";
+
+export const prerender = false;
+
+if (!isAuthed(Astro.cookies.get(AUTH_COOKIE)?.value)) {
+  return Astro.redirect("/login?next=" + encodeURIComponent(Astro.url.pathname + Astro.url.search));
+}
+
+// ?id=N 为编辑模式；缺省为新建模式
+const id = Number(Astro.url.searchParams.get("id"));
+const isEdit = Number.isInteger(id) && id > 0;
+
+let gallery: { id: number; title: string; category: string; description: string } | undefined;
+let photos: string[] = [];
+if (isEdit) {
+  gallery = db.select().from(galleries).where(eq(galleries.id, id)).get();
+  if (!gallery) return Astro.redirect("/admin?tab=galleries");
+  photos = db
+    .select({ path: galleryPhotos.path })
+    .from(galleryPhotos)
+    .where(eq(galleryPhotos.galleryId, gallery.id))
+    .orderBy(asc(galleryPhotos.sort), asc(galleryPhotos.id))
+    .all()
+    .map((p) => p.path);
+}
+const catPath = parseCategoryPath(gallery?.category);
+const cat1 = catPath[0] ?? "";
+const cat2 = catPath[1] ?? "";
+
+// 既有分类联想（全部相册的一级/二级去重）+ 默认建议合并
+const allCats = db.select({ category: galleries.category }).from(galleries).all();
+const l1Set = new Set(GALLERY_CATEGORY_SUGGESTIONS);
+const l2Set = new Set();
+for (const row of allCats) {
+  const p = parseCategoryPath(row.category);
+  if (p[0]) l1Set.add(p[0]);
+  if (p[1]) l2Set.add(p[1]);
+}
+const gameId = isEdit ? gallery!.id : 0;
+---
+
+<Layout title={isEdit ? `编辑相册：${gallery!.title}` : "新建相册"}>
+  <article class="py-10 max-w-3xl mx-auto">
+    <header class="mb-8">
+      <p class="text-xs font-semibold tracking-[0.15em] uppercase text-[var(--color-text-subtle)] mb-3">Admin · Gallery</p>
+      <h1 class="text-3xl font-bold tracking-[-0.02em] mb-3">{isEdit ? "编辑相册" : "新建相册"}</h1>
+      <a href="/admin?tab=galleries" class="inline-flex items-center gap-1 text-sm text-[var(--color-text-muted)] hover:text-[var(--color-accent)] transition-colors">
+        <span aria-hidden="true">←</span> 返回内容管理
+      </a>
+    </header>
+
+    <div class="rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] p-6 space-y-5">
+      <div>
+        <label for="gal-title" class="block text-sm font-medium text-[var(--color-text)] mb-1.5">相册标题 <span class="text-red-400" aria-hidden="true">*</span></label>
+        <input id="gal-title" type="text" maxlength="60" placeholder="相册标题（必填）" value={isEdit ? gallery!.title : ""}
+          class="w-full px-3 py-2 rounded-lg border border-[var(--color-border)] bg-[var(--color-bg)] text-sm text-[var(--color-text)] outline-none focus:border-[var(--color-accent)]" />
+      </div>
+      <div class="grid gap-3 sm:grid-cols-2">
+        <div>
+          <label for="gal-cat1" class="block text-sm font-medium text-[var(--color-text)] mb-1.5">一级分类 <span class="text-red-400" aria-hidden="true">*</span></label>
+          <input id="gal-cat1" type="text" maxlength="20" list="gal-cat1-list" placeholder="如：旅行 / 日常 / 其他" value={cat1} required
+            class="w-full px-3 py-2 rounded-lg border border-[var(--color-border)] bg-[var(--color-bg)] text-sm text-[var(--color-text)] outline-none focus:border-[var(--color-accent)]" />
+          <datalist id="gal-cat1-list">
+            {[...l1Set].map((n) => <option value={n} />)}
+          </datalist>
+        </div>
+        <div>
+          <label for="gal-cat2" class="block text-sm font-medium text-[var(--color-text)] mb-1.5">二级分类 <span class="text-xs text-[var(--color-text-subtle)] font-normal">（可选）</span></label>
+          <input id="gal-cat2" type="text" maxlength="20" list="gal-cat2-list" placeholder="可选" value={cat2}
+            class="w-full px-3 py-2 rounded-lg border border-[var(--color-border)] bg-[var(--color-bg)] text-sm text-[var(--color-text)] outline-none focus:border-[var(--color-accent)]" />
+          <datalist id="gal-cat2-list">
+            {[...l2Set].map((n) => <option value={n} />)}
+          </datalist>
+        </div>
+      </div>
+      <div>
+        <label for="gal-desc" class="block text-sm font-medium text-[var(--color-text)] mb-1.5">简介</label>
+        <input id="gal-desc" type="text" maxlength="300" placeholder="简介（可选）" value={isEdit ? gallery!.description : ""}
+          class="w-full px-3 py-2 rounded-lg border border-[var(--color-border)] bg-[var(--color-bg)] text-sm text-[var(--color-text)] outline-none focus:border-[var(--color-accent)]" />
+      </div>
+
+      <div>
+        <div class="flex items-center justify-between mb-1.5">
+          <label class="block text-sm font-medium text-[var(--color-text)]">照片（顺序即浏览顺序）</label>
+          <span id="gal-photo-count" class="text-xs text-[var(--color-text-subtle)]"></span>
+        </div>
+        <div id="gal-photos" class="flex flex-wrap gap-3" data-photos={JSON.stringify(photos)}></div>
+        <label class="gal-add mt-3 inline-flex items-center justify-center gap-1 px-4 py-2 text-xs font-semibold rounded-lg border border-dashed border-[var(--color-border)] text-[var(--color-text-subtle)] hover:text-[var(--color-accent)] hover:border-[var(--color-accent)] cursor-pointer transition-colors">
+          + 上传照片（可多选，单张 ≤5MB）
+          <input id="gal-upload" type="file" accept="image/png,image/jpeg,image/webp,image/gif,image/avif" multiple class="hidden" />
+        </label>
+      </div>
+
+      <p id="gal-hint" class="hidden text-sm text-[var(--color-text-muted)]"></p>
+
+      <div class="flex items-center gap-3 pt-2 border-t border-[var(--color-border)] flex-wrap">
+        <button id="gal-save" type="button" class="px-5 py-2.5 text-sm font-semibold rounded-lg bg-[var(--color-accent)] text-white hover:bg-[var(--color-accent-hover)] transition-colors">保存</button>
+        {isEdit && (
+          <button id="gal-del" type="button" class="px-4 py-2.5 text-sm rounded-lg border border-[var(--color-border)] text-red-400 hover:text-red-500 hover:border-red-200 hover:bg-red-50 transition-colors">删除相册</button>
+        )}
+        <span class="text-xs text-[var(--color-text-subtle)]">保存后自动返回内容管理</span>
+      </div>
+    </div>
+  </article>
+
+  <style is:global>
+    #gal-photos .gal-thumb { position: relative; }
+    #gal-photos .gal-thumb img { height: 88px; width: auto; border-radius: 8px; display: block; border: 1px solid var(--color-border); }
+    #gal-photos .gal-thumb .gal-x { position: absolute; top: -7px; right: -7px; width: 20px; height: 20px; border-radius: 9999px; background: var(--color-accent); color: #fff; font-size: 12px; line-height: 20px; text-align: center; }
+    #gal-photos .gal-thumb button[disabled] { opacity: 0.3; cursor: default; }
+  </style>
+
+  <script data-astro-rerun>
+    // 相册编辑器（data-astro-rerun 不做 TS 编译——只写纯 JS）
+    (() => {
+      const GAME_ID = Number(document.getElementById("gal-title") ? new URL(location.href).searchParams.get("id") : 0) || 0;
+      const isEdit = GAME_ID > 0;
+      const photosEl = document.getElementById("gal-photos");
+      const countEl = document.getElementById("gal-photo-count");
+      const hint = document.getElementById("gal-hint");
+      const saveBtn = document.getElementById("gal-save");
+      const delBtn = document.getElementById("gal-del");
+      const uploadInput = document.getElementById("gal-upload");
+      if (!photosEl || !countEl || !hint || !saveBtn || !uploadInput) return;
+
+      // 照片列表：SSR 初始注入（编辑模式），纯路径数组
+      const photosEl2 = document.querySelector("[data-photos]");
+      let photos = photosEl2 ? JSON.parse(photosEl2.dataset.photos || "[]") : [];
+
+      const setHint = (t) => { hint.textContent = t; hint.classList.remove("hidden"); };
+      const esc = (s) => String(s).replace(/[&<>"']/g, (m) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[m]));
+
+      const render = () => {
+        countEl.textContent = photos.length ? photos.length + " 张" : "尚未上传";
+        photosEl.innerHTML = photos.map((p, j) => `
+          <div class="gal-thumb" data-j="${j}">
+            <img src="${esc(p)}" alt="" loading="lazy" />
+            <button type="button" class="gal-x" data-act="rm" data-j="${j}" aria-label="删除这张">×</button>
+            <div class="mt-1 flex justify-center gap-1 text-xs text-[var(--color-text-subtle)]">
+              <button type="button" data-act="mv" data-j="${j}" data-d="-1" aria-label="前移" ${j === 0 ? "disabled" : ""}>←</button>
+              <button type="button" data-act="mv" data-j="${j}" data-d="1" aria-label="后移" ${j === photos.length - 1 ? "disabled" : ""}>→</button>
+            </div>
+          </div>`).join("");
+      };
+
+      photosEl.addEventListener("click", (ev) => {
+        const el = ev.target.closest("[data-act]");
+        if (!el) return;
+        const j = Number(el.dataset.j);
+        if (el.dataset.act === "rm") photos.splice(j, 1);
+        else {
+          const d = Number(el.dataset.d);
+          const t = photos[j];
+          photos[j] = photos[j + d];
+          photos[j + d] = t;
+        }
+        render();
+      });
+
+      uploadInput.addEventListener("change", async () => {
+        if (!uploadInput.files || !uploadInput.files.length) return;
+        setHint("上传中…");
+        for (const file of uploadInput.files) {
+          const fd = new FormData();
+          fd.append("file", file);
+          try {
+            const res = await fetch("/api/upload", { method: "POST", body: fd });
+            const j = await res.json().catch(() => ({}));
+            if (res.ok && j.url) photos.push(j.url);
+            else { setHint(j.error || "上传失败"); render(); return; }
+          } catch { setHint("上传失败"); render(); return; }
+        }
+        uploadInput.value = "";
+        setHint("上传完成，记得点「保存」");
+        render();
+      });
+
+      saveBtn.addEventListener("click", async () => {
+        const title = (document.getElementById("gal-title") || {}).value || "";
+        if (!title.trim()) { setHint("请先填写相册标题"); document.getElementById("gal-title").focus(); return; }
+        const cat1 = (document.getElementById("gal-cat1") || {}).value || "";
+        if (!cat1.trim()) { setHint("请先填写一级分类"); document.getElementById("gal-cat1").focus(); return; }
+        const cat2 = (document.getElementById("gal-cat2") || {}).value || "";
+        const categoryPath = cat2.trim() ? [cat1.trim(), cat2.trim()] : [cat1.trim()];
+        saveBtn.disabled = true;
+        setHint("保存中…");
+        try {
+          const payload = {
+            title,
+            categoryPath,
+            description: (document.getElementById("gal-desc") || {}).value || "",
+            photos,
+          };
+          const res = isEdit
+            ? await fetch("/api/gallery", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id: GAME_ID, ...payload }) })
+            : await fetch("/api/gallery", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
+          const j = await res.json().catch(() => ({}));
+          if (res.ok) { location.href = "/admin?tab=galleries"; return; }
+          setHint(j.error || "保存失败");
+        } catch {
+          setHint("网络错误，保存失败");
+        }
+        saveBtn.disabled = false;
+      });
+
+      delBtn?.addEventListener("click", async () => {
+        if (!confirm("确定删除整个相册？（照片记录将一并删除）")) return;
+        delBtn.disabled = true;
+        try {
+          const res = await fetch("/api/gallery?id=" + GAME_ID, { method: "DELETE" });
+          if (res.ok) { location.href = "/admin?tab=galleries"; return; }
+          setHint("删除失败");
+        } catch { setHint("删除失败"); }
+        delBtn.disabled = false;
+      });
+
+      render();
+    })();
+  </script>
+</Layout>

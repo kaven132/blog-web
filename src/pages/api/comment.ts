@@ -1,12 +1,46 @@
 import type { APIRoute } from "astro";
 import { db } from "../../db";
-import { comments, posts } from "../../db/schema";
+import { comments, posts, galleries, galleryComments } from "../../db/schema";
 import { eq } from "drizzle-orm";
 import { AUTH_COOKIE, isAuthed } from "../../lib/auth";
 
 export const POST: APIRoute = async ({ request, redirect }) => {
   try {
     const formData = await request.formData();
+
+    // ── 相册评论分支：galleryId 存在时走 gallery_comments ──
+    const galleryIdRaw = formData.get("galleryId");
+    if (galleryIdRaw) {
+      const galleryId = Number(galleryIdRaw);
+      const authorRaw = formData.get("author")?.toString().trim() || "匿名";
+      const content = formData.get("content")?.toString().trim();
+      if (!Number.isInteger(galleryId) || galleryId <= 0 || !content) {
+        return new Response("缺少必要参数", { status: 400 });
+      }
+      if (content.length > 500) {
+        return new Response("评论内容不能超过500字", { status: 400 });
+      }
+      const gallery = db.select({ id: galleries.id }).from(galleries).where(eq(galleries.id, galleryId)).get();
+      if (!gallery) {
+        return new Response("相册不存在", { status: 404 });
+      }
+      const author = authorRaw.slice(0, 20) || "匿名";
+      const parentIdRaw = formData.get("parentId");
+      let parentId: number | null = null;
+      if (parentIdRaw) {
+        const pid = Number(parentIdRaw);
+        const parent = Number.isInteger(pid)
+          ? db.select().from(galleryComments).where(eq(galleryComments.id, pid)).get()
+          : undefined;
+        if (!parent || parent.galleryId !== galleryId || parent.parentId !== null) {
+          return new Response("回复目标无效", { status: 400 });
+        }
+        parentId = pid;
+      }
+      db.insert(galleryComments).values({ galleryId, parentId, author, content }).run();
+      return redirect(`/gallery/${galleryId}#comments`, 302);
+    }
+
     const postIdRaw = formData.get("postId");
     const authorRaw = formData.get("author")?.toString().trim() || "匿名";
     const content = formData.get("content")?.toString().trim();
@@ -76,7 +110,12 @@ export const DELETE: APIRoute = async ({ url, cookies }) => {
     });
   }
 
-  const deleted = db.delete(comments).where(eq(comments.id, id)).run();
+  // target=gallery：删相册评论（连带其下回复）；缺省删文章评论
+  const isGalleryTarget = url.searchParams.get("target") === "gallery";
+
+  const deleted = isGalleryTarget
+    ? db.delete(galleryComments).where(eq(galleryComments.id, id)).run()
+    : db.delete(comments).where(eq(comments.id, id)).run();
   if (deleted.changes === 0) {
     return new Response(JSON.stringify({ error: "评论不存在" }), {
       status: 404,
@@ -84,7 +123,11 @@ export const DELETE: APIRoute = async ({ url, cookies }) => {
     });
   }
   // 级联删除挂在该评论下的回复（仅一层盖楼）
-  db.delete(comments).where(eq(comments.parentId, id)).run();
+  if (isGalleryTarget) {
+    db.delete(galleryComments).where(eq(galleryComments.parentId, id)).run();
+  } else {
+    db.delete(comments).where(eq(comments.parentId, id)).run();
+  }
 
   return new Response(JSON.stringify({ ok: true }), {
     headers: { "Content-Type": "application/json" },

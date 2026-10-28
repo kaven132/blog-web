@@ -1,0 +1,238 @@
+---
+import Layout from "../layouts/Layout.astro";
+import { db } from "../db";
+import { galleries, galleryPhotos } from "../db/schema";
+import { asc, desc } from "drizzle-orm";
+import { AUTH_COOKIE, isAuthed } from "../lib/auth";
+import { parseCategoryPath, categoryLabel } from "../lib/gallery-categories";
+
+export const prerender = false;
+
+const authed = isAuthed(Astro.cookies.get(AUTH_COOKIE)?.value);
+
+const allGalleries = db
+  .select()
+  .from(galleries)
+  .orderBy(asc(galleries.sort), desc(galleries.createdAt), asc(galleries.id))
+  .all();
+const allPhotos = db
+  .select({ galleryId: galleryPhotos.galleryId, path: galleryPhotos.path })
+  .from(galleryPhotos)
+  .orderBy(asc(galleryPhotos.sort), asc(galleryPhotos.id))
+  .all();
+
+const byGallery = new Map<number, string[]>();
+for (const p of allPhotos) {
+  let arr = byGallery.get(p.galleryId);
+  if (!arr) {
+    arr = [];
+    byGallery.set(p.galleryId, arr);
+  }
+  arr.push(p.path);
+}
+
+const cards = allGalleries.map((g) => {
+  const photos = byGallery.get(g.id) ?? [];
+  const catPath = parseCategoryPath(g.category);
+  return {
+    id: g.id,
+    title: g.title,
+    cat1: catPath[0] ?? "其他",
+    cat2: catPath[1] ?? "",
+    label: categoryLabel(catPath),
+    description: g.description,
+    cover: photos[0] ?? "",
+    count: photos.length,
+    createdAt: g.createdAt.slice(0, 10),
+  };
+});
+
+// 分类 facets：一级标签（含数量）+ 每个一级下的二级子项（含数量）
+const l1Facets = [];
+const l2Of = new Map();
+for (const c of cards) {
+  let f = l1Facets.find((x) => x.name === c.cat1);
+  if (!f) {
+    f = { name: c.cat1, count: 0, children: new Map() };
+    l1Facets.push(f);
+    l2Of.set(c.cat1, new Map());
+  }
+  f.count += 1;
+  if (c.cat2) {
+    const m = l2Of.get(c.cat1);
+    m.set(c.cat2, (m.get(c.cat2) ?? 0) + 1);
+    f.children.set(c.cat2, (f.children.get(c.cat2) ?? 0) + 1);
+  }
+}
+const allCount = cards.length;
+---
+
+<Layout title="相册" description="分类型存放的相册 —— 点击相册左右切换浏览">
+  <article class="py-12 md:py-16">
+    <!-- Header -->
+    <header class="mb-10 animate-[slide-up_0.5s_ease-out_both]">
+      <p class="text-xs font-semibold tracking-[0.15em] uppercase text-[var(--color-text-subtle)] mb-3">Gallery</p>
+      <h1 class="text-3xl md:text-4xl font-bold tracking-[-0.02em] mb-4">相册</h1>
+      <p class="text-base text-[var(--color-text-muted)] leading-relaxed font-serif max-w-xl">
+        按类型存放的相册，点开相册即可左右切换浏览。
+      </p>
+    </header>
+
+    <!-- 分类标签：一级 -->
+    <div class="mb-3 inline-flex flex-wrap rounded-full border border-[var(--color-border)] bg-[var(--color-surface)] p-1 gap-1 animate-[slide-up_0.5s_ease-out_both]" role="tablist" aria-label="相册一级分类">
+      <button type="button" role="tab" aria-selected="true" data-cat1="all" class="px-4 py-1.5 rounded-full text-sm font-medium transition-colors bg-[var(--color-accent)] text-white">全部 {allCount}</button>
+      {l1Facets.map((f) => (
+        <button type="button" role="tab" aria-selected="false" data-cat1={f.name} class="px-4 py-1.5 rounded-full text-sm font-medium transition-colors text-[var(--color-text-muted)] hover:text-[var(--color-text)]">{f.name} {f.count}</button>
+      ))}
+    </div>
+
+    <!-- 二级标签（选一级后出现） -->
+    <div id="cat2-row" class="hidden mb-6 flex flex-wrap items-center gap-2 animate-[slide-up_0.5s_ease-out_both]">
+      <span class="text-xs text-[var(--color-text-subtle)]">子分类：</span>
+      <span id="cat2-tabs" class="inline-flex flex-wrap gap-2"></span>
+    </div>
+
+    <!-- 相册卡片 -->
+    <div id="gallery-grid" class="grid gap-5 sm:grid-cols-2">
+      {cards.map((g, i) => (
+        <a
+          href={`/gallery/${g.id}`}
+          data-cat1={g.cat1}
+          data-cat2={g.cat2}
+          class={`gallery-card group block bg-[var(--color-surface)] border border-[var(--color-border)] hover:border-[var(--color-border-hover)] rounded-2xl overflow-hidden transition-all duration-300 animate-[slide-up_0.5s_ease-out_both] ${
+            i >= 2 ? "[animation-delay:150ms]" : i === 1 ? "[animation-delay:100ms]" : ""
+          }`}
+        >
+          <div class="relative h-48 bg-[var(--color-bg)] border-b border-[var(--color-border)] overflow-hidden">
+            {g.cover ? (
+              <img
+                src={g.cover}
+                alt={`${g.title} 封面`}
+                class="absolute inset-0 w-full h-full object-cover transition-transform duration-500 group-hover:scale-[1.04]"
+                loading="lazy"
+              />
+            ) : (
+              <div class="absolute inset-0 flex items-center justify-center text-4xl opacity-20" aria-hidden="true">🖼️</div>
+            )}
+            <span class="absolute top-3 right-3 inline-flex items-center gap-1.5 rounded-full bg-[var(--color-surface)]/90 backdrop-blur border border-[var(--color-border)] px-2.5 py-1 text-[11px] font-medium text-[var(--color-text-muted)]">
+              {g.count} 张
+            </span>
+          </div>
+          <div class="p-5">
+            <div class="flex items-baseline gap-2.5">
+              <h2 class="text-lg font-bold text-[var(--color-text)]">{g.title}</h2>
+              <span class="text-[11px] font-mono tracking-[0.18em] uppercase text-[var(--color-text-subtle)]">{g.label}</span>
+            </div>
+            {g.description && <p class="mt-2 text-sm text-[var(--color-text-muted)] leading-relaxed line-clamp-2">{g.description}</p>}
+            <div class="mt-4 pt-4 border-t border-[var(--color-border)] flex items-center justify-between">
+              <span class="text-xs text-[var(--color-text-subtle)]">{g.createdAt}</span>
+              <span class="inline-flex items-center gap-1 text-sm font-medium text-[var(--color-accent)]">
+                浏览
+                <span class="transition-transform duration-300 group-hover:translate-x-0.5" aria-hidden="true">→</span>
+              </span>
+            </div>
+          </div>
+        </a>
+      ))}
+    </div>
+
+    {cards.length === 0 && (
+      <div class="rounded-2xl border border-dashed border-[var(--color-border)] p-8 text-center text-sm text-[var(--color-text-subtle)]">
+        还没有相册 —— 登录后可在管理页创建。
+      </div>
+    )}
+
+    <p id="gallery-empty-hint" class="hidden mt-2 rounded-2xl border border-dashed border-[var(--color-border)] p-6 text-center text-sm text-[var(--color-text-subtle)]">
+      该分类下暂无相册
+    </p>
+
+    {
+      authed && (
+        <div class="mt-8 flex justify-end">
+          <a href="/admin?tab=galleries" class="inline-flex items-center gap-1.5 px-4 py-2 text-sm font-medium rounded-lg border border-[var(--color-border)] text-[var(--color-text-muted)] hover:text-[var(--color-accent)] hover:border-[var(--color-accent)]/40 transition-colors">
+            管理相册
+          </a>
+        </div>
+      )
+    }
+  </article>
+
+  <script data-astro-rerun>
+    // 两级分类切换：一级标签 + 动态二级子标签，按 data-cat1/data-cat2 过滤卡片
+    // （data-astro-rerun 不做 TS 编译——只写纯 JS）
+    (() => {
+      const cards = document.querySelectorAll(".gallery-card");
+      const cat1Tabs = document.querySelectorAll("[data-cat1]");
+      const cat2Row = document.getElementById("cat2-row");
+      const cat2Tabs = document.getElementById("cat2-tabs");
+      const hint = document.getElementById("gallery-empty-hint");
+      if (!cat1Tabs.length || !cat2Row || !cat2Tabs) return;
+
+      const esc = (s) => String(s).replace(/[&<>"']/g, (m) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[m]));
+      let cat1 = "all";
+      let cat2 = "all";
+
+      const apply = () => {
+        let visible = 0;
+        cards.forEach((card) => {
+          const ok1 = cat1 === "all" || card.dataset.cat1 === cat1;
+          const ok2 = cat1 === "all" || cat2 === "all" || card.dataset.cat2 === cat2;
+          const show = ok1 && ok2;
+          card.classList.toggle("hidden", !show);
+          if (show) visible += 1;
+        });
+        if (hint) hint.classList.toggle("hidden", visible > 0);
+        cat1Tabs.forEach((b) => {
+          const on = b.dataset.cat1 === cat1;
+          b.setAttribute("aria-selected", on ? "true" : "false");
+          b.classList.toggle("bg-[var(--color-accent)]", on);
+          b.classList.toggle("text-white", on);
+          b.classList.toggle("text-[var(--color-text-muted)]", !on);
+          b.classList.toggle("hover:text-[var(--color-text)]", !on);
+        });
+      };
+
+      // 二级子标签按当前一级下的卡片动态聚合
+      const renderCat2 = () => {
+        if (cat1 === "all") { cat2Row.classList.add("hidden"); cat2Tabs.innerHTML = ""; return; }
+        const counts = new Map();
+        cards.forEach((card) => {
+          if (card.dataset.cat1 !== cat1) return;
+          const c2 = card.dataset.cat2 || "";
+          if (!c2) return;
+          counts.set(c2, (counts.get(c2) ?? 0) + 1);
+        });
+        let html = `<button type="button" data-cat2="all" class="px-3 py-1 rounded-full text-xs font-medium border transition-colors ${cat2 === "all" ? "border-[var(--color-accent)] text-[var(--color-accent)] bg-[var(--color-accent)]/10" : "border-[var(--color-border)] text-[var(--color-text-muted)] hover:text-[var(--color-text)]"}">全部</button>`;
+        for (const [name, n] of counts) {
+          const on = cat2 === name;
+          html += `<button type="button" data-cat2="${esc(name)}" class="px-3 py-1 rounded-full text-xs font-medium border transition-colors ${on ? "border-[var(--color-accent)] text-[var(--color-accent)] bg-[var(--color-accent)]/10" : "border-[var(--color-border)] text-[var(--color-text-muted)] hover:text-[var(--color-text)]"}">${esc(name)} ${n}</button>`;
+        }
+        cat2Tabs.innerHTML = html;
+        cat2Row.classList.remove("hidden");
+        cat2Tabs.querySelectorAll("[data-cat2]").forEach((b) => {
+          b.addEventListener("click", () => {
+            cat2 = b.dataset.cat2 === "all" ? "all" : b.dataset.cat2;
+            apply();
+            renderCat2();
+          });
+        });
+      };
+
+      cat1Tabs.forEach((b) => {
+        b.addEventListener("click", () => {
+          cat1 = b.dataset.cat1;
+          cat2 = "all";
+          renderCat2();
+          apply();
+        });
+      });
+
+      // 初始二级标签渲染（若直接落在某个一级上）
+      if (cat1Tabs.length) {
+        const active = Array.from(cat1Tabs).find((b) => b.getAttribute("aria-selected") === "true");
+        if (active) { cat1 = active.dataset.cat1; renderCat2(); }
+      }
+      apply();
+    })();
+  </script>
+</Layout>
