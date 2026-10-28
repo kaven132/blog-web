@@ -24,11 +24,7 @@ const entryV = (() => {
   <article class="py-12 md:py-16 max-w-4xl mx-auto">
     <header class="mb-6 animate-[slide-up_0.5s_ease-out_both]">
       <p class="text-xs font-semibold tracking-[0.15em] uppercase text-[var(--color-text-subtle)] mb-3">RPG Game · Browser</p>
-      <h1 class="text-3xl md:text-4xl font-bold tracking-[-0.02em] mb-3">{game.title} <span class="text-lg text-[var(--color-text-subtle)] font-normal">{game.orig}</span></h1>
-      <p class="text-base text-[var(--color-text-muted)] leading-relaxed font-serif">
-        浏览器原生运行（RPG Maker 引擎），无需模拟器。鼠标 / 键盘操作，游戏过程全自动全屏按需加载资源。
-        登录状态下游玩进度自动云同步 —— 换电脑也能续玩。
-      </p>
+      <h1 class="text-3xl md:text-4xl font-bold tracking-[-0.02em] mb-3">{game.title}</h1>
       <a href="/games" class="inline-flex items-center gap-1 text-sm text-[var(--color-text-muted)] hover:text-[var(--color-accent)] transition-colors mt-3">
         <span>←</span> 返回小游戏
       </a>
@@ -49,7 +45,7 @@ const entryV = (() => {
     <!-- 播放控制：音量 / 双全屏 -->
     <div class="mb-4 flex items-center gap-3 flex-wrap text-sm">
       <span class="flex items-center gap-2 text-[var(--color-text-muted)]">
-        <span aria-hidden="true">🔊</span>
+        <button id="vol-mute" type="button" aria-label="静音切换" title="静音切换" class="w-7 h-7 flex items-center justify-center rounded-lg hover:bg-[var(--color-bg)] transition-colors">🔊</button>
         <input id="vol-slider" type="range" min="0" max="100" step="1" value="100" class="w-32 accent-[var(--color-accent)]" aria-label="游戏音量" />
       </span>
       <span class="flex-1"></span>
@@ -195,22 +191,35 @@ const entryV = (() => {
       const v = Number(localStorage.getItem(VOL_KEY));
       return Number.isFinite(v) && v >= 0 && v <= 100 ? v : 100;
     };
+    // 一键静音：记忆静音态与静音前的音量，取消静音时还原
+    const MUTE_KEY = "game-muted";
+    const volBtn = document.getElementById("vol-mute");
+    const isMuted = () => localStorage.getItem(MUTE_KEY) === "1";
     // RPG Maker MV 音量标的是 0-100：BGM/BGS/ME/SE 四通道一并设置
     const applyVolume = () => {
       const w = frameEl && frameEl.contentWindow;
       if (!w || !w.AudioManager) return false;
       try {
-        const v = getVolume();
+        const v = isMuted() ? 0 : getVolume();
         w.AudioManager.bgmVolume = v;
         w.AudioManager.bgsVolume = v;
         w.AudioManager.meVolume = v;
         w.AudioManager.seVolume = v;
+        if (volBtn) {
+          volBtn.textContent = v > 0 ? "🔊" : "🔇";
+          volBtn.setAttribute("aria-label", v > 0 ? "静音" : "取消静音");
+          volBtn.title = v > 0 ? "静音" : "取消静音";
+        }
         return true;
       } catch { return false; }
     };
     volSlider.value = getVolume();
     volSlider.addEventListener("input", () => {
       localStorage.setItem(VOL_KEY, volSlider.value);
+      applyVolume();
+    });
+    volBtn?.addEventListener("click", () => {
+      localStorage.setItem(MUTE_KEY, isMuted() ? "0" : "1");
       applyVolume();
     });
     // 游戏 iframe 异步启动，AudioManager 就绪前重试应用

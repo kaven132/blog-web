@@ -12,11 +12,7 @@ const { game, ruffleVersion } = Astro.props;
   <article class="py-12 md:py-16 max-w-4xl mx-auto">
     <header class="mb-6 animate-[slide-up_0.5s_ease-out_both]">
       <p class="text-xs font-semibold tracking-[0.15em] uppercase text-[var(--color-text-subtle)] mb-3">Flash Game · Ruffle</p>
-      <h1 class="text-3xl md:text-4xl font-bold tracking-[-0.02em] mb-3">{game.title} <span class="text-lg text-[var(--color-text-subtle)] font-normal">{game.orig}</span></h1>
-      <p class="text-base text-[var(--color-text-muted)] leading-relaxed font-serif">
-        Ruffle 模拟器网页运行。鼠标点击推进剧情 / 选项，战斗中用键盘方向键移动、Z 轻击 X 重击。
-        登录状态下游玩进度自动云同步 —— 换电脑也能续玩，本地 Flash 播放器的 .sol 存档也能导入。
-      </p>
+      <h1 class="text-3xl md:text-4xl font-bold tracking-[-0.02em] mb-3">{game.title}</h1>
       <a href="/games" class="inline-flex items-center gap-1 text-sm text-[var(--color-text-muted)] hover:text-[var(--color-accent)] transition-colors mt-3">
         <span>←</span> 返回小游戏
       </a>
@@ -37,7 +33,7 @@ const { game, ruffleVersion } = Astro.props;
     <!-- 播放控制：音量 / 双全屏 -->
     <div class="mb-4 flex items-center gap-3 flex-wrap text-sm">
       <span class="flex items-center gap-2 text-[var(--color-text-muted)]">
-        <span aria-hidden="true">🔊</span>
+        <button id="vol-mute" type="button" aria-label="静音切换" title="静音切换" class="w-7 h-7 flex items-center justify-center rounded-lg hover:bg-[var(--color-bg)] transition-colors">🔊</button>
         <input id="vol-slider" type="range" min="0" max="100" step="1" value="100" class="w-32 accent-[var(--color-accent)]" aria-label="游戏音量" />
       </span>
       <span class="flex-1"></span>
@@ -229,14 +225,29 @@ const { game, ruffleVersion } = Astro.props;
       const v = Number(localStorage.getItem(VOL_KEY));
       return Number.isFinite(v) && v >= 0 && v <= 100 ? v : 100;
     };
+    // 一键静音：记忆静音态与静音前的音量，取消静音时还原
+    const MUTE_KEY = "game-muted";
+    const volBtn = document.getElementById("vol-mute");
+    const isMuted = () => localStorage.getItem(MUTE_KEY) === "1";
     const applyVolume = () => {
       const player = stageEl && stageEl.querySelector("ruffle-player");
       if (!player) return;
-      try { player.volume = getVolume() / 100; } catch { /* API 不可用时静默 */ }
+      const v = isMuted() ? 0 : getVolume();
+      try { player.volume = v / 100; } catch { /* API 不可用时静默 */ }
+      if (volBtn) {
+        volBtn.textContent = v > 0 ? "🔊" : "🔇";
+        volBtn.setAttribute("aria-label", v > 0 ? "静音" : "取消静音");
+        volBtn.title = v > 0 ? "静音" : "取消静音";
+      }
     };
     volSlider.value = getVolume();
+    applyVolume();
     volSlider.addEventListener("input", () => {
       localStorage.setItem(VOL_KEY, volSlider.value);
+      applyVolume();
+    });
+    volBtn?.addEventListener("click", () => {
+      localStorage.setItem(MUTE_KEY, isMuted() ? "0" : "1");
       applyVolume();
     });
 
