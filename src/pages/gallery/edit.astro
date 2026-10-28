@@ -84,6 +84,10 @@ const gameId = isEdit ? gallery!.id : 0;
         <input id="gal-desc" type="text" maxlength="300" placeholder="简介（可选）" value={isEdit ? gallery!.description : ""}
           class="w-full px-3 py-2 rounded-lg border border-[var(--color-border)] bg-[var(--color-bg)] text-sm text-[var(--color-text)] outline-none focus:border-[var(--color-accent)]" />
       </div>
+      <label class="flex items-center gap-2.5 text-sm text-[var(--color-text)] cursor-pointer select-none">
+        <input id="gal-private" type="checkbox" class="w-4 h-4 accent-[var(--color-accent)]" checked={isEdit && !!gallery!.isPrivate} />
+        隐私相册（仅登录后可见，未登录访客与列表不显示）
+      </label>
 
       <div>
         <div class="flex items-center justify-between mb-1.5">
@@ -196,6 +200,7 @@ const gameId = isEdit ? gallery!.id : 0;
             categoryPath,
             description: (document.getElementById("gal-desc") || {}).value || "",
             photos,
+            isPrivate: (document.getElementById("gal-private") || {}).checked ? 1 : 0,
           };
           const res = isEdit
             ? await fetch("/api/gallery", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id: GAME_ID, ...payload }) })

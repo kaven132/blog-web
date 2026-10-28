@@ -145,6 +145,7 @@ const galleryData = allGalleries.map((g) => ({
   title: g.title,
   category: g.category,
   description: g.description,
+  isPrivate: !!g.isPrivate,
   photos: photosByGallery.get(g.id) ?? [],
 }));
 const galleryCount = galleryData.length;
@@ -577,6 +578,11 @@ const topViewedGalleries = db
               <div class="min-w-0 flex-1">
                 <div class="flex items-center gap-2 mb-1">
                   <h2 class="text-base font-semibold text-[var(--color-text)] truncate">{g.title}</h2>
+                  {g.isPrivate && (
+                    <span class="flex-shrink-0 text-[10px] font-semibold px-2 py-0.5 rounded-full bg-[var(--color-border)] text-[var(--color-text-subtle)]">
+                      🔒 隐私
+                    </span>
+                  )}
                   <span class="flex-shrink-0 text-[10px] font-semibold px-2 py-0.5 rounded-full bg-[var(--color-accent-muted)] text-[var(--color-accent)]">
                     {categoryLabel(parseCategoryPath(g.category))}
                   </span>

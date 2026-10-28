@@ -63,6 +63,9 @@ try {
 try {
   sqlite.exec("ALTER TABLE galleries ADD COLUMN views INTEGER NOT NULL DEFAULT 0");
 } catch { /* 列已存在 */ }
+try {
+  sqlite.exec("ALTER TABLE galleries ADD COLUMN is_private INTEGER NOT NULL DEFAULT 0");
+} catch { /* 列已存在 */ }
 // 相册点赞与评论（与文章同构）
 sqlite.exec(`CREATE TABLE IF NOT EXISTS gallery_likes (
   gallery_id INTEGER PRIMARY KEY REFERENCES galleries(id) ON DELETE CASCADE,

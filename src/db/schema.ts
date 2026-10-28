@@ -82,6 +82,7 @@ export const galleries = sqliteTable("galleries", {
   category: text("category").notNull().default("other"), // 分类标识，见 lib/gallery-categories
   description: text("description").notNull().default(""),
   views: integer("views").notNull().default(0), // 浏览量：浏览页每次渲染 +1
+  isPrivate: integer("is_private").notNull().default(0), // 隐私相册：仅登录可见
   sort: integer("sort").notNull().default(0),
   createdAt: text("created_at")
     .notNull()

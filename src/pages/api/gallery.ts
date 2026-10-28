@@ -17,13 +17,14 @@ export const prerender = false;
 const MAX_PHOTOS = 200;
 const PHOTO_RE = /^\/uploads\/[A-Za-z0-9._-]+$/;
 
-type Parsed = { title: string; category: string; description: string; photos: string[] };
+type Parsed = { title: string; category: string; description: string; photos: string[]; isPrivate: number };
 
 function parseBody(raw: unknown): { error: string } | Parsed {
   const b = (raw ?? {}) as Record<string, unknown>;
   const title = typeof b.title === "string" ? b.title.trim() : "";
   const description = typeof b.description === "string" ? b.description.trim().slice(0, 300) : "";
   const photos = Array.isArray(b.photos) ? b.photos : [];
+  const isPrivate = b.isPrivate === 1 || b.isPrivate === true ? 1 : 0;
 
   if (!title || title.length > 60) return { error: "标题需 1-60 字" };
   const catRaw = Array.isArray(b.categoryPath) ? b.categoryPath : [];
@@ -36,7 +37,7 @@ function parseBody(raw: unknown): { error: string } | Parsed {
   if (!photos.every((p): p is string => typeof p === "string" && PHOTO_RE.test(p))) {
     return { error: "照片路径无效" };
   }
-  return { title, category: JSON.stringify(categoryPath), description, photos };
+  return { title, category: JSON.stringify(categoryPath), description, photos, isPrivate };
 }
 
 const unauthorized = () =>
@@ -52,7 +53,7 @@ export const POST: APIRoute = async ({ request, cookies }) => {
   const id = db.transaction((tx) => {
     const g = tx
       .insert(galleries)
-      .values({ title: parsed.title, category: parsed.category, description: parsed.description })
+      .values({ title: parsed.title, category: parsed.category, description: parsed.description, isPrivate: parsed.isPrivate })
       .returning({ id: galleries.id })
       .get();
     // drizzle 的 insert.values() 不接受空数组：无照片时跳过
@@ -78,7 +79,7 @@ export const PUT: APIRoute = async ({ request, cookies }) => {
 
   db.transaction((tx) => {
     tx.update(galleries)
-      .set({ title: parsed.title, category: parsed.category, description: parsed.description })
+      .set({ title: parsed.title, category: parsed.category, description: parsed.description, isPrivate: parsed.isPrivate })
       .where(eq(galleries.id, id))
       .run();
     tx.delete(galleryPhotos).where(eq(galleryPhotos.galleryId, id)).run();

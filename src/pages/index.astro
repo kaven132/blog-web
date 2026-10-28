@@ -3,8 +3,8 @@ import Layout from "../layouts/Layout.astro";
 import PostCard from "../components/PostCard";
 import SearchBar from "../components/SearchBar";
 import { db } from "../db";
-import { posts, likes } from "../db/schema";
-import { desc, eq, sql } from "drizzle-orm";
+import { posts, likes, galleries, galleryPhotos, galleryLikes } from "../db/schema";
+import { desc, eq, sql, asc, inArray } from "drizzle-orm";
 
 const recentPosts = db
   .select({
@@ -24,6 +24,39 @@ const recentPosts = db
   .orderBy(desc(posts.createdAt))
   .limit(3)
   .all();
+
+// 最新相册（仅公开）：3 个，封面取相册第一张照片
+const recentGalleries = db
+  .select({
+    id: galleries.id,
+    title: galleries.title,
+    views: galleries.views,
+    likeCount: sql<number>`coalesce(${galleryLikes.count}, 0)`,
+    photoCount: sql<number>`(select count(*) from gallery_photos gp where gp.gallery_id = ${galleries.id})`,
+  })
+  .from(galleries)
+  .leftJoin(galleryLikes, eq(galleryLikes.galleryId, galleries.id))
+  .where(eq(galleries.isPrivate, 0))
+  .orderBy(desc(galleries.createdAt))
+  .limit(3)
+  .all();
+const recentGalleryIds = recentGalleries.map((g) => g.id);
+const allGalleryPhotos = recentGalleryIds.length
+  ? db
+      .select({ galleryId: galleryPhotos.galleryId, path: galleryPhotos.path })
+      .from(galleryPhotos)
+      .where(inArray(galleryPhotos.galleryId, recentGalleryIds))
+      .orderBy(asc(galleryPhotos.sort), asc(galleryPhotos.id))
+      .all()
+  : [];
+const galleryCover = new Map();
+for (const p of allGalleryPhotos) {
+  if (!galleryCover.has(p.galleryId)) galleryCover.set(p.galleryId, p.path);
+}
+const recentGalleryCards = recentGalleries.map((g) => ({
+  ...g,
+  cover: galleryCover.get(g.id) ?? "",
+}));
 ---
 
 <Layout title="首页" description="一个专注于 Web 开发与工程实践的个人博客">
@@ -84,4 +117,56 @@ const recentPosts = db
       )
     }
   </section>
+
+  <!-- Latest galleries -->
+  {
+    recentGalleryCards.length > 0 && (
+      <section class="pb-12">
+        <div class="flex items-end justify-between mb-8">
+          <div>
+            <p class="text-xs font-semibold tracking-[0.15em] uppercase text-[var(--color-text-subtle)] mb-2">Gallery</p>
+            <h2 class="text-2xl font-bold tracking-[-0.01em]">最新相册</h2>
+          </div>
+          <a
+            href="/gallery"
+            class="text-sm font-medium text-[var(--color-accent)] hover:text-[var(--color-accent-hover)] transition-colors group flex items-center gap-1"
+          >
+            查看全部
+            <span class="inline-block transition-transform group-hover:translate-x-0.5">→</span>
+          </a>
+        </div>
+
+        <div class="grid gap-5 sm:grid-cols-3">
+          {recentGalleryCards.map((g, i) => (
+            <a
+              href={`/gallery/${g.id}`}
+              class={`group block bg-[var(--color-surface)] border border-[var(--color-border)] hover:border-[var(--color-border-hover)] rounded-2xl overflow-hidden transition-all duration-300 animate-[slide-up_0.5s_ease-out_both] ${
+                i === 0 ? "" : "[animation-delay:100ms]"
+              }`}
+            >
+              <div class="relative h-40 bg-[var(--color-bg)] border-b border-[var(--color-border)] overflow-hidden">
+                {g.cover ? (
+                  <img
+                    src={g.cover}
+                    alt={`${g.title} 封面`}
+                    class="absolute inset-0 w-full h-full object-cover transition-transform duration-500 group-hover:scale-[1.04]"
+                    loading="lazy"
+                  />
+                ) : (
+                  <div class="absolute inset-0 flex items-center justify-center text-4xl opacity-20" aria-hidden="true">🖼️</div>
+                )}
+                <span class="absolute top-3 right-3 inline-flex items-center gap-1.5 rounded-full bg-[var(--color-surface)]/90 backdrop-blur border border-[var(--color-border)] px-2.5 py-1 text-[11px] font-medium text-[var(--color-text-muted)]">
+                  {g.photoCount} 张
+                </span>
+              </div>
+              <div class="p-4">
+                <h3 class="text-base font-semibold text-[var(--color-text)] truncate">{g.title}</h3>
+                <p class="text-xs text-[var(--color-text-subtle)] mt-1.5">{g.likeCount} 点赞 · {g.views} 浏览</p>
+              </div>
+            </a>
+          ))}
+        </div>
+      </section>
+    )
+  }
 </Layout>
