@@ -53,7 +53,8 @@
     "树上的男爵",
     "世说新语",
     "叫魂",
-    "日瓦戈医生"
+    "日瓦戈医生",
+    "长恨歌"
   ],
   "plugins": [
     "DeepSeek Harness (dsh) — https://github.com/deepseek-ai/deepseek-harness",
@@ -117,6 +118,7 @@
     "deepseek-flash（DeepSeek-V4.1-Flash-1017） — https://api-docs.deepseek.com/quick_start/pricing",
     "Claude Opus 5.5 — https://www.anthropic.com/news/claude-opus-5-5",
     "GPT-6.1 Sol — https://openai.com/index/introducing-gpt-6-1-sol/",
-    "Gemini 4 Argon — https://blog.google/intl/en-mena/product-updates/explore-get-answers/gemini-4-argon-built-to-solve-your-hardest-problems/"
+    "Gemini 4 Argon — https://blog.google/intl/en-mena/product-updates/explore-get-answers/gemini-4-argon-built-to-solve-your-hardest-problems/",
+    "Qwen3.8-Max — https://www.alizila.com/alibaba-unveils-qwen3-8-max-most-capable-flagship-model-to-date/"
   ]
 }
