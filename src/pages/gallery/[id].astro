@@ -6,6 +6,7 @@ import { galleries, galleryPhotos, galleryLikes, galleryComments } from "../../d
 import { asc, eq, sql } from "drizzle-orm";
 import { AUTH_COOKIE, isAuthed } from "../../lib/auth";
 import { parseCategoryPath, categoryLabel } from "../../lib/gallery-categories";
+import { trackBrowse } from "../../lib/history";
 
 export const prerender = false;
 
@@ -27,6 +28,11 @@ db.update(galleries)
   .where(eq(galleries.id, gallery.id))
   .run();
 const viewsDisplay = galleryViews > 9999 ? `${(galleryViews / 10000).toFixed(1)} 万` : String(galleryViews);
+
+// 浏览历史采集：仅登录用户记录
+if (authed) {
+  trackBrowse("gallery", gallery.id, gallery.title, `/gallery/${gallery.id}`);
+}
 
 const photos = db
   .select({ path: galleryPhotos.path })

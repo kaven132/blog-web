@@ -80,6 +80,25 @@ sqlite.exec(`CREATE TABLE IF NOT EXISTS gallery_comments (
   created_at TEXT NOT NULL DEFAULT (CURRENT_TIMESTAMP)
 )`);
 
+// 浏览历史（随账号走）：(user_id, kind, ref_id) 唯一，重复浏览 upsert 置顶
+sqlite.exec(`CREATE TABLE IF NOT EXISTS browse_history (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  user_id INTEGER NOT NULL,
+  kind TEXT NOT NULL,
+  ref_id TEXT NOT NULL,
+  title TEXT NOT NULL,
+  url TEXT NOT NULL,
+  viewed_at TEXT NOT NULL DEFAULT (CURRENT_TIMESTAMP)
+)`);
+sqlite.exec(`CREATE UNIQUE INDEX IF NOT EXISTS browse_history_unique ON browse_history(user_id, kind, ref_id)`);
+// 容量护栏：每用户最多保留最近 50 条。DROP + 重建使限额调整随重启生效（IF NOT EXISTS 不会更新已存在的触发器）
+sqlite.exec("DROP TRIGGER IF EXISTS browse_history_cap");
+sqlite.exec(`CREATE TRIGGER browse_history_cap AFTER INSERT ON browse_history BEGIN
+  DELETE FROM browse_history WHERE user_id = new.user_id AND id NOT IN (
+    SELECT id FROM browse_history WHERE user_id = new.user_id ORDER BY viewed_at DESC, id DESC LIMIT 50
+  );
+END`);
+
 // ── 全文搜索（FTS5 trigram）：外部内容表 + 触发器同步，正文可搜、中文子串命中 ──
 // trigram 按 3 字滑窗切词：中文 ≥3 字的查询走 MATCH（快、带相关性与高亮片段），
 // <3 字由查询层回落 LIKE。触发器保证自动化脚本直写库时索引也不漏。

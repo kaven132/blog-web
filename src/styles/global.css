@@ -311,6 +311,23 @@ body {
   position: relative;
 }
 
+/* ── highlight.js 主题：贴合站内珊瑚红点缀的暗色 token（SSR 服务端高亮） ── */
+.hljs-keyword, .hljs-selector-tag, .hljs-literal, .hljs-section { color: oklch(78% 0.1 300); }
+.hljs-string, .hljs-regexp, .hljs-addition { color: oklch(80% 0.12 150); }
+.hljs-comment, .hljs-quote { color: oklch(62% 0.01 260); font-style: italic; }
+.hljs-number, .hljs-symbol, .hljs-bullet, .hljs-meta { color: oklch(82% 0.1 70); }
+.hljs-title, .hljs-name, .hljs-function { color: oklch(80% 0.09 40); }
+.hljs-attr, .hljs-attribute, .hljs-variable, .hljs-template-variable, .hljs-type { color: oklch(80% 0.08 230); }
+.hljs-built_in, .hljs-class .hljs-title, .hljs-title.function_ { color: oklch(82% 0.11 200); }
+.hljs-params { color: oklch(88% 0.01 260); }
+.hljs-property, .hljs-constant { color: oklch(80% 0.09 40); }
+.hljs-tag { color: oklch(75% 0.06 230); }
+.hljs-tag .hljs-name { color: oklch(78% 0.1 300); }
+.hljs-tag .hljs-attr { color: oklch(80% 0.08 230); }
+.hljs-emphasis { font-style: italic; }
+.hljs-strong { font-weight: 600; }
+.hljs-deletion { color: oklch(70% 0.12 25); }
+
 /* ── 代码块语言标签 + 复制按钮（详情页脚本注入） ── */
 .code-lang {
   position: absolute;
@@ -404,7 +421,7 @@ body {
   color: var(--color-text);
 }
 
-/* 正文插图：统一高度，宽度按原始比例自适应（不裁切、不拉伸） */
+/* 正文插图：统一高度，宽度按原始比例自适应（不裁切、不拉伸）；点击打开灯箱 */
 .prose img {
   display: block;
   height: 25rem;
@@ -414,6 +431,7 @@ body {
   border-radius: 0.75rem;
   border: 1px solid var(--color-border);
   margin: 2rem auto;
+  cursor: zoom-in;
 }
 
 @media (max-width: 640px) {

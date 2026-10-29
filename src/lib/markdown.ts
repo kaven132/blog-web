@@ -1,4 +1,5 @@
 import { optimizeImgSrc, responsiveImgAttrs } from "./imgsrc";
+import hljs from "highlight.js/lib/common";
 
 export function escapeHtml(str: string): string {
   return str
@@ -7,6 +8,21 @@ export function escapeHtml(str: string): string {
     .replace(/>/g, "&gt;")
     .replace(/"/g, "&quot;")
     .replace(/'/g, "&#39;");
+}
+
+/**
+ * 代码块语法高亮：SSR 时用 highlight.js 常用语言集渲染（输出已转义，无客户端 JS 不闪烁）。
+ * 语言未注册或高亮异常时回退纯转义，代码照常展示。
+ */
+function highlightCode(code: string, lang: string): string {
+  if (lang && hljs.getLanguage(lang)) {
+    try {
+      return hljs.highlight(code, { language: lang, ignoreIllegals: true }).value;
+    } catch {
+      /* 回退纯转义 */
+    }
+  }
+  return escapeHtml(code);
 }
 
 export interface MdHeading {
@@ -108,7 +124,9 @@ export function renderMarkdown(src: string): string {
       if (line.startsWith("```")) {
         inCode = false;
         const lang = codeLang.replace(/[^a-z0-9_-]/gi, "");
-        out.push(`<pre${lang ? ` data-lang="${lang}"` : ""}><code>${escapeHtml(codeBuf.join("\n"))}</code></pre>`);
+        out.push(
+          `<pre${lang ? ` data-lang="${lang}"` : ""}><code class="hljs language-${lang}">${highlightCode(codeBuf.join("\n"), lang)}</code></pre>`
+        );
         codeBuf = [];
         codeLang = "";
       } else {
@@ -180,7 +198,7 @@ export function renderMarkdown(src: string): string {
     paraBuf.push(inline(line));
   }
 
-  if (inCode) out.push(`<pre><code>${escapeHtml(codeBuf.join("\n"))}</code></pre>`);
+  if (inCode) out.push(`<pre><code class="hljs">${highlightCode(codeBuf.join("\n"), "")}</code></pre>`);
   flush();
 
   return out.join("\n");

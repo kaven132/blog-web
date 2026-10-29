@@ -34,6 +34,7 @@
     "d3-selection": "^3.0.0",
     "d3-zoom": "^3.0.0",
     "drizzle-orm": "^0.38.0",
+    "highlight.js": "^11.11.1",
     "lucide-react": "^1.61.0",
     "qrcode": "^1.5.4",
     "react": "^19.0.0",

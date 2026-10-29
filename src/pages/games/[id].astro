@@ -6,6 +6,7 @@ import { getRpgGame } from "../../lib/rpg-games";
 import FlashGameBody from "../../components/games/FlashGameBody.astro";
 import RpgGameBody from "../../components/games/RpgGameBody.astro";
 import { readFileSync } from "node:fs";
+import { trackBrowse } from "../../lib/history";
 
 export const prerender = false;
 
@@ -16,6 +17,8 @@ const game = flash ?? rpg;
 // 未注册的游戏 id 回列表页；存档随账号走，页面只对登录用户开放
 if (!game) return Astro.redirect("/games");
 if (!authed) return Astro.redirect("/login?next=" + encodeURIComponent("/games/" + Astro.params.id));
+// 浏览历史采集（本页全站仅登录可见，走到这里必然已登录）
+trackBrowse("game", Astro.params.id, game.title, `/games/${Astro.params.id}`);
 
 // Flash 款需要 Ruffle 版本号进 script URL 破缓存
 let ruffleVersion = "dev";

@@ -1,0 +1,157 @@
+---
+import Layout from "../layouts/Layout.astro";
+import { db } from "../db";
+import { browseHistory } from "../db/schema";
+import { desc, eq } from "drizzle-orm";
+import { AUTH_COOKIE, isAuthed } from "../lib/auth";
+import { timeAgo } from "../lib/history";
+
+export const prerender = false;
+
+if (!isAuthed(Astro.cookies.get(AUTH_COOKIE)?.value)) {
+  return Astro.redirect("/login?next=" + encodeURIComponent("/history"));
+}
+
+const KIND_META: Record<string, { label: string; icon: string }> = {
+  post: { label: "文章", icon: "M7 4.5h10a1.5 1.5 0 0 1 1.5 1.5v12a1.5 1.5 0 0 1-1.5 1.5H7A1.5 1.5 0 0 1 5.5 18V6A1.5 1.5 0 0 1 7 4.5Zm2.5 4h5m-5 3.5h5m-5 3.5h3" },
+  gallery: { label: "相册", icon: "M4.5 6.5h15v11h-15Zm2.5 8 3.2-3.8 2.3 2.6 2.5-2.9 3.5 4.1M9 10a1 1 0 1 1 0-2 1 1 0 0 1 0 2Z" },
+  game: { label: "游戏", icon: "M7.5 8.5h9a4.5 4.5 0 0 1 4.4 5.4l-.5 2.4a2.4 2.4 0 0 1-4.2 1l-1-1.3h-6.4l-1 1.3a2.4 2.4 0 0 1-4.2-1l-.5-2.4A4.5 4.5 0 0 1 7.5 8.5Zm-.9 3v2.4m-1.2-1.2h2.4m8.1-.6h.01m1.8 1.2h.01" },
+};
+
+const items = db
+  .select()
+  .from(browseHistory)
+  .where(eq(browseHistory.userId, 1))
+  .orderBy(desc(browseHistory.viewedAt), desc(browseHistory.id))
+  .limit(50)
+  .all()
+  .map((r) => ({ ...r, meta: KIND_META[r.kind] ?? { label: "页面", icon: KIND_META.post.icon }, ago: timeAgo(r.viewedAt) }));
+
+const counts = {
+  all: items.length,
+  post: items.filter((i) => i.kind === "post").length,
+  gallery: items.filter((i) => i.kind === "gallery").length,
+  game: items.filter((i) => i.kind === "game").length,
+};
+---
+
+<Layout title="浏览历史">
+  <article class="py-10 md:py-14 max-w-3xl mx-auto">
+    <header class="mb-6 animate-[slide-up_0.5s_ease-out_both]">
+      <p class="text-xs font-semibold tracking-[0.15em] uppercase text-[var(--color-text-subtle)] mb-3">History</p>
+      <h1 class="text-3xl md:text-4xl font-bold tracking-[-0.02em] mb-3">浏览历史</h1>
+      <div class="mt-4 flex items-center gap-4 flex-wrap">
+        <a href="/" class="inline-flex items-center gap-1 text-sm text-[var(--color-text-muted)] hover:text-[var(--color-accent)] transition-colors">
+          <span aria-hidden="true">←</span> 返回首页
+        </a>
+        <span class="text-sm text-[var(--color-text-subtle)]">共 {items.length} 条 · 仅本人可见 · 最多保留 50 条</span>
+        {items.length > 0 && (
+          <button type="button" id="hist-clear" class="ml-auto text-sm text-red-400 hover:text-red-500 transition-colors">清空全部</button>
+        )}
+      </div>
+    </header>
+
+    {items.length === 0 ? (
+      <div class="rounded-2xl border border-dashed border-[var(--color-border)] p-12 text-center">
+        <p class="text-sm text-[var(--color-text-muted)] font-serif mb-2">暂无浏览记录</p>
+        <p class="text-xs text-[var(--color-text-subtle)]">浏览文章、相册或小游戏后会自动记录在这里（仅保存在你的账号下）</p>
+      </div>
+    ) : (
+      <div id="hist-root" data-items={JSON.stringify(items)}>
+        <!-- 类型筛选 -->
+        <div class="flex flex-wrap items-center gap-2 mb-5">
+          {[
+            { key: "all", label: "全部" },
+            { key: "post", label: "文章" },
+            { key: "gallery", label: "相册" },
+            { key: "game", label: "游戏" },
+          ].map((t) => (
+            <button
+              type="button"
+              data-kind={t.key}
+              class={`inline-flex items-center gap-1.5 px-3.5 py-1.5 text-sm font-medium rounded-full border transition-all ${
+                t.key === "all"
+                  ? "bg-[var(--color-accent)] text-white border-[var(--color-accent)]"
+                  : "bg-[var(--color-surface)] text-[var(--color-text-muted)] border-[var(--color-border)] hover:border-[var(--color-accent)] hover:text-[var(--color-accent)]"
+              }`}
+            >
+              {t.label}
+              <span class={`text-[10px] font-semibold px-1.5 py-0.5 rounded-full ${t.key === "all" ? "bg-white/20 text-white" : "bg-[var(--color-accent-muted)] text-[var(--color-accent)]"}`}>{counts[t.key]}</span>
+            </button>
+          ))}
+        </div>
+
+        <!-- 列表：先整表渲染，筛选/删除由页面脚本驱动 -->
+        <ul class="space-y-2" id="hist-list">
+          {items.map((it) => (
+            <li
+              data-kind={it.kind}
+              data-id={it.id}
+              class="hist-item group flex items-center gap-3 bg-[var(--color-surface)] border border-[var(--color-border)] rounded-xl px-4 py-3 hover:border-[var(--color-border-hover)] transition-colors"
+            >
+              <span class="flex-shrink-0 w-8 h-8 rounded-lg bg-[var(--color-accent-muted)] text-[var(--color-accent)] flex items-center justify-center" title={it.meta.label}>
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24" aria-hidden="true">
+                  <path stroke-linecap="round" stroke-linejoin="round" d={it.meta.icon} />
+                </svg>
+              </span>
+              <a href={it.url} class="flex-1 min-w-0">
+                <p class="text-sm font-medium text-[var(--color-text)] truncate group-hover:text-[var(--color-accent)] transition-colors">{it.title}</p>
+                <p class="text-[11px] text-[var(--color-text-subtle)] mt-0.5">
+                  <span class="uppercase tracking-wide">{it.meta.label}</span> · {it.ago}
+                </p>
+              </a>
+              <button
+                type="button"
+                data-del={it.id}
+                aria-label="删除这条记录"
+                class="flex-shrink-0 w-7 h-7 rounded-md text-[var(--color-text-subtle)] opacity-0 group-hover:opacity-100 hover:text-red-500 hover:bg-red-50 transition-all"
+              >
+                <svg class="w-3.5 h-3.5 mx-auto" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24" aria-hidden="true">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </li>
+          ))}
+        </ul>
+      </div>
+    )}
+  </article>
+
+  <script>
+    // 筛选 / 单条删除 / 清空全部（TypeScript 可用：普通 script 走打包）
+    const root = document.getElementById("hist-root");
+    const list = document.getElementById("hist-list") as HTMLUListElement | null;
+
+    document.querySelectorAll<HTMLButtonElement>("[data-kind]").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        const kind = btn.dataset.kind;
+        document.querySelectorAll<HTMLButtonElement>("[data-kind]").forEach((b) => {
+          const active = b === btn;
+          b.classList.toggle("bg-[var(--color-accent)]", active);
+          b.classList.toggle("text-white", active);
+          b.classList.toggle("border-[var(--color-accent)]", active);
+          b.classList.toggle("bg-[var(--color-surface)]", !active);
+          b.classList.toggle("text-[var(--color-text-muted)]", !active);
+          b.classList.toggle("border-[var(--color-border)]", !active);
+        });
+        list?.querySelectorAll<HTMLLIElement>(".hist-item").forEach((li) => {
+          li.classList.toggle("hidden", kind !== "all" && li.dataset.kind !== kind);
+        });
+      });
+    });
+
+    list?.addEventListener("click", async (e) => {
+      const btn = (e.target as Element).closest("[data-del]");
+      if (!btn) return;
+      const id = (btn as HTMLElement).dataset.del;
+      const res = await fetch(`/api/history?id=${id}`, { method: "DELETE" });
+      if (res.ok) (btn.closest(".hist-item") as HTMLElement)?.remove();
+    });
+
+    document.getElementById("hist-clear")?.addEventListener("click", async () => {
+      if (!confirm("确定清空全部浏览历史？此操作不可恢复。")) return;
+      const res = await fetch("/api/history?all=1", { method: "DELETE" });
+      if (res.ok) window.location.reload();
+    });
+  </script>
+</Layout>

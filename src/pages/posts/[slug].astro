@@ -4,12 +4,15 @@ import LikeButton from "../../components/LikeButton";
 import ShareButtons from "../../components/ShareButtons";
 import ReadingProgress from "../../components/ReadingProgress";
 import TocNav from "../../components/TocNav";
+import ImgLightbox from "../../components/ImgLightbox.astro";
 import { db } from "../../db";
 import { posts, comments, likes } from "../../db/schema";
 import { eq, and, lt, gt, desc, asc, sql } from "drizzle-orm";
 import { parseTags, getParentTag, getChildTags } from "../../lib/tags";
 import { renderMarkdown, extractHeadings } from "../../lib/markdown";
 import { formatDateCN, dbDateToISO } from "../../lib/datetime";
+import { AUTH_COOKIE, isAuthed } from "../../lib/auth";
+import { trackBrowse } from "../../lib/history";
 import glossaryRaw from "../../data/glossary.json";
 
 // 术语词典（序列化后经 define:vars 注入内联脚本，供正文术语标注与悬停卡片使用）
@@ -72,6 +75,10 @@ const formattedDate = formatDateCN(post.createdAt);
 // 目录（h2/h3）与字数、阅读时长
 const headings = extractHeadings(post.content);
 const contentHtml = renderMarkdown(post.content);
+// 浏览历史采集：仅登录用户记录（游客浏览不进历史）
+if (isAuthed(Astro.cookies.get(AUTH_COOKIE)?.value)) {
+  trackBrowse("post", post.slug, post.title, `/posts/${post.slug}`);
+}
 const charCount = post.content.replace(/\s/g, "").length;
 const wordCountDisplay = charCount > 9999 ? `${(charCount / 10000).toFixed(1)} 万` : String(charCount);
 const readMinutes = Math.max(1, Math.ceil(charCount / 400));
@@ -201,6 +208,7 @@ const viewsDisplay = postViews > 9999 ? `${(postViews / 10000).toFixed(1)} 万` 
       <span id="tts-status" class="ml-2 text-xs text-[var(--color-text-subtle)]"></span>
     </div>
     <div class="prose max-w-none mb-14" set:html={contentHtml} />
+    <ImgLightbox container=".prose" />
 
     <!-- Divider -->
     <div class="flex items-center gap-4 mb-10">

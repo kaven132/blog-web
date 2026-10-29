@@ -121,3 +121,16 @@ export const galleryPhotos = sqliteTable("gallery_photos", {
   sort: integer("sort").notNull().default(0),
 });
 
+/** 浏览历史（随账号走）：kind = post | gallery | game，ref_id 为 slug 或数字 id 字符串；(user_id,kind,ref_id) 唯一，重复浏览 upsert 置顶 */
+export const browseHistory = sqliteTable("browse_history", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  userId: integer("user_id").notNull(), // 单管理员体系恒为 1
+  kind: text("kind").notNull(),
+  refId: text("ref_id").notNull(),
+  title: text("title").notNull(),
+  url: text("url").notNull(),
+  viewedAt: text("viewed_at")
+    .notNull()
+    .default(sql`(CURRENT_TIMESTAMP)`),
+});
+

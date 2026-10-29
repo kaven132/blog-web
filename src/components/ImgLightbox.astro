@@ -1,0 +1,183 @@
+---
+/**
+ * 正文图片灯箱（自包含组件）：扫描 container 内所有 <img>，点击打开全屏查看。
+ * 交互与相册灯箱同款：←/→ 切换、滚轮以鼠标为锚点缩放（1x-5x）、双击 1x↔2.5x、
+ * 工具条 ±/适应屏幕、放大后拖拽平移（边界钳制）、触屏双指捏合、Esc/点黑边关闭。
+ * 用法：<ImgLightbox container=".prose" />
+ */
+interface Props {
+  container?: string;
+}
+const container = Astro.props.container ?? ".prose";
+---
+
+<div id="img-lightbox" class="hidden fixed inset-0 z-[300] bg-black/95 select-none" style="touch-action:none" data-container={container}>
+  <div class="absolute inset-0 flex items-center justify-center">
+    <img id="il-img" class="max-w-[94vw] max-h-[88vh] will-change-transform" draggable="false" alt="" />
+  </div>
+  <div class="absolute top-3 left-1/2 -translate-x-1/2 flex items-center gap-0.5 rounded-full bg-black/60 backdrop-blur px-1.5 py-1 text-white">
+    <button type="button" id="il-zoom-out" aria-label="缩小" class="w-8 h-8 rounded-full hover:bg-white/15 text-lg leading-none transition-colors">−</button>
+    <span id="il-zoom-label" class="w-12 text-center text-xs font-mono">100%</span>
+    <button type="button" id="il-zoom-in" aria-label="放大" class="w-8 h-8 rounded-full hover:bg-white/15 text-lg leading-none transition-colors">+</button>
+    <button type="button" id="il-zoom-reset" class="px-2.5 h-8 rounded-full text-xs hover:bg-white/15 transition-colors">适应屏幕</button>
+    <span class="w-px h-4 bg-white/25 mx-1"></span>
+    <button type="button" id="il-close" aria-label="关闭" class="w-8 h-8 rounded-full hover:bg-white/15 transition-colors">
+      <svg class="w-4 h-4 mx-auto" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
+    </button>
+  </div>
+  <button type="button" id="il-prev" aria-label="上一张" class="hidden absolute left-3 top-1/2 -translate-y-1/2 w-11 h-11 items-center justify-center rounded-full bg-black/50 text-white text-2xl leading-none hover:bg-black/70 transition-colors">‹</button>
+  <button type="button" id="il-next" aria-label="下一张" class="hidden absolute right-3 top-1/2 -translate-y-1/2 w-11 h-11 items-center justify-center rounded-full bg-black/50 text-white text-2xl leading-none hover:bg-black/70 transition-colors">›</button>
+  <span id="il-counter" class="hidden absolute bottom-14 right-4 rounded-full bg-black/50 text-white text-xs px-2.5 py-1 font-mono"></span>
+  <p class="absolute bottom-4 left-1/2 -translate-x-1/2 text-[11px] text-white/50 whitespace-nowrap">滚轮缩放 · 拖拽平移 · 双击放大 · ←/→ 切换 · Esc 关闭</p>
+</div>
+
+<script data-astro-rerun>
+  // data-astro-rerun 按 is:inline 原样内联（不做 TS 编译）——只写纯 JS
+  (() => {
+    const wrap = document.getElementById("img-lightbox");
+    if (!wrap) return;
+    const scope = document.querySelector(wrap.dataset.container || ".prose");
+    if (!scope) return;
+    const imgs = Array.from(scope.querySelectorAll("img"));
+    if (imgs.length === 0) return;
+
+    const img = document.getElementById("il-img");
+    const label = document.getElementById("il-zoom-label");
+    const counter = document.getElementById("il-counter");
+    const btnPrev = document.getElementById("il-prev");
+    const btnNext = document.getElementById("il-next");
+    const MIN = 1, MAX = 5;
+    let open = false, scale = 1, tx = 0, ty = 0, idx = 0;
+
+    const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+    const panLimit = () => ({
+      x: Math.max(0, (img.clientWidth * scale - wrap.clientWidth) / 2),
+      y: Math.max(0, (img.clientHeight * scale - wrap.clientHeight) / 2),
+    });
+    const apply = () => {
+      const lim = panLimit();
+      tx = clamp(tx, -lim.x, lim.x);
+      ty = clamp(ty, -lim.y, lim.y);
+      img.style.transform = "translate(" + tx + "px," + ty + "px) scale(" + scale + ")";
+      label.textContent = Math.round(scale * 100) + "%";
+    };
+    const zoomAt = (k, cx, cy) => {
+      const next = clamp(scale * k, MIN, MAX);
+      if (next === scale) return;
+      if (cx === undefined) { cx = wrap.clientWidth / 2; cy = wrap.clientHeight / 2; }
+      tx += (cx - wrap.clientWidth / 2) * scale * (1 - next / scale);
+      ty += (cy - wrap.clientHeight / 2) * scale * (1 - next / scale);
+      scale = next;
+      apply();
+    };
+    const resetZoom = () => { scale = 1; tx = 0; ty = 0; apply(); };
+
+    const render = () => {
+      const src = imgs[idx].currentSrc || imgs[idx].src;
+      img.src = src;
+      img.alt = imgs[idx].alt || "";
+      if (counter) {
+        counter.textContent = (idx + 1) + " / " + imgs.length;
+        counter.classList.toggle("hidden", imgs.length < 2);
+      }
+      if (btnPrev) { btnPrev.classList.toggle("hidden", imgs.length < 2); btnPrev.classList.toggle("flex", imgs.length >= 2); }
+      if (btnNext) { btnNext.classList.toggle("hidden", imgs.length < 2); btnNext.classList.toggle("flex", imgs.length >= 2); }
+      resetZoom();
+    };
+    const openAt = (i) => {
+      open = true;
+      idx = i;
+      wrap.classList.remove("hidden");
+      document.body.style.overflow = "hidden";
+      render();
+    };
+    const close = () => {
+      open = false;
+      wrap.classList.add("hidden");
+      document.body.style.overflow = "";
+    };
+    const go = (d) => {
+      if (imgs.length < 2) return;
+      idx = (idx + d + imgs.length) % imgs.length;
+      render();
+    };
+
+    imgs.forEach((el, i) => {
+      el.style.cursor = "zoom-in";
+      el.addEventListener("click", () => openAt(i));
+    });
+
+    wrap.addEventListener("wheel", (e) => {
+      e.preventDefault();
+      const r = wrap.getBoundingClientRect();
+      zoomAt(e.deltaY < 0 ? 1.2 : 1 / 1.2, e.clientX - r.left, e.clientY - r.top);
+    }, { passive: false });
+
+    img.addEventListener("dblclick", (e) => {
+      const r = wrap.getBoundingClientRect();
+      if (scale !== 1) { resetZoom(); return; }
+      zoomAt(2.5 / scale, e.clientX - r.left, e.clientY - r.top);
+    });
+
+    // 拖拽平移（鼠标与触屏统一 Pointer Events；1x 时不启用）
+    let dragging = false, px = 0, py = 0;
+    img.addEventListener("pointerdown", (e) => {
+      if (scale === 1) return;
+      dragging = true; px = e.clientX; py = e.clientY;
+      img.setPointerCapture(e.pointerId);
+    });
+    img.addEventListener("pointermove", (e) => {
+      if (!dragging) return;
+      tx += e.clientX - px; ty += e.clientY - py;
+      px = e.clientX; py = e.clientY;
+      apply();
+    });
+    img.addEventListener("pointerup", () => { dragging = false; });
+    img.addEventListener("pointercancel", () => { dragging = false; });
+
+    // 双指捏合
+    let pinchDist = 0, pinchScale = 1;
+    wrap.addEventListener("touchstart", (e) => {
+      if (e.touches.length === 2) {
+        pinchDist = Math.hypot(e.touches[0].clientX - e.touches[1].clientX, e.touches[0].clientY - e.touches[1].clientY);
+        pinchScale = scale;
+      }
+    }, { passive: true });
+    wrap.addEventListener("touchmove", (e) => {
+      if (e.touches.length !== 2 || !pinchDist) return;
+      e.preventDefault();
+      const d = Math.hypot(e.touches[0].clientX - e.touches[1].clientX, e.touches[0].clientY - e.touches[1].clientY);
+      const r = wrap.getBoundingClientRect();
+      zoomAt((pinchScale * d / pinchDist) / scale, (e.touches[0].clientX + e.touches[1].clientX) / 2 - r.left, (e.touches[0].clientY + e.touches[1].clientY) / 2 - r.top);
+    }, { passive: false });
+    wrap.addEventListener("touchend", () => { pinchDist = 0; }, { passive: true });
+
+    // 1x 时单指左右滑动切图
+    let swipeX = null;
+    wrap.addEventListener("touchstart", (e) => { if (e.touches.length === 1) swipeX = e.touches[0].clientX; }, { passive: true });
+    wrap.addEventListener("touchend", (e) => {
+      if (swipeX === null || scale !== 1) { swipeX = null; return; }
+      const dx = e.changedTouches[0].clientX - swipeX;
+      if (Math.abs(dx) > 40) go(dx < 0 ? 1 : -1);
+      swipeX = null;
+    }, { passive: true });
+
+    document.getElementById("il-zoom-in")?.addEventListener("click", () => zoomAt(1.25));
+    document.getElementById("il-zoom-out")?.addEventListener("click", () => zoomAt(1 / 1.25));
+    document.getElementById("il-zoom-reset")?.addEventListener("click", resetZoom);
+    document.getElementById("il-close")?.addEventListener("click", close);
+    btnPrev?.addEventListener("click", () => go(-1));
+    btnNext?.addEventListener("click", () => go(1));
+    wrap.addEventListener("click", (e) => { if (e.target === wrap) close(); });
+
+    document.addEventListener("keydown", (e) => {
+      if (!open) return;
+      if (e.key === "Escape") { close(); return; }
+      if (e.key === "ArrowLeft") { go(-1); return; }
+      if (e.key === "ArrowRight") { go(1); return; }
+      if (e.key === "+" || e.key === "=") { zoomAt(1.25); return; }
+      if (e.key === "-") { zoomAt(1 / 1.25); return; }
+      if (e.key === "0") resetZoom();
+    });
+  })();
+</script>
