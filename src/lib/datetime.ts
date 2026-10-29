@@ -23,3 +23,12 @@ export function formatDateCN(
   if (isNaN(d.getTime())) return "";
   return d.toLocaleDateString("zh-CN", opts);
 }
+
+/** 日期短格式「2026/10/29」（月/日补零，宽度一致），卡片等紧凑场景用 */
+export function formatDateShort(s: string): string {
+  const d = parseDbDate(s);
+  if (isNaN(d.getTime())) return "";
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${d.getFullYear()}/${m}/${day}`;
+}

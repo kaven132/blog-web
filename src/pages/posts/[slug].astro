@@ -124,19 +124,19 @@ const viewsDisplay = postViews > 9999 ? `${(postViews / 10000).toFixed(1)} 万` 
 
       <!-- Meta -->
       <div class="flex flex-wrap items-center gap-x-3 gap-y-1.5 text-sm text-[var(--color-text-subtle)] font-medium">
-        <time datetime={dbDateToISO(post.createdAt)}>{formattedDate}</time>
+        <time class="whitespace-nowrap" datetime={dbDateToISO(post.createdAt)}>{formattedDate}</time>
         {
           post.updatedAt !== post.createdAt && (
             <>
               <span class="w-1 h-1 rounded-full bg-[var(--color-text-subtle)]" />
-              <span>更新于 {formatDateCN(post.updatedAt, { year: "numeric", month: "long", day: "numeric" })}</span>
+              <span class="whitespace-nowrap">更新于 {formatDateCN(post.updatedAt, { year: "numeric", month: "long", day: "numeric" })}</span>
             </>
           )
         }
         <span class="w-1 h-1 rounded-full bg-[var(--color-text-subtle)]" />
         <span>{wordCountDisplay} 字</span>
         <span class="w-1 h-1 rounded-full bg-[var(--color-text-subtle)]" />
-        <span>约 {readMinutes} 分钟阅读</span>
+        <span class="whitespace-nowrap">约 {readMinutes} 分钟阅读</span>
         <span class="w-1 h-1 rounded-full bg-[var(--color-text-subtle)]" />
         <span class="inline-flex items-center gap-1">
           <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24" aria-hidden="true">

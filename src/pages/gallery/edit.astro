@@ -96,7 +96,7 @@ const gameId = isEdit ? gallery!.id : 0;
         </div>
         <div id="gal-photos" class="flex flex-wrap gap-3" data-photos={JSON.stringify(photos)}></div>
         <label class="gal-add mt-3 inline-flex items-center justify-center gap-1 px-4 py-2 text-xs font-semibold rounded-lg border border-dashed border-[var(--color-border)] text-[var(--color-text-subtle)] hover:text-[var(--color-accent)] hover:border-[var(--color-accent)] cursor-pointer transition-colors">
-          + 上传照片（可多选，单张 ≤5MB）
+          + 上传照片（可多选，单张 ≤10MB）
           <input id="gal-upload" type="file" accept="image/png,image/jpeg,image/webp,image/gif,image/avif" multiple class="hidden" />
         </label>
       </div>
@@ -169,19 +169,23 @@ const gameId = isEdit ? gallery!.id : 0;
 
       uploadInput.addEventListener("change", async () => {
         if (!uploadInput.files || !uploadInput.files.length) return;
+        // 相册照片走 /api/upload/photo（10MB）；超限的本地直接跳过，不白传
+        const MAX = 10 * 1024 * 1024;
         setHint("上传中…");
+        let skipped = 0;
         for (const file of uploadInput.files) {
+          if (file.size > MAX) { skipped++; continue; }
           const fd = new FormData();
           fd.append("file", file);
           try {
-            const res = await fetch("/api/upload", { method: "POST", body: fd });
+            const res = await fetch("/api/upload/photo", { method: "POST", body: fd });
             const j = await res.json().catch(() => ({}));
             if (res.ok && j.url) photos.push(j.url);
             else { setHint(j.error || "上传失败"); render(); return; }
           } catch { setHint("上传失败"); render(); return; }
         }
         uploadInput.value = "";
-        setHint("上传完成，记得点「保存」");
+        setHint(skipped ? `上传完成，${skipped} 个文件超过 10MB 已跳过；记得点「保存」` : "上传完成，记得点「保存」");
         render();
       });
 

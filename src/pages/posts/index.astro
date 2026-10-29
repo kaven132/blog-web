@@ -67,7 +67,6 @@ const allPosts = db
     coverImage: posts.coverImage,
     createdAt: posts.createdAt,
     views: posts.views,
-    contentLen: sql<number>`length(${posts.content})`,
     likeCount: sql<number>`coalesce(${likes.count}, 0)`,
     commentCount: sql<number>`count(${comments.id})`,
   })
@@ -257,8 +256,8 @@ const pageTitle = [l1, l2, l3].filter(Boolean).join(" Â· ") || (searchQuery ? `æ
               coverImage={post.coverImage ?? undefined}
               createdAt={post.createdAt}
               likeCount={post.likeCount}
+              commentCount={post.commentCount}
               views={post.views}
-              contentLen={post.contentLen}
               searchSnippet={ftsHit?.get(post.id)?.snippet}
               index={i}
             />

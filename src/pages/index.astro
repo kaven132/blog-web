@@ -3,7 +3,7 @@ import Layout from "../layouts/Layout.astro";
 import PostCard from "../components/PostCard";
 import SearchBar from "../components/SearchBar";
 import { db } from "../db";
-import { posts, likes, galleries, galleryPhotos, galleryLikes } from "../db/schema";
+import { posts, likes, comments, galleries, galleryPhotos, galleryLikes } from "../db/schema";
 import { desc, eq, sql, asc, inArray } from "drizzle-orm";
 
 const recentPosts = db
@@ -15,12 +15,14 @@ const recentPosts = db
     coverImage: posts.coverImage,
     createdAt: posts.createdAt,
     likeCount: sql<number>`coalesce(${likes.count}, 0)`,
+    commentCount: sql<number>`count(${comments.id})`,
     views: posts.views,
-    contentLen: sql<number>`length(${posts.content})`,
   })
   .from(posts)
   .leftJoin(likes, eq(likes.postId, posts.id))
+  .leftJoin(comments, eq(comments.postId, posts.id))
   .where(eq(posts.published, true))
+  .groupBy(posts.id)
   .orderBy(desc(posts.createdAt))
   .limit(3)
   .all();
@@ -108,8 +110,8 @@ const recentGalleryCards = recentGalleries.map((g) => ({
               coverImage={post.coverImage ?? undefined}
               createdAt={post.createdAt}
               likeCount={post.likeCount}
+              commentCount={post.commentCount}
               views={post.views}
-              contentLen={post.contentLen}
               index={i}
             />
           ))}
