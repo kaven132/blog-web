@@ -97,6 +97,10 @@ const userAvatar = row?.avatar || "";
         document.addEventListener("astro:after-swap", apply);
       })();
     </script>
+    <!-- 自托管字体声明（postbuild 从主 CSS 抽出 626 个 @font-face）：非阻塞加载，
+         主 CSS 不再被 732KB 字体表拖住首屏；字体 display:swap 异步晚到无妨。
+         dev 模式无 postbuild 产物，404 回退系统字体，属预期 -->
+    <link rel="stylesheet" href="/fonts.css" media="print" onload="this.media='all'" />
   </head>
   <body>
     <AppShell client:load authed={authed} userName={userName} userAvatar={userAvatar}>

@@ -1,6 +1,7 @@
 import type { APIRoute } from "astro";
 import { mkdirSync, writeFileSync } from "node:fs";
 import { randomUUID } from "node:crypto";
+import sharp from "sharp";
 import { AUTH_COOKIE, isAuthed } from "./auth";
 
 const ALLOWED: Record<string, string> = {
@@ -56,7 +57,17 @@ export function createUploadHandler(maxSize: number): APIRoute {
       const name = `${Date.now()}-${randomUUID().slice(0, 8)}.${ext}`;
       const dir = "./data/uploads";
       mkdirSync(dir, { recursive: true });
-      writeFileSync(`${dir}/${name}`, Buffer.from(await file.arrayBuffer()));
+      let data = Buffer.from(await file.arrayBuffer());
+      // JPEG 落盘前直接转 WebP q82（文件名保持 .jpg，/uploads 按魔数嗅探 MIME）——
+      // 与存量图片策略一致，新图落盘即享受 -70% 体积；转换失败回退原始字节，上传永不失败
+      if (file.type === "image/jpeg" && data.length > 20 * 1024) {
+        try {
+          data = await sharp(data).webp({ quality: 82 }).toBuffer();
+        } catch {
+          /* 回退原始 JPEG */
+        }
+      }
+      writeFileSync(`${dir}/${name}`, data);
 
       return new Response(JSON.stringify({ url: `/uploads/${name}` }), {
         status: 200,

@@ -10,8 +10,8 @@
  * 建议挂到自动发文流水线末尾，或系统定时任务每天跑一次。
  */
 
-import { mkdirSync, readdirSync, statSync, unlinkSync } from "node:fs";
-import { join } from "node:path";
+import { mkdirSync, readdirSync, statSync, unlinkSync, existsSync, rmSync } from "node:fs";
+import { join, resolve } from "node:path";
 import Database from "better-sqlite3";
 
 const keepArg = process.argv.find((a) => a.startsWith("--keep="));
@@ -39,3 +39,23 @@ while (autos.length > KEEP) {
 }
 
 console.log(`✅ 已备份：${dest}（${(statSync(dest).size / 1024).toFixed(1)} KB）`);
+
+// ── 图片存储养护（与备份同频）：兜底转 WebP + 清运行时转档缓存 ──
+// 1) 幂等兜底：把漏网的新 JPEG 转成 WebP（脚本自带"已转跳过/不变小跳过"，重复跑无副作用）
+try {
+  console.log("── 图片兜底转换 ──");
+  const { spawnSync } = await import("node:child_process");
+  spawnSync(process.execPath, ["scripts/_webp-convert.mjs"], { stdio: "inherit" });
+} catch (err) {
+  console.error("⚠️ 兜底转换失败（不影响备份）:", err.message);
+}
+// 2) 清运行时转档缓存（/uploads 按 Accept 协商产生的 .webp 副本；存量已预转，多数缓存冗余）
+try {
+  const cacheDir = resolve("./data/img-cache");
+  if (existsSync(cacheDir)) {
+    rmSync(cacheDir, { recursive: true, force: true });
+    console.log("🧹 已清理图片转档缓存 data/img-cache（下次访问按需重建）");
+  }
+} catch (err) {
+  console.error("⚠️ 缓存清理失败（不影响备份）:", err.message);
+}

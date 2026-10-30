@@ -258,7 +258,7 @@ const pageTitle = editing ? "编辑文章" : "写文章";
 </Layout>
 
 <script>
-  import { renderMarkdown } from "../lib/markdown";
+  // renderMarkdown 改为下方按需动态 import（连带 highlight.js 拆独立 chunk）
   import { slugify } from "../lib/slug";
 
   const form = document.getElementById("write-form")!;
@@ -342,7 +342,25 @@ const pageTitle = editing ? "编辑文章" : "写文章";
   const modePreviewBtn = document.getElementById("mode-preview")!;
   const meta = document.getElementById("content-meta")!;
 
+  // 渲染器按需加载：renderMarkdown 连带 highlight.js（~150KB）拆成独立 chunk，
+  // 首次切预览/插入图片时才拉取；首屏脚本只剩表单与工具栏逻辑
+  let renderMarkdown: ((src: string) => string) | null = null;
+  let rendererLoading: Promise<void> | null = null;
+  const loadRenderer = () => {
+    rendererLoading ??= import("../lib/markdown").then((m) => {
+      renderMarkdown = m.renderMarkdown;
+    });
+    return rendererLoading;
+  };
+
   const updatePreview = () => {
+    if (!renderMarkdown) {
+      preview.innerHTML = `<p class="text-[var(--color-text-subtle)]">渲染器加载中…</p>`;
+      loadRenderer().then(() => {
+        if (!preview.classList.contains("hidden")) updatePreview();
+      });
+      return;
+    }
     preview.innerHTML = contentInput.value.trim() ? renderMarkdown(contentInput.value) : `<p class="text-[var(--color-text-subtle)]">预览区 — 开始编写即可实时预览渲染效果</p>`;
   };
 
