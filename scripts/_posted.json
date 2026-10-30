@@ -54,7 +54,8 @@
     "世说新语",
     "叫魂",
     "日瓦戈医生",
-    "长恨歌"
+    "长恨歌",
+    "卡拉马佐夫兄弟"
   ],
   "plugins": [
     "DeepSeek Harness (dsh) — https://github.com/deepseek-ai/deepseek-harness",
@@ -119,6 +120,7 @@
     "Claude Opus 5.5 — https://www.anthropic.com/news/claude-opus-5-5",
     "GPT-6.1 Sol — https://openai.com/index/introducing-gpt-6-1-sol/",
     "Gemini 4 Argon — https://blog.google/intl/en-mena/product-updates/explore-get-answers/gemini-4-argon-built-to-solve-your-hardest-problems/",
-    "Qwen3.8-Max — https://www.alizila.com/alibaba-unveils-qwen3-8-max-most-capable-flagship-model-to-date/"
+    "Qwen3.8-Max — https://www.alizila.com/alibaba-unveils-qwen3-8-max-most-capable-flagship-model-to-date/",
+    "Kimi K3.1 Pro（K3.1 系列首模型，3 万亿级后训练版） — https://platform.kimi.com/docs/guide/kimi-k3-1-pro-quickstart"
   ]
 }
