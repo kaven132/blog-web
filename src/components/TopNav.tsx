@@ -6,6 +6,7 @@ const navLinks = [
   { href: "/", label: "首页" },
   { href: "/posts", label: "文章" },
   { href: "/gallery", label: "相册" },
+  { href: "/videos", label: "视频" },
   { href: "/travel", label: "旅行地图" },
   { href: "/games", label: "小游戏" },
   { href: "/about", label: "关于" },

@@ -1,0 +1,251 @@
+---
+import Layout from "../../layouts/Layout.astro";
+import { db } from "../../db";
+import { videos } from "../../db/schema";
+import { eq } from "drizzle-orm";
+import { AUTH_COOKIE, isAuthed } from "../../lib/auth";
+
+export const prerender = false;
+
+if (!isAuthed(Astro.cookies.get(AUTH_COOKIE)?.value)) {
+  return Astro.redirect("/login?next=" + encodeURIComponent(Astro.url.pathname + Astro.url.search));
+}
+
+// ?id=N 为编辑模式；缺省为新建模式
+const id = Number(Astro.url.searchParams.get("id"));
+const isEdit = Number.isInteger(id) && id > 0;
+
+let video: { id: number; title: string; description: string; url: string; poster: string; isPrivate: number } | undefined;
+if (isEdit) {
+  video = db.select().from(videos).where(eq(videos.id, id)).get();
+  if (!video) return Astro.redirect("/videos");
+}
+const vid = isEdit ? video!.id : 0;
+---
+
+<Layout title={isEdit ? `编辑视频：${video!.title}` : "上传视频"}>
+  <article class="py-10 max-w-3xl mx-auto">
+    <header class="mb-8">
+      <p class="text-xs font-semibold tracking-[0.15em] uppercase text-[var(--color-text-subtle)] mb-3">Admin · Video</p>
+      <h1 class="text-3xl font-bold tracking-[-0.02em] mb-3">{isEdit ? "编辑视频" : "上传视频"}</h1>
+      <a href="/videos" class="inline-flex items-center gap-1 text-sm text-[var(--color-text-muted)] hover:text-[var(--color-accent)] transition-colors">
+        <span aria-hidden="true">←</span> 返回视频
+      </a>
+    </header>
+
+    <div class="rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] p-6 space-y-5">
+      <div>
+        <label for="v-title" class="block text-sm font-medium text-[var(--color-text)] mb-1.5">视频标题 <span class="text-red-400" aria-hidden="true">*</span></label>
+        <input id="v-title" type="text" maxlength="60" placeholder="视频标题（必填）" value={isEdit ? video!.title : ""}
+          class="w-full px-3 py-2 rounded-lg border border-[var(--color-border)] bg-[var(--color-bg)] text-sm text-[var(--color-text)] outline-none focus:border-[var(--color-accent)]" />
+      </div>
+      <div>
+        <label for="v-desc" class="block text-sm font-medium text-[var(--color-text)] mb-1.5">简介</label>
+        <input id="v-desc" type="text" maxlength="300" placeholder="简介（可选）" value={isEdit ? video!.description : ""}
+          class="w-full px-3 py-2 rounded-lg border border-[var(--color-border)] bg-[var(--color-bg)] text-sm text-[var(--color-text)] outline-none focus:border-[var(--color-accent)]" />
+      </div>
+      <label class="flex items-center gap-2.5 text-sm text-[var(--color-text)] cursor-pointer select-none">
+        <input id="v-private" type="checkbox" class="w-4 h-4 accent-[var(--color-accent)]" checked={isEdit && !!video!.isPrivate} />
+        隐私视频（仅登录后可见，未登录访客与列表不显示）
+      </label>
+
+      <div>
+        <div class="flex items-center justify-between mb-1.5">
+          <label class="block text-sm font-medium text-[var(--color-text)]">视频文件 <span class="text-red-400" aria-hidden="true">*</span></label>
+          <span class="text-xs text-[var(--color-text-subtle)]">MP4 / WebM / MOV，单文件 ≤ 500MB</span>
+        </div>
+        <div id="v-file-box" class="rounded-lg border border-dashed border-[var(--color-border)] px-4 py-4 text-sm">
+          <input id="v-file" type="file" accept="video/mp4,video/webm,video/quicktime" class="hidden" />
+          {isEdit ? (
+            <span class="text-[var(--color-text-muted)]">已有视频文件。要替换时点下面按钮重新上传。</span>
+          ) : (
+            <span class="text-[var(--color-text-muted)]">尚未上传。</span>
+          )}
+          <button type="button" id="v-file-btn" class="ml-3 px-3 py-1 rounded-md text-xs font-semibold border border-[var(--color-border)] text-[var(--color-text-muted)] hover:text-[var(--color-accent)] hover:border-[var(--color-accent)] transition-colors">
+            {isEdit ? "替换视频" : "选择视频"}
+          </button>
+          <div id="v-progress-wrap" class="hidden mt-3">
+            <div class="h-2 rounded-full bg-[var(--color-bg)] overflow-hidden">
+              <div id="v-progress-bar" class="h-full bg-[var(--color-accent)] transition-all" style="width:0%"></div>
+            </div>
+            <p id="v-progress-text" class="text-[11px] text-[var(--color-text-subtle)] mt-1 font-mono">0%</p>
+          </div>
+        </div>
+        <input type="hidden" id="v-url" value={isEdit ? video!.url : ""} />
+      </div>
+
+      <div>
+        <label class="block text-sm font-medium text-[var(--color-text)] mb-1.5">封面图 <span class="text-xs text-[var(--color-text-subtle)] font-normal">（可选，≤10MB；不传则播放器显示视频首帧）</span></label>
+        <div class="flex items-center gap-4">
+          <div id="v-poster-preview" class="w-40 aspect-video rounded-lg border border-[var(--color-border)] bg-[var(--color-bg)] overflow-hidden flex items-center justify-center text-xs text-[var(--color-text-subtle)]">
+            {isEdit && video!.poster ? <img src={video!.poster} alt="封面" class="w-full h-full object-cover" /> : "暂无封面"}
+          </div>
+          <div class="flex flex-col gap-2">
+            <button type="button" id="v-poster-btn" class="px-3 py-1.5 rounded-md text-xs font-semibold border border-[var(--color-border)] text-[var(--color-text-muted)] hover:text-[var(--color-accent)] hover:border-[var(--color-accent)] transition-colors">
+              上传封面
+            </button>
+            <button type="button" id="v-poster-remove" class="px-3 py-1.5 rounded-md text-xs font-semibold border border-[var(--color-border)] text-[var(--color-text-muted)] hover:text-[var(--color-accent)] transition-colors">
+              移除封面
+            </button>
+          </div>
+          <input type="file" id="v-poster-file" accept="image/png,image/jpeg,image/webp" class="hidden" />
+        </div>
+        <input type="hidden" id="v-poster" value={isEdit ? video!.poster : ""} />
+      </div>
+
+      <p id="v-hint" class="hidden text-sm text-[var(--color-text-muted)]"></p>
+
+      <div class="flex items-center gap-3 pt-2 border-t border-[var(--color-border)] flex-wrap">
+        <button id="v-save" type="button" class="px-5 py-2.5 text-sm font-semibold rounded-lg bg-[var(--color-accent)] text-white hover:bg-[var(--color-accent-hover)] transition-colors">保存</button>
+        {isEdit && (
+          <button id="v-del" type="button" class="px-4 py-2.5 text-sm rounded-lg border border-[var(--color-border)] text-red-400 hover:text-red-500 hover:border-red-200 hover:bg-red-50 transition-colors">删除视频</button>
+        )}
+        <span class="text-xs text-[var(--color-text-subtle)]">保存后自动返回视频列表</span>
+      </div>
+    </div>
+  </article>
+
+  <script>
+    const hint = (t: string) => {
+      const el = document.getElementById("v-hint")!;
+      el.textContent = t;
+      el.classList.remove("hidden");
+    };
+
+    // ── 视频上传（XHR 才有上传进度；fetch 拿不到）──
+    const videoUrlInput = document.getElementById("v-url") as HTMLInputElement;
+    const wrap = document.getElementById("v-progress-wrap")!;
+    const bar = document.getElementById("v-progress-bar")!;
+    const progressText = document.getElementById("v-progress-text")!;
+    const fileInput = document.getElementById("v-file") as HTMLInputElement;
+    const fileBtn = document.getElementById("v-file-btn")!;
+
+    fileBtn.addEventListener("click", () => fileInput.click());
+    fileInput.addEventListener("change", () => {
+      const file = fileInput.files?.[0];
+      if (!file) return;
+      wrap.classList.remove("hidden");
+      bar.style.width = "0%";
+      progressText.textContent = "0%";
+      hint(`上传中：${file.name}`);
+
+      const xhr = new XMLHttpRequest();
+      // 视频上传端点按 Content-Type 识别类型并流式读原始 body —— 必须直传文件本体，
+      // 不能用 FormData（multipart 会被当成未知类型拒掉）
+      xhr.open("POST", "/api/videos/upload");
+      xhr.setRequestHeader("Content-Type", file.type || "application/octet-stream");
+      xhr.upload.addEventListener("progress", (e) => {
+        if (e.lengthComputable) {
+          const pct = Math.round((e.loaded / e.total) * 100);
+          bar.style.width = pct + "%";
+          progressText.textContent = `${pct}%（${(e.loaded / 1048576).toFixed(1)} / ${(e.total / 1048576).toFixed(1)} MB）`;
+        }
+      });
+      xhr.addEventListener("load", () => {
+        try {
+          const j = JSON.parse(xhr.responseText);
+          if (xhr.status === 200 && j.url) {
+            videoUrlInput.value = j.url;
+            hint("视频上传完成，记得点「保存」");
+          } else {
+            hint(j.error || "上传失败");
+            wrap.classList.add("hidden");
+          }
+        } catch {
+          hint("上传失败");
+          wrap.classList.add("hidden");
+        }
+      });
+      xhr.addEventListener("error", () => {
+        hint("上传失败（网络错误）");
+        wrap.classList.add("hidden");
+      });
+      xhr.send(file);
+    });
+
+    // ── 封面上传（走 /api/upload/photo，10MB）──
+    const posterInput = document.getElementById("v-poster") as HTMLInputElement;
+    const posterPreview = document.getElementById("v-poster-preview")!;
+    const posterFile = document.getElementById("v-poster-file") as HTMLInputElement;
+    document.getElementById("v-poster-btn")!.addEventListener("click", () => posterFile.click());
+    posterFile.addEventListener("change", async () => {
+      const file = posterFile.files?.[0];
+      if (!file) return;
+      hint("封面上传中…");
+      const fd = new FormData();
+      fd.append("file", file);
+      try {
+        const res = await fetch("/api/upload/photo", { method: "POST", body: fd });
+        const j = await res.json();
+        if (res.ok && j.url) {
+          posterInput.value = j.url;
+          posterPreview.innerHTML = `<img src="${j.url}" alt="封面" class="w-full h-full object-cover" />`;
+          hint("封面上传完成，记得点「保存」");
+        } else {
+          hint(j.error || "封面上传失败");
+        }
+      } catch {
+        hint("封面上传失败");
+      } finally {
+        posterFile.value = "";
+      }
+    });
+    document.getElementById("v-poster-remove")!.addEventListener("click", () => {
+      posterInput.value = "";
+      posterPreview.textContent = "暂无封面";
+    });
+
+    // ── 保存 / 删除 ──
+    const saveBtn = document.getElementById("v-save") as HTMLButtonElement;
+    saveBtn.addEventListener("click", async () => {
+      const title = (document.getElementById("v-title") as HTMLInputElement).value.trim();
+      if (!title) { hint("请先填写视频标题"); return; }
+      const url = videoUrlInput.value;
+      if (!url) { hint("请先上传视频文件"); return; }
+      saveBtn.disabled = true;
+      hint("保存中…");
+      const payload = {
+        title,
+        description: (document.getElementById("v-desc") as HTMLInputElement).value,
+        url,
+        poster: posterInput.value,
+        isPrivate: (document.getElementById("v-private") as HTMLInputElement).checked ? 1 : 0,
+      };
+      const doSave = () =>
+        fetch("/api/video", {
+          method: isEdit ? "PUT" : "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(isEdit ? { id: vid, ...payload } : payload),
+        }).then(async (res) => {
+          const j = await res.json().catch(() => ({}));
+          return res.ok ? { ok: true } : { ok: false, error: j.error || "保存失败" };
+        });
+
+      // 大文件上传后 Node 默认的 5 秒 keep-alive 超时可能已把连接关闭，
+      // 浏览器在旧连接上发 POST 会报网络错误 —— 自动换新连接重试一次
+      const save = async (attempt: number): Promise<void> => {
+        try {
+          const r = await doSave();
+          if (r.ok) { window.location.href = "/videos"; return; }
+          hint(r.error);
+        } catch {
+          if (attempt === 0) {
+            await new Promise((res) => setTimeout(res, 600));
+            return save(attempt + 1);
+          }
+          hint("保存失败（网络错误），请再试一次");
+        }
+        saveBtn.disabled = false;
+      };
+      await save(0);
+    });
+
+    const delBtn = document.getElementById("v-del");
+    delBtn?.addEventListener("click", async () => {
+      if (!confirm("确定删除这个视频？评论与点赞会一并删除，此操作不可恢复。")) return;
+      const res = await fetch(`/api/video?id=${vid}`, { method: "DELETE" });
+      if (res.ok) window.location.href = "/videos";
+      else hint("删除失败，请重试");
+    });
+  </script>
+</Layout>

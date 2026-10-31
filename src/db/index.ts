@@ -80,6 +80,30 @@ sqlite.exec(`CREATE TABLE IF NOT EXISTS gallery_comments (
   created_at TEXT NOT NULL DEFAULT (CURRENT_TIMESTAMP)
 )`);
 
+// 视频（上传播放）：文件在 data/videos/，url 指向 /media/<文件名>；点赞评论与相册同构
+sqlite.exec(`CREATE TABLE IF NOT EXISTS videos (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  title TEXT NOT NULL,
+  description TEXT NOT NULL DEFAULT '',
+  url TEXT NOT NULL,
+  poster TEXT NOT NULL DEFAULT '',
+  is_private INTEGER NOT NULL DEFAULT 0,
+  views INTEGER NOT NULL DEFAULT 0,
+  created_at TEXT NOT NULL DEFAULT (CURRENT_TIMESTAMP)
+)`);
+sqlite.exec(`CREATE TABLE IF NOT EXISTS video_likes (
+  video_id INTEGER PRIMARY KEY REFERENCES videos(id) ON DELETE CASCADE,
+  count INTEGER NOT NULL DEFAULT 0
+)`);
+sqlite.exec(`CREATE TABLE IF NOT EXISTS video_comments (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  video_id INTEGER NOT NULL REFERENCES videos(id) ON DELETE CASCADE,
+  parent_id INTEGER,
+  author TEXT NOT NULL DEFAULT '匿名',
+  content TEXT NOT NULL,
+  created_at TEXT NOT NULL DEFAULT (CURRENT_TIMESTAMP)
+)`);
+
 // 浏览历史（随账号走）：(user_id, kind, ref_id) 唯一，重复浏览 upsert 置顶
 sqlite.exec(`CREATE TABLE IF NOT EXISTS browse_history (
   id INTEGER PRIMARY KEY AUTOINCREMENT,

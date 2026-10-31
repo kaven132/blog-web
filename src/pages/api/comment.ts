@@ -1,12 +1,45 @@
 import type { APIRoute } from "astro";
 import { db } from "../../db";
-import { comments, posts, galleries, galleryComments } from "../../db/schema";
+import { comments, posts, galleries, galleryComments, videos, videoComments } from "../../db/schema";
 import { eq } from "drizzle-orm";
 import { AUTH_COOKIE, isAuthed } from "../../lib/auth";
 
 export const POST: APIRoute = async ({ request, redirect }) => {
   try {
     const formData = await request.formData();
+
+    // ── 视频评论分支：videoId 存在时走 video_comments（结构与相册分支完全同构） ──
+    const videoIdRaw = formData.get("videoId");
+    if (videoIdRaw) {
+      const videoId = Number(videoIdRaw);
+      const authorRaw = formData.get("author")?.toString().trim() || "匿名";
+      const content = formData.get("content")?.toString().trim();
+      if (!Number.isInteger(videoId) || videoId <= 0 || !content) {
+        return new Response("缺少必要参数", { status: 400 });
+      }
+      if (content.length > 500) {
+        return new Response("评论内容不能超过500字", { status: 400 });
+      }
+      const video = db.select({ id: videos.id }).from(videos).where(eq(videos.id, videoId)).get();
+      if (!video) {
+        return new Response("视频不存在", { status: 404 });
+      }
+      const author = authorRaw.slice(0, 20) || "匿名";
+      const parentIdRaw = formData.get("parentId");
+      let parentId: number | null = null;
+      if (parentIdRaw) {
+        const pid = Number(parentIdRaw);
+        const parent = Number.isInteger(pid)
+          ? db.select().from(videoComments).where(eq(videoComments.id, pid)).get()
+          : undefined;
+        if (!parent || parent.videoId !== videoId || parent.parentId !== null) {
+          return new Response("回复目标无效", { status: 400 });
+        }
+        parentId = pid;
+      }
+      db.insert(videoComments).values({ videoId, parentId, author, content }).run();
+      return redirect(`/videos/${videoId}#comments`, 302);
+    }
 
     // ── 相册评论分支：galleryId 存在时走 gallery_comments ──
     const galleryIdRaw = formData.get("galleryId");

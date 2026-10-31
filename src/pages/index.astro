@@ -132,13 +132,22 @@ const recentGalleryCards = recentGalleries.map((g) => ({
             <p class="text-xs font-semibold tracking-[0.15em] uppercase text-[var(--color-text-subtle)] mb-2">Gallery</p>
             <h2 class="text-2xl font-bold tracking-[-0.01em]">最新相册</h2>
           </div>
-          <a
-            href="/gallery"
-            class="text-sm font-medium text-[var(--color-accent)] hover:text-[var(--color-accent-hover)] transition-colors group flex items-center gap-1"
-          >
-            查看全部
-            <span class="inline-block transition-transform group-hover:translate-x-0.5">→</span>
-          </a>
+          <div class="flex items-center gap-4 text-sm font-medium">
+            <a
+              href="/videos"
+              class="text-[var(--color-text-muted)] hover:text-[var(--color-accent)] transition-colors flex items-center gap-1"
+            >
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M15.75 10.5l4.72-4.72a.75.75 0 0 1 1.28.53v11.38a.75.75 0 0 1-1.28.53l-4.72-4.72M4.5 18.75h9a2.25 2.25 0 0 0 2.25-2.25v-9a2.25 2.25 0 0 0-2.25-2.25h-9A2.25 2.25 0 0 0 2.25 7.5v9a2.25 2.25 0 0 0 2.25 2.25Z" /></svg>
+              视频馆
+            </a>
+            <a
+              href="/gallery"
+              class="text-[var(--color-accent)] hover:text-[var(--color-accent-hover)] transition-colors group flex items-center gap-1"
+            >
+              查看全部
+              <span class="inline-block transition-transform group-hover:translate-x-0.5">→</span>
+            </a>
+          </div>
         </div>
 
         <div class="grid gap-5 sm:grid-cols-3">

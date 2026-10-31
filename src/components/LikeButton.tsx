@@ -1,20 +1,23 @@
 import { useState, useCallback, useEffect } from "react";
 
 interface LikeButtonProps {
-  /** 文章点赞（与 galleryId 二选一） */
+  /** 文章点赞（与 galleryId / videoId 三选一） */
   postId?: number;
-  /** 相册点赞（与 postId 二选一） */
+  /** 相册点赞（与 postId / videoId 三选一） */
   galleryId?: number;
+  /** 视频点赞（与 postId / galleryId 三选一） */
+  videoId?: number;
   initialCount: number;
 }
 
-export default function LikeButton({ postId, galleryId, initialCount }: LikeButtonProps) {
+export default function LikeButton({ postId, galleryId, videoId, initialCount }: LikeButtonProps) {
   const [count, setCount] = useState(initialCount);
   const [liked, setLiked] = useState(false);
   const [loading, setLoading] = useState(false);
   const [animating, setAnimating] = useState(false);
 
-  const storageKey = galleryId !== undefined ? `liked:gallery:${galleryId}` : `liked:${postId}`;
+  const storageKey =
+    videoId !== undefined ? `liked:video:${videoId}` : galleryId !== undefined ? `liked:gallery:${galleryId}` : `liked:${postId}`;
 
   // 已点赞状态落到 localStorage：刷新/再次访问不会「已点赞」变回未点，
   // 防止无意识重复点赞把计数刷虚高（服务端本身没有按用户去重）
@@ -35,7 +38,7 @@ export default function LikeButton({ postId, galleryId, initialCount }: LikeButt
       const res = await fetch("/api/like", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(galleryId !== undefined ? { galleryId } : { postId }),
+        body: JSON.stringify(videoId !== undefined ? { videoId } : galleryId !== undefined ? { galleryId } : { postId }),
       });
       if (res.ok) {
         const data = await res.json();

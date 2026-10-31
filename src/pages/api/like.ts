@@ -1,6 +1,6 @@
 import type { APIRoute } from "astro";
 import { db } from "../../db";
-import { likes, posts, galleries, galleryLikes } from "../../db/schema";
+import { likes, posts, galleries, galleryLikes, videos, videoLikes } from "../../db/schema";
 import { eq, sql } from "drizzle-orm";
 
 export const POST: APIRoute = async ({ request }) => {
@@ -8,6 +8,37 @@ export const POST: APIRoute = async ({ request }) => {
     const body = await request.json();
     const postId = typeof body?.postId === "number" ? body.postId : undefined;
     const galleryId = typeof body?.galleryId === "number" ? body.galleryId : undefined;
+    const videoId = typeof body?.videoId === "number" ? body.videoId : undefined;
+
+    // 视频点赞：与文章/相册同款原子累加（video_likes.video_id 主键天然去重）
+    if (videoId !== undefined) {
+      if (!Number.isInteger(videoId) || videoId <= 0) {
+        return new Response(JSON.stringify({ error: "无效的请求" }), {
+          status: 400,
+          headers: { "Content-Type": "application/json" },
+        });
+      }
+      const exists = db.select({ id: videos.id }).from(videos).where(eq(videos.id, videoId)).get();
+      if (!exists) {
+        return new Response(JSON.stringify({ error: "视频不存在" }), {
+          status: 404,
+          headers: { "Content-Type": "application/json" },
+        });
+      }
+      const rows = db
+        .insert(videoLikes)
+        .values({ videoId, count: 1 })
+        .onConflictDoUpdate({
+          target: videoLikes.videoId,
+          set: { count: sql`${videoLikes.count} + 1` },
+        })
+        .returning()
+        .all();
+      return new Response(JSON.stringify({ count: rows[0]?.count ?? 1 }), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      });
+    }
 
     // 相册点赞：与文章同款原子累加（gallery_likes.gallery_id 主键天然去重）
     if (galleryId !== undefined) {

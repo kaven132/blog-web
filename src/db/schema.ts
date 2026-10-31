@@ -121,7 +121,7 @@ export const galleryPhotos = sqliteTable("gallery_photos", {
   sort: integer("sort").notNull().default(0),
 });
 
-/** 浏览历史（随账号走）：kind = post | gallery | game，ref_id 为 slug 或数字 id 字符串；(user_id,kind,ref_id) 唯一，重复浏览 upsert 置顶 */
+/** 浏览历史（随账号走）：kind = post | gallery | game | video，ref_id 为 slug 或数字 id 字符串；(user_id,kind,ref_id) 唯一，重复浏览 upsert 置顶 */
 export const browseHistory = sqliteTable("browse_history", {
   id: integer("id").primaryKey({ autoIncrement: true }),
   userId: integer("user_id").notNull(), // 单管理员体系恒为 1
@@ -130,6 +130,42 @@ export const browseHistory = sqliteTable("browse_history", {
   title: text("title").notNull(),
   url: text("url").notNull(),
   viewedAt: text("viewed_at")
+    .notNull()
+    .default(sql`(CURRENT_TIMESTAMP)`),
+});
+
+/** 视频：文件在 data/videos/，url 指向 /media/<文件名>；poster 为 /uploads/ 封面图（可空，空则播放器显示首帧） */
+export const videos = sqliteTable("videos", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  title: text("title").notNull(),
+  description: text("description").notNull().default(""),
+  url: text("url").notNull(),
+  poster: text("poster").notNull().default(""),
+  isPrivate: integer("is_private").notNull().default(0), // 隐私视频：仅登录可见
+  views: integer("views").notNull().default(0),
+  createdAt: text("created_at")
+    .notNull()
+    .default(sql`(CURRENT_TIMESTAMP)`),
+});
+
+/** 视频点赞：每视频一行，原子累加（与文章/相册同款并发方案） */
+export const videoLikes = sqliteTable("video_likes", {
+  videoId: integer("video_id")
+    .primaryKey()
+    .references(() => videos.id, { onDelete: "cascade" }),
+  count: integer("count").notNull().default(0),
+});
+
+/** 视频评论：盖楼回复（只做一层），随视频级联删除 */
+export const videoComments = sqliteTable("video_comments", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  videoId: integer("video_id")
+    .notNull()
+    .references(() => videos.id, { onDelete: "cascade" }),
+  parentId: integer("parent_id"), // 回复目标（仅一层：必须是顶层评论）
+  author: text("author").notNull().default("匿名"),
+  content: text("content").notNull(),
+  createdAt: text("created_at")
     .notNull()
     .default(sql`(CURRENT_TIMESTAMP)`),
 });

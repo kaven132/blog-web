@@ -1,0 +1,142 @@
+---
+import Layout from "../layouts/Layout.astro";
+import { db } from "../db";
+import { videos, videoLikes } from "../db/schema";
+import { desc, eq, sql } from "drizzle-orm";
+import { AUTH_COOKIE, isAuthed } from "../lib/auth";
+import { formatDateShort } from "../lib/datetime";
+
+export const prerender = false;
+
+const authed = isAuthed(Astro.cookies.get(AUTH_COOKIE)?.value);
+const SORT_KEYS = ["time", "views", "likes"];
+const sort: string = SORT_KEYS.includes(Astro.url.searchParams.get("sort") || "") ? (Astro.url.searchParams.get("sort") as string) : "time";
+
+// ── 数据：匿名只看公开视频 ──
+const allRows = db
+  .select({
+    id: videos.id,
+    title: videos.title,
+    description: videos.description,
+    poster: videos.poster,
+    url: videos.url,
+    views: videos.views,
+    isPrivate: videos.isPrivate,
+    createdAt: videos.createdAt,
+    likeCount: sql<number>`coalesce(${videoLikes.count}, 0)`,
+    commentCount: sql<number>`(select count(*) from video_comments vc where vc.video_id = ${videos.id})`,
+  })
+  .from(videos)
+  .leftJoin(videoLikes, eq(videoLikes.videoId, videos.id))
+  .orderBy(desc(videos.createdAt))
+  .all();
+
+let cards = allRows.map((v) => ({
+  ...v,
+  isPrivate: !!v.isPrivate,
+}));
+if (!authed) cards = cards.filter((c) => !c.isPrivate);
+
+const sorted = [...cards].sort((a, b) => {
+  if (sort === "views") return b.views - a.views;
+  if (sort === "likes") return b.likeCount - a.likeCount;
+  return b.createdAt.localeCompare(a.createdAt);
+});
+const sortUrl = (s: string) => (s === "time" ? "/videos" : `/videos?sort=${s}`);
+---
+
+<Layout title="视频" description="上传与分享的视频 —— 在线播放，点赞评论">
+  <article class="py-12 md:py-16">
+    <header class="mb-8">
+      <p class="text-xs font-semibold tracking-[0.15em] uppercase text-[var(--color-text-subtle)] mb-2">Videos</p>
+      <h1 class="text-3xl font-bold tracking-[-0.015em] mb-3">视频</h1>
+      <div class="flex items-center gap-3 flex-wrap text-sm">
+        <span class="text-[var(--color-text-muted)]">共 {sorted.length} 个视频</span>
+        <div class="flex items-center gap-2">
+          <span class="text-xs text-[var(--color-text-subtle)]">排序</span>
+          {SORT_KEYS.map((k) => (
+            <a
+              href={sortUrl(k)}
+              class={`px-3 py-1 rounded-lg text-xs font-semibold transition-colors ${
+                sort === k
+                  ? "bg-[var(--color-accent)] text-white"
+                  : "bg-[var(--color-bg)] text-[var(--color-text-muted)] hover:text-[var(--color-accent)]"
+              }`}
+            >
+              {k === "time" ? "时间" : k === "views" ? "浏览量" : "点赞数"}
+            </a>
+          ))}
+        </div>
+      </div>
+    </header>
+
+    {
+      sorted.length === 0 ? (
+        <div class="rounded-2xl border border-dashed border-[var(--color-border)] p-12 text-center">
+          <p class="text-sm text-[var(--color-text-muted)] font-serif mb-2">还没有视频</p>
+          <p class="text-xs text-[var(--color-text-subtle)]">上传 MP4 / WebM 视频后会显示在这里</p>
+        </div>
+      ) : (
+        <div class="grid gap-5 sm:grid-cols-2">
+          {sorted.map((v, i) => (
+            <a
+              href={`/videos/${v.id}`}
+              class={`group block bg-[var(--color-surface)] border border-[var(--color-border)] hover:border-[var(--color-border-hover)] rounded-2xl overflow-hidden transition-all duration-300 animate-[slide-up_0.5s_ease-out_both] ${
+                i >= 2 ? "[animation-delay:150ms]" : i === 1 ? "[animation-delay:100ms]" : ""
+              }`}
+            >
+              <div class="relative aspect-video bg-black border-b border-[var(--color-border)] overflow-hidden">
+                {v.poster ? (
+                  <img
+                    src={v.poster}
+                    alt={`${v.title} 封面`}
+                    class="absolute inset-0 w-full h-full object-cover transition-transform duration-500 group-hover:scale-[1.04]"
+                    loading="lazy"
+                  />
+                ) : (
+                  <video class="absolute inset-0 w-full h-full object-cover" src={v.url} preload="metadata" muted playsinline></video>
+                )}
+                <span class="absolute inset-0 flex items-center justify-center">
+                  <span class="w-12 h-12 rounded-full bg-black/50 backdrop-blur flex items-center justify-center text-white text-xl group-hover:scale-110 transition-transform" aria-hidden="true">▶</span>
+                </span>
+                {v.isPrivate && (
+                  <span class="absolute top-3 left-3 inline-flex items-center gap-1 rounded-full bg-black/60 backdrop-blur px-2.5 py-1 text-[11px] font-medium text-white">
+                    🔒 隐私
+                  </span>
+                )}
+              </div>
+              <div class="p-5">
+                <div class="flex items-baseline gap-2.5">
+                  <h2 class="text-lg font-bold text-[var(--color-text)] truncate">{v.title}</h2>
+                </div>
+                {v.description && <p class="mt-2 text-sm text-[var(--color-text-muted)] leading-relaxed line-clamp-2">{v.description}</p>}
+                <div class="mt-4 pt-4 border-t border-[var(--color-border)] flex flex-wrap items-center gap-x-2.5 gap-y-1 text-xs text-[var(--color-text-subtle)]">
+                  <time class="whitespace-nowrap font-medium tracking-wide uppercase tabular-nums">{formatDateShort(v.createdAt)}</time>
+                  <span class="inline-flex items-center gap-1 whitespace-nowrap" title="点赞数">
+                    <svg class="w-3.5 h-3.5 text-[var(--color-accent)]/60" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                      <path d="M11.645 20.91l-.007-.003-.022-.012a15.247 15.247 0 01-.383-.218 25.18 25.18 0 01-4.244-3.17C4.688 15.36 2.25 12.174 2.25 8.25 2.25 5.322 4.714 3 7.688 3A5.5 5.5 0 0112 5.052 5.5 5.5 0 0116.313 3c2.973 0 5.437 2.322 5.437 5.25 0 3.925-2.438 7.111-4.739 9.256a25.175 25.175 0 01-4.244 3.17 15.247 15.247 0 01-.383.219l-.022.012-.007.004-.003.001a.752.752 0 01-.704 0l-.003-.001z" />
+                    </svg>
+                    <span class="tabular-nums">{v.likeCount}</span>
+                  </span>
+                  <span class="inline-flex items-center gap-1 whitespace-nowrap" title="浏览量">
+                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24" aria-hidden="true">
+                      <path stroke-linecap="round" stroke-linejoin="round" d="M2.036 12.322a1.012 1.012 0 0 1 0-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178Z" />
+                      <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z" />
+                    </svg>
+                    <span class="tabular-nums">{v.views}</span>
+                  </span>
+                  <span class="inline-flex items-center gap-1 whitespace-nowrap" title="评论数">
+                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24" aria-hidden="true">
+                      <path stroke-linecap="round" stroke-linejoin="round" d="M8.625 12a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Zm0 0H8.25m4.125 0a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Zm0 0H12m4.125 0a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Zm0 0h-.375M21 12c0 4.556-4.03 8.25-9 8.25a9.764 9.764 0 0 1-2.555-.337A5.972 5.972 0 0 1 5.41 20.97a5.969 5.969 0 0 1-.474-.065 4.48 4.48 0 0 0 .978-2.025c.09-.457-.133-.901-.467-1.226C3.93 16.178 3 14.189 3 12c0-4.556 4.03-8.25 9-8.25s9 3.694 9 8.25Z" />
+                    </svg>
+                    <span class="tabular-nums">{v.commentCount}</span>
+                  </span>
+                </div>
+              </div>
+            </a>
+          ))}
+        </div>
+      )
+    }
+  </article>
+</Layout>

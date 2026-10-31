@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { House, Newspaper, Images, Map, Gamepad2, Info } from "lucide-react";
+import { House, Newspaper, Images, Clapperboard, Map, Gamepad2, Info } from "lucide-react";
 
 /**
  * 移动端底部标签栏（<xl 显示）：顶栏导航链接（≥xl 显示）在中等与窄屏收起时的替代导航，
@@ -11,6 +11,7 @@ const TABS = [
   { href: "/", label: "首页", Icon: House },
   { href: "/posts", label: "文章", Icon: Newspaper },
   { href: "/gallery", label: "相册", Icon: Images },
+  { href: "/videos", label: "视频", Icon: Clapperboard },
   { href: "/travel", label: "旅行", Icon: Map },
   { href: "/games", label: "游戏", Icon: Gamepad2 },
   { href: "/about", label: "关于", Icon: Info },
@@ -36,7 +37,7 @@ export default function TabBar() {
       style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
       aria-label="移动端导航"
     >
-      <div className="grid grid-cols-6">
+      <div className="grid grid-cols-7">
         {TABS.map((t) => {
           const active = isActive(t.href);
           return (
