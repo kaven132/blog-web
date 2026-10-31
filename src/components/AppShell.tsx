@@ -3,6 +3,7 @@ import TopNav from "./TopNav";
 import TabBar from "./TabBar";
 import ProfileCard from "./ProfileCard";
 import NewsPanel from "./NewsPanel";
+import WeatherCard, { type WeatherProp } from "./WeatherCard";
 
 interface AppShellProps {
   children: ReactNode;
@@ -10,11 +11,13 @@ interface AppShellProps {
   authed: boolean;
   userName?: string;
   userAvatar?: string;
+  /** 服务端拉好的天气（Layout 按站主城市查询），拉取失败或城市未登记时为 null 整卡隐藏 */
+  weather?: WeatherProp | null;
 }
 
 const PAD = "px-4 sm:px-5 md:px-6 xl:px-8";
 
-export default function AppShell({ children, authed, userName, userAvatar }: AppShellProps) {
+export default function AppShell({ children, authed, userName, userAvatar, weather }: AppShellProps) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
   return (
@@ -31,6 +34,7 @@ export default function AppShell({ children, authed, userName, userAvatar }: App
           <aside className="hidden xl:block xl:w-60 xl:flex-shrink-0 xl:h-full xl:min-h-0 xl:overflow-y-auto xl:overscroll-contain scrollbar-none">
             <div className="space-y-5">
               <ProfileCard authed={authed} />
+              {weather && <WeatherCard weather={weather} />}
               <NewsPanel />
             </div>
           </aside>
@@ -61,7 +65,10 @@ export default function AppShell({ children, authed, userName, userAvatar }: App
             </div>
             <ProfileCard authed={authed} />
             {/* pb 需大于底部标签栏高度（含安全区），否则资讯栏底部的来源切换会被标签栏盖住滚不出来 */}
-            <div className="p-3 pb-24"><NewsPanel /></div>
+            <div className="p-3 pb-24">
+              {weather && <div className="mb-4"><WeatherCard weather={weather} /></div>}
+              <NewsPanel />
+            </div>
           </div>
         </div>
       )}

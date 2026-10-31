@@ -5,6 +5,7 @@ import { db } from "../db";
 import { profile } from "../db/schema";
 import { eq } from "drizzle-orm";
 import { AUTH_COOKIE, isAuthed } from "../lib/auth";
+import { fetchWeather } from "../lib/weather";
 import "../styles/global.css";
 
 // 字体自托管（@fontsource）：同源加载不依赖 Google，大陆网络不再受 fonts.googleapis.com 波动影响；
@@ -41,9 +42,12 @@ const desc = description || title;
 // 登录态和用户名在服务端就绪，作为 props 下发给岛屿：
 // 客户端不用再发 /api/auth/me + /api/profile，登录用户也不会先闪一下「登录」按钮
 const authed = isAuthed(Astro.cookies.get(AUTH_COOKIE)?.value);
-const row = db.select({ name: profile.name, avatar: profile.avatar }).from(profile).where(eq(profile.id, 1)).get();
+const row = db.select({ name: profile.name, avatar: profile.avatar, city: profile.city }).from(profile).where(eq(profile.id, 1)).get();
 const userName = row?.name || "kaven";
 const userAvatar = row?.avatar || "";
+
+// 天气：按站主城市查询（内存缓存 30 分钟），上游失败或城市未登记返回 null 整卡隐藏
+const weather = row?.city ? await fetchWeather(row.city) : null;
 ---
 
 <!doctype html>
@@ -53,8 +57,10 @@ const userAvatar = row?.avatar || "";
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="description" content={desc} />
     <title>{title} | kaven的个人网页</title>
-    <!-- 页面转场：ClientRouter 拦截导航做客户端换页，默认交叉淡入淡出 -->
-    <ClientRouter />
+    <!-- 页面转场：ClientRouter 拦截导航做客户端换页，默认交叉淡入淡出。
+         仅生产启用：dev 模式下 Vite 按页注入 <style>，ClientRouter 转场交换 head
+         时会丢掉注入样式导致工具类全失效（底栏变竖排/内容裸奔），故 dev 走普通整页加载 -->
+    {import.meta.env.PROD && <ClientRouter />}
     <!-- Open Graph / Twitter Card：聊天与社交平台分享链接时的卡片数据 -->
     <meta property="og:type" content={ogType} />
     <meta property="og:site_name" content="kaven的个人网页" />
@@ -103,7 +109,7 @@ const userAvatar = row?.avatar || "";
     <link rel="stylesheet" href="/fonts.css" media="print" onload="this.media='all'" />
   </head>
   <body>
-    <AppShell client:load authed={authed} userName={userName} userAvatar={userAvatar}>
+    <AppShell client:load authed={authed} userName={userName} userAvatar={userAvatar} weather={weather}>
       <slot />
     </AppShell>
   </body>
