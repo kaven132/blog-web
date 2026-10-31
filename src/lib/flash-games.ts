@@ -16,6 +16,8 @@ export interface FlashGame {
   solName: string;
   /** 卡片左下角小字（首载体积提示） */
   footer: string;
+  /** 设备字体注册源（可选）：游戏对话用设备字体而非内嵌字体时，把含中文字形的 TTF 交给 Ruffle 注册 */
+  fonts?: string[];
 }
 
 export const FLASH_GAMES: FlashGame[] = [
@@ -63,6 +65,9 @@ export const FLASH_GAMES: FlashGame[] = [
     tags: ["Flash", "格斗", "Ruffle", "账号存档"],
     solName: "save_data_maisa",
     footer: "首次加载约 15MB",
+    // 对话文本是 HTML 设备字体（face="DFGothic-EB"，字体替换式汉化）：
+    // 不注册含中文字形的同名字体，Ruffle 渲染不出文字（对话框空白）
+    fonts: ["/games/maisa/swf/fonts/DFGothic-EB.ttf"],
   },
   {
     id: "elf-knight",

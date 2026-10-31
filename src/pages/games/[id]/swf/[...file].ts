@@ -17,6 +17,7 @@ const MIME: Record<string, string> = {
   ".swf": "application/x-shockwave-flash",
   ".png": "image/png",
   ".mp3": "audio/mpeg",
+  ".ttf": "font/ttf", // 设备字体（fontSources 注册用，如 maisa 的对话字体）
 };
 
 export const GET: APIRoute = async ({ params, cookies }) => {

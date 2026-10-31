@@ -2,11 +2,43 @@
 /**
  * Flash 游戏（Ruffle 运行）页面主体 —— 由 /games/[id].astro 按 kind 分发渲染。
  */
+import { inflateSync } from "node:zlib";
+import { readFileSync } from "node:fs";
+
 interface Props {
   game: import("../../lib/flash-games").FlashGame;
   ruffleVersion: string;
 }
 const { game, ruffleVersion } = Astro.props;
+
+/** 解析 SWF 头的舞台尺寸（twips -> px）：播放器比例按各游戏实际舞台走，
+ *  硬编码 4:3 会让非 4:3 游戏（如 maisa 600×600）在全屏时左右留大白边 */
+function swfStage(path: string): { w: number; h: number } | null {
+  try {
+    const buf = readFileSync(path);
+    const body = inflateSync(buf.subarray(8));
+    let pos = 0;
+    const readN = (n: number): number => {
+      let v = 0;
+      for (let i = 0; i < n; i++) {
+        v = (v << 1) | ((body[pos >> 3] >> (7 - (pos & 7))) & 1);
+        pos++;
+      }
+      return v;
+    };
+    const nBits = readN(5);
+    const xmin = readN(nBits) / 20;
+    const xmax = readN(nBits) / 20;
+    const ymin = readN(nBits) / 20;
+    const ymax = readN(nBits) / 20;
+    return { w: Math.max(1, xmax - xmin), h: Math.max(1, ymax - ymin) };
+  } catch {
+    return null;
+  }
+}
+
+const stageDim = swfStage(`../blog2-gamedata/games/${game.id}/main.swf`);
+const stageAspect = stageDim ? `${stageDim.w} / ${stageDim.h}` : "4 / 3";
 ---
 
   <article class="py-12 md:py-16 max-w-4xl mx-auto">
@@ -19,7 +51,7 @@ const { game, ruffleVersion } = Astro.props;
     </header>
 
     <!-- 存档同步栏（页面仅登录可见，进度随账号走；data-* 供脚本读取游戏标识） -->
-    <div id="sync-bar" class="mb-4 flex items-center gap-2 flex-wrap text-sm" data-game={game.id} data-sol={game.solName}>
+    <div id="sync-bar" class="mb-4 flex items-center gap-2 flex-wrap text-sm" data-game={game.id} data-sol={game.solName} data-fonts={JSON.stringify(game.fonts ?? [])}>
       <span id="sync-status" class="text-[var(--color-text-subtle)] font-mono text-xs">存档同步：初始化…</span>
       <span class="flex-1"></span>
       <button type="button" id="btn-upload" class="px-3 py-1.5 text-xs font-semibold rounded-lg border border-[var(--color-border)] text-[var(--color-text-muted)] hover:text-[var(--color-accent)] hover:border-[var(--color-accent)]/40 transition-colors">上传存档</button>
@@ -41,8 +73,8 @@ const { game, ruffleVersion } = Astro.props;
       <button type="button" id="btn-osfs" class="px-3 py-1.5 text-xs font-semibold rounded-lg border border-[var(--color-border)] text-[var(--color-text-muted)] hover:text-[var(--color-accent)] hover:border-[var(--color-accent)]/40 transition-colors">屏幕全屏</button>
     </div>
 
-    <!-- Ruffle 舞台（player 由脚本动态创建，避免自定义元素注册时序问题） -->
-    <div id="stage" class="rounded-2xl overflow-hidden border border-[var(--color-border)] bg-black animate-[slide-up_0.5s_ease-out_both] [animation-delay:100ms]"></div>
+    <!-- 舞台实际宽高比由各游戏 SWF 头解析（--game-aspect），全屏时按真实比例填充 -->
+    <div id="stage" class="rounded-2xl overflow-hidden border border-[var(--color-border)] bg-black animate-[slide-up_0.5s_ease-out_both] [animation-delay:100ms]" style={`--game-aspect: ${stageAspect}`}></div>
 
     <p class="text-xs text-[var(--color-text-subtle)] mt-4 leading-relaxed">
       本页面为个人收藏性质的本地游玩用途，游戏版权归原作者所有，请勿二次分发；
@@ -51,13 +83,13 @@ const { game, ruffleVersion } = Astro.props;
   </article>
 
 <style is:global>
-  /* 网页全屏：舞台脱离文档流铺满视口，播放器保持 4:3 居中 */
+  /* 网页全屏：舞台脱离文档流铺满视口，播放器按该游戏舞台比例居中 */
   #stage.web-full { position: fixed; inset: 0; z-index: 80; display: flex; align-items: center; justify-content: center; background: #000; border: none; border-radius: 0; }
-  #stage.web-full > ruffle-player { width: auto !important; height: 100% !important; aspect-ratio: 4 / 3 !important; }
+  #stage.web-full > ruffle-player { width: auto !important; height: 100% !important; aspect-ratio: var(--game-aspect, 4 / 3) !important; }
   body.web-full-lock { overflow: hidden; }
-  /* 屏幕全屏：Fullscreen API 元素铺满，播放器同样 4:3 居中 */
+  /* 屏幕全屏：Fullscreen API 元素铺满，播放器同真实比例居中 */
   #stage:fullscreen { display: flex; align-items: center; justify-content: center; background: #000; }
-  #stage:fullscreen > ruffle-player { width: auto !important; height: 100% !important; aspect-ratio: 4 / 3 !important; }
+  #stage:fullscreen > ruffle-player { width: auto !important; height: 100% !important; aspect-ratio: var(--game-aspect, 4 / 3) !important; }
 </style>
 
 <script src={`/ruffle/ruffle.js?v=${ruffleVersion}`} data-astro-rerun></script>
@@ -67,6 +99,7 @@ const { game, ruffleVersion } = Astro.props;
     const bar = document.getElementById("sync-bar");
     const GAME_ID = bar ? bar.dataset.game : "";
     const SOL_NAME = bar ? bar.dataset.sol : "";
+    const GAME_FONTS = (() => { try { return JSON.parse(bar ? bar.dataset.fonts || "[]" : "[]"); } catch { return []; } })();
     const SOL_EXT = "/" + SOL_NAME;
     const authed = document.getElementById("btn-upload") !== null;
     const statusEl = document.getElementById("sync-status");
@@ -171,10 +204,14 @@ const { game, ruffleVersion } = Astro.props;
         };
         const ruffle = window.RufflePlayer.newest();
         const player = ruffle.createPlayer();
-        player.style.cssText = "display:block;width:100%;aspect-ratio:4/3;";
+        player.style.cssText = "display:block;width:100%;aspect-ratio:" + (getComputedStyle(document.getElementById("stage")).getPropertyValue("--game-aspect") || "4 / 3") + ";";
         document.getElementById("stage").appendChild(player);
-        // base 指向 SWF 目录：游戏内 sub/xxx.swf 相对路径按 SWF 而非页面 URL 解析
-        await player.load({ url: "/games/" + GAME_ID + "/swf/main.swf", base: "/games/" + GAME_ID + "/swf/", allowScriptAccess: false });
+        // base 指向 SWF 目录：游戏内 sub/xxx.swf 相对路径按 SWF 而非页面 URL 解析；
+        // fonts 由注册表按需下发（设备字体游戏必须注册同名字体，否则对话文字空白）
+        await player.load(Object.assign(
+          { url: "/games/" + GAME_ID + "/swf/main.swf", base: "/games/" + GAME_ID + "/swf/", allowScriptAccess: false },
+          GAME_FONTS && GAME_FONTS.length ? { fontSources: GAME_FONTS } : {}
+        ));
         applyVolume();
         setStatus((statusEl.textContent || "").replace("存档同步：", "") + " · 游戏已就绪");
       } catch (e) {
