@@ -3,7 +3,7 @@ import Layout from "../layouts/Layout.astro";
 import PostCard from "../components/PostCard";
 import SearchBar from "../components/SearchBar";
 import { db } from "../db";
-import { posts, likes, comments, galleries, galleryPhotos, galleryLikes } from "../db/schema";
+import { posts, likes, comments, galleries, galleryPhotos, galleryLikes, videos, videoLikes } from "../db/schema";
 import { desc, eq, sql, asc, inArray } from "drizzle-orm";
 import { formatDateShort } from "../lib/datetime";
 
@@ -62,6 +62,25 @@ const recentGalleryCards = recentGalleries.map((g) => ({
   ...g,
   cover: galleryCover.get(g.id) ?? "",
 }));
+
+// 最新视频（仅公开）：3 个，与最新相册同构；无封面时前端用 <video> 首帧兜底
+const recentVideos = db
+  .select({
+    id: videos.id,
+    title: videos.title,
+    poster: videos.poster,
+    url: videos.url,
+    views: videos.views,
+    createdAt: videos.createdAt,
+    likeCount: sql<number>`coalesce(${videoLikes.count}, 0)`,
+    commentCount: sql<number>`(select count(*) from video_comments vc where vc.video_id = ${videos.id})`,
+  })
+  .from(videos)
+  .leftJoin(videoLikes, eq(videoLikes.videoId, videos.id))
+  .where(eq(videos.isPrivate, 0))
+  .orderBy(desc(videos.createdAt))
+  .limit(3)
+  .all();
 ---
 
 <Layout title="首页" description="一个专注于 Web 开发与工程实践的个人博客">
@@ -69,7 +88,7 @@ const recentGalleryCards = recentGalleries.map((g) => ({
   <section class="py-10 md:py-16 text-center">
     <div class="max-w-xl mx-auto">
       <div class="animate-[slide-up_0.5s_0.1s_ease-out_both]">
-        <SearchBar client:load placeholder="搜索文章..." />
+        <SearchBar client:load placeholder="搜索文章、相册、视频..." action="/search" />
       </div>
     </div>
   </section>
@@ -134,13 +153,6 @@ const recentGalleryCards = recentGalleries.map((g) => ({
           </div>
           <div class="flex items-center gap-4 text-sm font-medium">
             <a
-              href="/videos"
-              class="text-[var(--color-text-muted)] hover:text-[var(--color-accent)] transition-colors flex items-center gap-1"
-            >
-              <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M15.75 10.5l4.72-4.72a.75.75 0 0 1 1.28.53v11.38a.75.75 0 0 1-1.28.53l-4.72-4.72M4.5 18.75h9a2.25 2.25 0 0 0 2.25-2.25v-9a2.25 2.25 0 0 0-2.25-2.25h-9A2.25 2.25 0 0 0 2.25 7.5v9a2.25 2.25 0 0 0 2.25 2.25Z" /></svg>
-              视频馆
-            </a>
-            <a
               href="/gallery"
               class="text-[var(--color-accent)] hover:text-[var(--color-accent-hover)] transition-colors group flex items-center gap-1"
             >
@@ -195,6 +207,79 @@ const recentGalleryCards = recentGalleries.map((g) => ({
                       <path stroke-linecap="round" stroke-linejoin="round" d="M8.625 12a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Zm0 0H8.25m4.125 0a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Zm0 0H12m4.125 0a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Zm0 0h-.375M21 12c0 4.556-4.03 8.25-9 8.25a9.764 9.764 0 0 1-2.555-.337A5.972 5.972 0 0 1 5.41 20.97a5.969 5.969 0 0 1-.474-.065 4.48 4.48 0 0 0 .978-2.025c.09-.457-.133-.901-.467-1.226C3.93 16.178 3 14.189 3 12c0-4.556 4.03-8.25 9-8.25s9 3.694 9 8.25Z" />
                     </svg>
                     <span class="tabular-nums">{g.commentCount}</span>
+                  </span>
+                </div>
+              </div>
+            </a>
+          ))}
+        </div>
+      </section>
+    )
+  }
+
+  <!-- 最新视频（仅公开，卡片与最新相册同构） -->
+  {
+    recentVideos.length > 0 && (
+      <section class="pb-12">
+        <div class="flex items-end justify-between mb-8">
+          <div>
+            <p class="text-xs font-semibold tracking-[0.15em] uppercase text-[var(--color-text-subtle)] mb-2">Video</p>
+            <h2 class="text-2xl font-bold tracking-[-0.01em]">最新视频</h2>
+          </div>
+          <a
+            href="/videos"
+            class="text-sm font-medium text-[var(--color-accent)] hover:text-[var(--color-accent-hover)] transition-colors group flex items-center gap-1"
+          >
+            查看全部
+            <span class="inline-block transition-transform group-hover:translate-x-0.5">→</span>
+          </a>
+        </div>
+
+        <div class="grid gap-5 sm:grid-cols-3">
+          {recentVideos.map((v, i) => (
+            <a
+              href={`/videos/${v.id}`}
+              class={`group block bg-[var(--color-surface)] border border-[var(--color-border)] hover:border-[var(--color-border-hover)] rounded-2xl overflow-hidden transition-all duration-300 animate-[slide-up_0.5s_ease-out_both] ${
+                i === 0 ? "" : "[animation-delay:100ms]"
+              }`}
+            >
+              <div class="relative h-40 bg-black border-b border-[var(--color-border)] overflow-hidden">
+                {v.poster ? (
+                  <img
+                    src={v.poster}
+                    alt={`${v.title} 封面`}
+                    class="absolute inset-0 w-full h-full object-cover transition-transform duration-500 group-hover:scale-[1.04]"
+                    loading="lazy"
+                  />
+                ) : (
+                  <video class="absolute inset-0 w-full h-full object-cover" src={v.url} preload="metadata" muted playsinline></video>
+                )}
+                <span class="absolute inset-0 flex items-center justify-center">
+                  <span class="w-12 h-12 rounded-full bg-black/50 backdrop-blur flex items-center justify-center text-white text-xl group-hover:scale-110 transition-transform" aria-hidden="true">▶</span>
+                </span>
+              </div>
+              <div class="p-4">
+                <h3 class="text-base font-semibold text-[var(--color-text)] truncate">{v.title}</h3>
+                <div class="flex flex-wrap items-center gap-x-2.5 gap-y-1 text-xs text-[var(--color-text-subtle)] mt-1.5">
+                  <time class="whitespace-nowrap font-medium tracking-wide uppercase tabular-nums">{formatDateShort(v.createdAt)}</time>
+                  <span class="inline-flex items-center gap-1 whitespace-nowrap" title="点赞数">
+                    <svg class="w-3.5 h-3.5 text-[var(--color-accent)]/60" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                      <path d="M11.645 20.91l-.007-.003-.022-.012a15.247 15.247 0 01-.383-.218 25.18 25.18 0 01-4.244-3.17C4.688 15.36 2.25 12.174 2.25 8.25 2.25 5.322 4.714 3 7.688 3A5.5 5.5 0 0112 5.052 5.5 5.5 0 0116.313 3c2.973 0 5.437 2.322 5.437 5.25 0 3.925-2.438 7.111-4.739 9.256a25.175 25.175 0 01-4.244 3.17 15.247 15.247 0 01-.383.219l-.022.012-.007.004-.003.001a.752.752 0 01-.704 0l-.003-.001z" />
+                    </svg>
+                    <span class="tabular-nums">{v.likeCount}</span>
+                  </span>
+                  <span class="inline-flex items-center gap-1 whitespace-nowrap" title="浏览量">
+                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24" aria-hidden="true">
+                      <path stroke-linecap="round" stroke-linejoin="round" d="M2.036 12.322a1.012 1.012 0 0 1 0-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178Z" />
+                      <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z" />
+                    </svg>
+                    <span class="tabular-nums">{v.views}</span>
+                  </span>
+                  <span class="inline-flex items-center gap-1 whitespace-nowrap" title="评论数">
+                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24" aria-hidden="true">
+                      <path stroke-linecap="round" stroke-linejoin="round" d="M8.625 12a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Zm0 0H8.25m4.125 0a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Zm0 0H12m4.125 0a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Zm0 0h-.375M21 12c0 4.556-4.03 8.25-9 8.25a9.764 9.764 0 0 1-2.555-.337A5.972 5.972 0 0 1 5.41 20.97a5.969 5.969 0 0 1-.474-.065 4.48 4.48 0 0 0 .978-2.025c.09-.457-.133-.901-.467-1.226C3.93 16.178 3 14.189 3 12c0-4.556 4.03-8.25 9-8.25s9 3.694 9 8.25Z" />
+                    </svg>
+                    <span class="tabular-nums">{v.commentCount}</span>
                   </span>
                 </div>
               </div>
