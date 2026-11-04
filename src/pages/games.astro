@@ -1,7 +1,7 @@
 ---
 import Layout from "../layouts/Layout.astro";
 import GameLauncher from "../components/games/GameLauncher";
-import { AUTH_COOKIE, isAuthed } from "../lib/auth";
+import { AUTH_COOKIE, isAuthed, nsfwOpen } from "../lib/auth";
 import { FLASH_GAMES } from "../lib/flash-games";
 import { RPG_GAMES } from "../lib/rpg-games";
 import { statSync } from "node:fs";
@@ -13,6 +13,8 @@ import { statSync } from "node:fs";
  */
 
 const authed = isAuthed(Astro.cookies.get(AUTH_COOKIE)?.value);
+// Flash/RPG 区属 NSFW 内容：登录且显示设置里 NSFW 开关打开才渲染（直链由 /games/[id] 与文件端点拦截）
+const nsfw = authed && nsfwOpen(Astro.cookies);
 
 // 预览图版本号（取 mtime）：预览端点是 immutable 永久缓存，换图后靠版本参数破缓存
 const previewV = (id: string) => {
@@ -75,7 +77,7 @@ const games = [
 
     <!-- 分类切换（Flash 分类仅登录用户可见，SSR 渲染门槛） -->
     {
-      authed && (
+      nsfw && (
         <div
           class="mb-6 inline-flex rounded-full border border-[var(--color-border)] bg-[var(--color-surface)] p-1 animate-[slide-up_0.5s_ease-out_both]"
           role="tablist"
@@ -262,7 +264,7 @@ const games = [
     </section>
 
     {
-      authed && (
+      nsfw && (
         <section data-cat-panel="rpg" class="hidden">
           <div class="grid gap-5 sm:grid-cols-2">
             {RPG_GAMES.map((g, i) => (
@@ -315,7 +317,7 @@ const games = [
     }
 
     {
-      authed && (
+      nsfw && (
         <section data-cat-panel="flash" class="hidden">
           <div class="grid gap-5 sm:grid-cols-2">
             {FLASH_GAMES.map((g, i) => (

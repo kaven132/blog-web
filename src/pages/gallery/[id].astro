@@ -4,7 +4,7 @@ import LikeButton from "../../components/LikeButton";
 import { db } from "../../db";
 import { galleries, galleryPhotos, galleryLikes, galleryComments } from "../../db/schema";
 import { asc, eq, sql } from "drizzle-orm";
-import { AUTH_COOKIE, isAuthed } from "../../lib/auth";
+import { AUTH_COOKIE, isAuthed, nsfwOpen } from "../../lib/auth";
 import { parseCategoryPath, categoryLabel } from "../../lib/gallery-categories";
 import { trackBrowse } from "../../lib/history";
 
@@ -16,9 +16,12 @@ const gallery = Number.isInteger(id) && id > 0
   ? db.select().from(galleries).where(eq(galleries.id, id)).get()
   : undefined;
 if (!gallery) return Astro.redirect("/gallery");
-// 隐私相册：仅登录可见（匿名一律送登录页，登录后自动回跳）
+// 隐私相册：未登录送登录页（登录后自动回跳）；登录但 NSFW 开关关闭送回列表（列表里本就看不到它）
 if (gallery.isPrivate && !authed) {
   return Astro.redirect("/login?next=" + encodeURIComponent(`/gallery/${gallery.id}`));
+}
+if (gallery.isPrivate && !nsfwOpen(Astro.cookies)) {
+  return Astro.redirect("/gallery");
 }
 
 // 浏览量：浏览页每次渲染 +1（先取旧值用于展示，再自增）

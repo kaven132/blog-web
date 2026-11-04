@@ -4,7 +4,7 @@ import LikeButton from "../../components/LikeButton";
 import { db } from "../../db";
 import { videos, videoLikes, videoComments } from "../../db/schema";
 import { asc, eq, sql } from "drizzle-orm";
-import { AUTH_COOKIE, isAuthed } from "../../lib/auth";
+import { AUTH_COOKIE, isAuthed, nsfwOpen } from "../../lib/auth";
 import { trackBrowse } from "../../lib/history";
 import { formatDateShort, dbDateToISO } from "../../lib/datetime";
 
@@ -14,9 +14,12 @@ const authed = isAuthed(Astro.cookies.get(AUTH_COOKIE)?.value);
 const id = Number(Astro.params.id);
 const video = Number.isInteger(id) && id > 0 ? db.select().from(videos).where(eq(videos.id, id)).get() : undefined;
 if (!video) return Astro.redirect("/videos");
-// 隐私视频：仅登录可见（匿名一律送登录页，登录后自动回跳）
+// 隐私视频：未登录送登录页（登录后自动回跳）；登录但 NSFW 开关关闭送回列表（列表里本就看不到它）
 if (video.isPrivate && !authed) {
   return Astro.redirect("/login?next=" + encodeURIComponent(`/videos/${video.id}`));
+}
+if (video.isPrivate && !nsfwOpen(Astro.cookies)) {
+  return Astro.redirect("/videos");
 }
 
 // 浏览量：浏览页每次渲染 +1（先取旧值用于展示，再自增）

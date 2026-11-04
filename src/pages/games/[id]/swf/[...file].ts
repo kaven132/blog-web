@@ -2,7 +2,7 @@ import type { APIRoute } from "astro";
 import { createReadStream, existsSync, statSync } from "node:fs";
 import { Readable } from "node:stream";
 import path from "node:path";
-import { AUTH_COOKIE, isAuthed } from "../../../../lib/auth";
+import { AUTH_COOKIE, isAuthed, nsfwOpen } from "../../../../lib/auth";
 import { getFlashGame } from "../../../../lib/flash-games";
 
 export const prerender = false;
@@ -21,7 +21,7 @@ const MIME: Record<string, string> = {
 };
 
 export const GET: APIRoute = async ({ params, cookies }) => {
-  if (!isAuthed(cookies.get(AUTH_COOKIE)?.value)) {
+  if (!isAuthed(cookies.get(AUTH_COOKIE)?.value) || !nsfwOpen(cookies)) {
     return new Response(null, { status: 404 });
   }
   const game = getFlashGame(params.id);

@@ -3,7 +3,7 @@ import Layout from "../layouts/Layout.astro";
 import { db } from "../db";
 import { videos, videoLikes } from "../db/schema";
 import { desc, eq, sql } from "drizzle-orm";
-import { AUTH_COOKIE, isAuthed } from "../lib/auth";
+import { AUTH_COOKIE, isAuthed, nsfwOpen } from "../lib/auth";
 import { formatDateShort } from "../lib/datetime";
 
 export const prerender = false;
@@ -35,7 +35,8 @@ let cards = allRows.map((v) => ({
   ...v,
   isPrivate: !!v.isPrivate,
 }));
-if (!authed) cards = cards.filter((c) => !c.isPrivate);
+// 隐私视频：未登录、或登录但 NSFW 开关关闭时，直接从列表剔除
+if (!authed || !nsfwOpen(Astro.cookies)) cards = cards.filter((c) => !c.isPrivate);
 
 const sorted = [...cards].sort((a, b) => {
   if (sort === "views") return b.views - a.views;

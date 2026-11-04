@@ -17,6 +17,17 @@ try {
 
 export const AUTH_COOKIE = "auth";
 
+/** NSFW 开关（TopNav 显示设置下拉切换）：cookie 存在且为 1 时登录用户可见隐私内容，缺省一律隐藏 */
+export const NSFW_COOKIE = "nsfw";
+
+/**
+ * 隐私内容可见性（相册/视频的 isPrivate 项、Flash/RPG 游戏区）：
+ * 登录 且 NSFW 开关打开 才可见 —— 开关只影响登录后的视角，匿名访客本来就不可见。
+ */
+export function nsfwOpen(cookies: { get(name: string): { value: string | undefined } | undefined }): boolean {
+  return cookies.get(NSFW_COOKIE)?.value === "1";
+}
+
 /**
  * 账号密码：优先环境变量（ADMIN_ACCOUNT / ADMIN_PASSWORD），未配置时退回本地默认值。
  * 旧实现把明文密码写死且 Cookie 值就是 "true"，任何人 curl 带上 auth=true 即可绕过登录。

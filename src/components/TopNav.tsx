@@ -44,6 +44,8 @@ export default function TopNav({ onToggleSidebar, sidebarOpen, authed, userName 
   const [fontSize, setFontSize] = useState("normal");
   const [fontStyle, setFontStyle] = useState("serif");
   const [eyeOn, setEyeOn] = useState(false);
+  // NSFW 开关：真值在 cookie（服务端 SSR 过滤隐私内容用），这里只镜像显示
+  const [nsfwOn, setNsfwOn] = useState(false);
 
   // 主题色初值（挂载后读，避免 SSR 不一致）
   useEffect(() => {
@@ -57,6 +59,7 @@ export default function TopNav({ onToggleSidebar, sidebarOpen, authed, userName 
       const f = localStorage.getItem("font-style");
       if (f) setFontStyle(f);
       setEyeOn(localStorage.getItem("eye-comfort") === "on");
+      setNsfwOn(document.cookie.split("; ").includes("nsfw=1"));
       const v = localStorage.getItem("tts-voice");
       if (v) setTtsVoice(v);
     } catch { /* ignore */ }
@@ -154,6 +157,16 @@ export default function TopNav({ onToggleSidebar, sidebarOpen, authed, userName 
     if (on) document.documentElement.dataset.eye = "on";
     else delete document.documentElement.dataset.eye;
     try { localStorage.setItem("eye-comfort", on ? "on" : "off"); } catch { /* ignore */ }
+  };
+  // NSFW：隐私内容是否随页面渲染由服务端读 cookie 决定，切换后必须整页刷新才生效
+  const applyNsfw = (on: boolean) => {
+    setNsfwOn(on);
+    try {
+      document.cookie = on
+        ? "nsfw=1; path=/; max-age=31536000; samesite=lax"
+        : "nsfw=; path=/; max-age=0; samesite=lax";
+    } catch { /* ignore */ }
+    window.location.reload();
   };
   const applyTtsVoice = (uri: string) => {
     setTtsVoice(uri);
@@ -358,6 +371,20 @@ export default function TopNav({ onToggleSidebar, sidebarOpen, authed, userName 
                     <span className="flex-1 text-left font-medium">护眼模式</span>
                     <span className="text-xs text-[var(--color-text-subtle)]">{eyeOn ? "开" : "关"}</span>
                   </button>
+
+                  {/* NSFW 开关：仅登录后有意义（匿名视角本来就看不到隐私内容），切换会刷新页面 */}
+                  {loggedIn && (
+                    <button
+                      type="button"
+                      onClick={() => applyNsfw(!nsfwOn)}
+                      title="控制隐私相册/视频与 Flash、RPG 游戏区的显示"
+                      className="w-full flex items-center gap-2.5 px-2 py-2 rounded-lg hover:bg-[var(--color-bg)] transition-colors text-[var(--color-text)]"
+                    >
+                      <span>🔞</span>
+                      <span className="flex-1 text-left font-medium">NSFW 内容</span>
+                      <span className="text-xs text-[var(--color-text-subtle)]">{nsfwOn ? "开" : "关"}</span>
+                    </button>
+                  )}
 
                   <button
                     type="button"

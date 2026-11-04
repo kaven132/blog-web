@@ -1,6 +1,6 @@
 ---
 import Layout from "../../layouts/Layout.astro";
-import { AUTH_COOKIE, isAuthed } from "../../lib/auth";
+import { AUTH_COOKIE, isAuthed, nsfwOpen } from "../../lib/auth";
 import { getFlashGame } from "../../lib/flash-games";
 import { getRpgGame } from "../../lib/rpg-games";
 import FlashGameBody from "../../components/games/FlashGameBody.astro";
@@ -17,6 +17,8 @@ const game = flash ?? rpg;
 // 未注册的游戏 id 回列表页；存档随账号走，页面只对登录用户开放
 if (!game) return Astro.redirect("/games");
 if (!authed) return Astro.redirect("/login?next=" + encodeURIComponent("/games/" + Astro.params.id));
+// NSFW 开关关闭：Flash/RPG 区整体隐藏，登录直链也送回列表页
+if (!nsfwOpen(Astro.cookies)) return Astro.redirect("/games");
 // 浏览历史采集（本页全站仅登录可见，走到这里必然已登录）
 trackBrowse("game", Astro.params.id, game.title, `/games/${Astro.params.id}`);
 

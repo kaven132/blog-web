@@ -3,7 +3,7 @@ import Layout from "../layouts/Layout.astro";
 import { db } from "../db";
 import { galleries, galleryPhotos, galleryLikes } from "../db/schema";
 import { asc, desc, eq, sql } from "drizzle-orm";
-import { AUTH_COOKIE, isAuthed } from "../lib/auth";
+import { AUTH_COOKIE, isAuthed, nsfwOpen } from "../lib/auth";
 import { parseCategoryPath, categoryLabel } from "../lib/gallery-categories";
 import { formatDateShort } from "../lib/datetime";
 
@@ -74,8 +74,8 @@ let cards = allRows.map((g) => {
     createdAt: g.createdAt.slice(0, 10),
   };
 });
-// 隐私相册：未登录直接从列表剔除
-if (!authed) cards = cards.filter((c) => !c.isPrivate);
+// 隐私相册：未登录、或登录但 NSFW 开关关闭时，直接从列表剔除
+if (!authed || !nsfwOpen(Astro.cookies)) cards = cards.filter((c) => !c.isPrivate);
 
 // ── 分类过滤（两级）──
 const filtered = cards.filter((c) => (cat1 ? c.cat1 === cat1 : true) && (cat2 ? c.cat2 === cat2 : true));
