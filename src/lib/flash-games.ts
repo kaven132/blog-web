@@ -18,6 +18,8 @@ export interface FlashGame {
   footer: string;
   /** 设备字体注册源（可选）：游戏对话用设备字体而非内嵌字体时，把含中文字形的 TTF 交给 Ruffle 注册 */
   fonts?: string[];
+  /** 秘籍（可选）：游戏页窗口下方展示，code 为密码/按键序列，desc 为效果说明（文件未注明时缺省） */
+  cheats?: { code: string; desc?: string }[];
 }
 
 export const FLASH_GAMES: FlashGame[] = [
@@ -140,6 +142,11 @@ export const FLASH_GAMES: FlashGame[] = [
     tags: ["Flash", "横版动作", "Ruffle", "账号存档"],
     solName: "witchgirl_data",
     footer: "首次加载约 37MB · 含语音包",
+    cheats: [
+      { code: "goodjob" },
+      { code: "girl" },
+      { code: "g-open" },
+    ],
   },
   {
     id: "shinobi-girl",
@@ -149,6 +156,12 @@ export const FLASH_GAMES: FlashGame[] = [
     tags: ["Flash", "横版动作", "Ruffle", "账号存档"],
     solName: "shinobigirl_data",
     footer: "首次加载约 15MB",
+    cheats: [
+      { code: "gal", desc: "解锁画廊" },
+      { code: "nd", desc: "不受伤害（无敌）" },
+      { code: "bi", desc: "无限炸弹" },
+      { code: "allinone", desc: "以上全部" },
+    ],
   },
   {
     id: "kung-fu-girl",
@@ -158,6 +171,12 @@ export const FLASH_GAMES: FlashGame[] = [
     tags: ["Flash", "横版动作", "Ruffle", "账号存档"],
     solName: "kungfugirl_data_v1",
     footer: "首次加载约 17MB",
+    cheats: [
+      { code: "2525" },
+      { code: "4649" },
+      { code: "7777" },
+      { code: "5963" },
+    ],
   },
   {
     id: "angel-girl",
@@ -167,6 +186,29 @@ export const FLASH_GAMES: FlashGame[] = [
     tags: ["Flash", "小品", "Ruffle"],
     solName: "angelgirl_none",
     footer: "单文件 2MB · 无存档功能",
+    cheats: [
+      { code: "abbaab→→←", desc: "画廊" },
+      { code: "↑↓b↓↓↑bb", desc: "无攻击力" },
+      { code: "↑↑↓↓←→←→ba", desc: "无限炸弹" },
+    ],
+  },
+  {
+    id: "mai-alien",
+    title: "不知火舞 VS 外星人",
+    orig: "SNK 不知火舞同人 · 单文件",
+    desc: "不知火舞同人游戏 —— 迎战外星入侵者的连场战斗，单文件即点即玩（本作无存档功能）。",
+    tags: ["Flash", "同人", "Ruffle"],
+    solName: "mai-alien_none",
+    footer: "单文件 8MB · 无存档功能",
+  },
+  {
+    id: "beauty-vs-alien",
+    title: "美女vs外星人",
+    orig: "美女PK镜子 · 单文件",
+    desc: "美女迎战外星入侵者的 Flash 互动游戏，单文件即点即玩（本作无存档功能）。",
+    tags: ["Flash", "互动", "Ruffle"],
+    solName: "beauty-vs-alien_none",
+    footer: "单文件 12MB · 无存档功能",
   },
 ];
 

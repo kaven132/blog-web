@@ -76,6 +76,21 @@ const stageAspect = stageDim ? `${stageDim.w} / ${stageDim.h}` : "4 / 3";
     <!-- 舞台实际宽高比由各游戏 SWF 头解析（--game-aspect），全屏时按真实比例填充 -->
     <div id="stage" class="rounded-2xl overflow-hidden border border-[var(--color-border)] bg-black animate-[slide-up_0.5s_ease-out_both] [animation-delay:100ms]" style={`--game-aspect: ${stageAspect}`}></div>
 
+    <!-- 秘籍（注册表按需下发）：游戏窗口正下方展示密码/按键序列与效果 -->
+    {game.cheats && game.cheats.length > 0 && (
+      <section class="mt-6 rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] p-5 animate-[slide-up_0.5s_ease-out_both] [animation-delay:200ms]">
+        <p class="text-xs font-semibold tracking-[0.15em] uppercase text-[var(--color-text-subtle)] mb-3">Cheat Codes · 秘籍</p>
+        <ul class="flex flex-col gap-2 text-sm">
+          {game.cheats.map((c) => (
+            <li class="flex items-baseline gap-3 flex-wrap">
+              <code class="font-mono text-[var(--color-accent)] bg-[var(--color-bg)] border border-[var(--color-border)] rounded-md px-2 py-0.5">{c.code}</code>
+              {c.desc && <span class="text-[var(--color-text-muted)]">{c.desc}</span>}
+            </li>
+          ))}
+        </ul>
+      </section>
+    )}
+
     <p class="text-xs text-[var(--color-text-subtle)] mt-4 leading-relaxed">
       本页面为个人收藏性质的本地游玩用途，游戏版权归原作者所有，请勿二次分发；
       {game.footer}，剧情场景按需加载。
