@@ -1,0 +1,301 @@
+---
+import Layout from "../layouts/Layout.astro";
+import PostCard from "../components/PostCard";
+import SearchBar from "../components/SearchBar";
+import { db, sqlite } from "../db";
+import { posts, likes, comments, galleries, galleryPhotos, galleryLikes, videos, videoLikes } from "../db/schema";
+import { eq, sql, inArray, desc } from "drizzle-orm";
+import { formatDateShort } from "../lib/datetime";
+
+export const prerender = false;
+
+// ── 全站搜索：文章（FTS/LIKE）+ 相册 + 视频（标题与描述子串），一次关键词三处命中 ──
+const searchQuery = Astro.url.searchParams.get("search") || "";
+const q = searchQuery.trim();
+const ql = q.toLowerCase();
+const ftsQuery = q.length >= 3 ? q : null;
+
+interface PostHit {
+  id: number;
+  title: string;
+  slug: string;
+  excerpt: string;
+  tags: string;
+  coverImage: string | null;
+  createdAt: string;
+  views: number;
+  likeCount: number;
+  commentCount: number;
+}
+
+const postSelect = () =>
+  db
+    .select({
+      id: posts.id,
+      title: posts.title,
+      slug: posts.slug,
+      excerpt: posts.excerpt,
+      tags: posts.tags,
+      coverImage: posts.coverImage,
+      createdAt: posts.createdAt,
+      views: posts.views,
+      likeCount: sql<number>`coalesce(${likes.count}, 0)`,
+      commentCount: sql<number>`count(${comments.id})`,
+    })
+    .from(posts)
+    .leftJoin(likes, eq(likes.postId, posts.id))
+    .leftJoin(comments, eq(comments.postId, posts.id))
+    .groupBy(posts.id);
+
+let postResults: PostHit[] = [];
+if (q) {
+  if (ftsQuery) {
+    // FTS 命中 id（bm25 相关性序）→ 按序取回完整行
+    const rows = sqlite
+      .prepare(
+        `SELECT rowid AS id FROM posts_fts
+         WHERE posts_fts MATCH ?
+           AND rowid IN (SELECT id FROM posts WHERE published = 1)
+         ORDER BY bm25(posts_fts, 8.0, 3.0, 1.0)`
+      )
+      .all(`"${ftsQuery.replace(/"/g, '""')}"`);
+    const idOrder = (rows as Array<{ id: number }>).map((r) => Number(r.id));
+    if (idOrder.length) {
+      const fetched = postSelect().where(inArray(posts.id, idOrder)).all();
+      const byId = new Map(fetched.map((p) => [p.id, p]));
+      postResults = idOrder.map((id) => byId.get(id)).filter((p): p is PostHit => Boolean(p));
+    }
+  } else {
+    postResults = postSelect()
+      .where(eq(posts.published, true))
+      .orderBy(desc(posts.createdAt))
+      .all()
+      .filter((p) => p.title.toLowerCase().includes(ql) || p.excerpt.toLowerCase().includes(ql) || p.tags.toLowerCase().includes(ql));
+  }
+}
+
+// ── 相册（仅公开）：标题与描述子串命中，封面取相册第一张照片 ──
+const galleryRows = q
+  ? db
+      .select({
+        id: galleries.id,
+        title: galleries.title,
+        description: galleries.description,
+        createdAt: galleries.createdAt,
+        likeCount: sql<number>`coalesce(${galleryLikes.count}, 0)`,
+        commentCount: sql<number>`(select count(*) from gallery_comments gc where gc.gallery_id = ${galleries.id})`,
+        photoCount: sql<number>`(select count(*) from gallery_photos gp where gp.gallery_id = ${galleries.id})`,
+      })
+      .from(galleries)
+      .leftJoin(galleryLikes, eq(galleryLikes.galleryId, galleries.id))
+      .where(eq(galleries.isPrivate, 0))
+      .all()
+      .filter((g) => g.title.toLowerCase().includes(ql) || g.description.toLowerCase().includes(ql))
+  : [];
+const galleryIds = galleryRows.map((g) => g.id);
+const galleryPhotosAll = galleryIds.length
+  ? db
+      .select({ galleryId: galleryPhotos.galleryId, path: galleryPhotos.path })
+      .from(galleryPhotos)
+      .where(inArray(galleryPhotos.galleryId, galleryIds))
+      .all()
+  : [];
+const galleryCover = new Map<number, string>();
+for (const p of galleryPhotosAll) {
+  if (!galleryCover.has(p.galleryId)) galleryCover.set(p.galleryId, p.path);
+}
+const galleryResults = galleryRows.map((g) => ({ ...g, cover: galleryCover.get(g.id) ?? "" }));
+
+// ── 视频（仅公开）：标题与描述子串命中 ──
+const videoResults = q
+  ? db
+      .select({
+        id: videos.id,
+        title: videos.title,
+        description: videos.description,
+        poster: videos.poster,
+        url: videos.url,
+        createdAt: videos.createdAt,
+        views: videos.views,
+        likeCount: sql<number>`coalesce(${videoLikes.count}, 0)`,
+        commentCount: sql<number>`(select count(*) from video_comments vc where vc.video_id = ${videos.id})`,
+      })
+      .from(videos)
+      .leftJoin(videoLikes, eq(videoLikes.videoId, videos.id))
+      .where(eq(videos.isPrivate, 0))
+      .all()
+      .filter((v) => v.title.toLowerCase().includes(ql) || v.description.toLowerCase().includes(ql))
+  : [];
+
+const totalHits = postResults.length + galleryResults.length + videoResults.length;
+---
+
+<Layout title={q ? `${q} 的搜索结果` : "搜索"} description="全站搜索 —— 文章、相册与视频一次命中">
+  <div class="py-8 md:py-12">
+    <!-- Search（与文章/相册/视频页同款置顶居中） -->
+    <div class="flex justify-center mb-10">
+      <SearchBar client:load placeholder="搜索文章、相册、视频..." defaultValue={searchQuery} action="/search" />
+    </div>
+
+    <!-- Header -->
+    <div class="mb-8">
+      <p class="text-xs font-semibold tracking-[0.15em] uppercase text-[var(--color-text-subtle)] mb-2">Search</p>
+      <h1 class="text-3xl font-bold tracking-[-0.015em]">
+        {q ? `"${q}" 的搜索结果` : "全站搜索"}
+      </h1>
+      {
+        q && (
+          <p class="text-sm text-[var(--color-text-muted)] mt-3 font-serif">
+            共 {totalHits} 条结果 —— 文章 {postResults.length} · 相册 {galleryResults.length} · 视频 {videoResults.length}
+          </p>
+        )
+      }
+    </div>
+
+    {
+      !q ? (
+        <p class="text-center py-16 text-[var(--color-text-subtle)] font-serif">输入关键词，同时搜索文章、相册与视频。</p>
+      ) : totalHits === 0 ? (
+        <p class="text-center py-16 text-[var(--color-text-subtle)] font-serif">没有找到与 "{q}" 相关的内容。</p>
+      ) : (
+        <div class="space-y-12">
+          {postResults.length > 0 && (
+            <section>
+              <div class="flex items-end justify-between mb-5">
+                <h2 class="text-lg font-bold tracking-tight text-[var(--color-text)]">文章 · {postResults.length}</h2>
+                <a href={`/posts?search=${encodeURIComponent(q)}`} class="text-sm font-medium text-[var(--color-accent)] hover:text-[var(--color-accent-hover)] transition-colors">
+                  在文章页查看全部 →
+                </a>
+              </div>
+              <div class="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+                {postResults.map((post, i) => (
+                  <PostCard
+                    title={post.title}
+                    slug={post.slug}
+                    excerpt={post.excerpt}
+                    tags={post.tags}
+                    coverImage={post.coverImage ?? undefined}
+                    createdAt={post.createdAt}
+                    likeCount={post.likeCount}
+                    commentCount={post.commentCount}
+                    views={post.views}
+                    index={i}
+                  />
+                ))}
+              </div>
+            </section>
+          )}
+
+          {galleryResults.length > 0 && (
+            <section>
+              <div class="flex items-end justify-between mb-5">
+                <h2 class="text-lg font-bold tracking-tight text-[var(--color-text)]">相册 · {galleryResults.length}</h2>
+                <a href={`/gallery?search=${encodeURIComponent(q)}`} class="text-sm font-medium text-[var(--color-accent)] hover:text-[var(--color-accent-hover)] transition-colors">
+                  在相册页查看全部 →
+                </a>
+              </div>
+              <div class="grid gap-5 sm:grid-cols-3">
+                {galleryResults.map((g) => (
+                  <a
+                    href={`/gallery/${g.id}`}
+                    class="group block bg-[var(--color-surface)] border border-[var(--color-border)] hover:border-[var(--color-border-hover)] rounded-2xl overflow-hidden transition-all duration-300"
+                  >
+                    <div class="relative h-40 bg-[var(--color-bg)] border-b border-[var(--color-border)] overflow-hidden">
+                      {g.cover ? (
+                        <img src={g.cover} alt={`${g.title} 封面`} class="absolute inset-0 w-full h-full object-cover transition-transform duration-500 group-hover:scale-[1.04]" loading="lazy" />
+                      ) : (
+                        <div class="absolute inset-0 flex items-center justify-center text-4xl opacity-20" aria-hidden="true">🖼️</div>
+                      )}
+                      <span class="absolute top-3 right-3 inline-flex items-center gap-1.5 rounded-full bg-[var(--color-surface)]/90 backdrop-blur border border-[var(--color-border)] px-2.5 py-1 text-[11px] font-medium text-[var(--color-text-muted)]">
+                        {g.photoCount} 张
+                      </span>
+                    </div>
+                    <div class="p-4">
+                      <h3 class="text-base font-semibold text-[var(--color-text)] truncate">{g.title}</h3>
+                      <div class="flex flex-wrap items-center gap-x-2.5 gap-y-1 text-xs text-[var(--color-text-subtle)] mt-1.5">
+                        <time class="whitespace-nowrap font-medium tracking-wide uppercase tabular-nums">{formatDateShort(g.createdAt)}</time>
+                        <span class="inline-flex items-center gap-1 whitespace-nowrap" title="点赞数">
+                          <svg class="w-3.5 h-3.5 text-[var(--color-accent)]/60" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                            <path d="M11.645 20.91l-.007-.003-.022-.012a15.247 15.247 0 01-.383-.218 25.18 25.18 0 01-4.244-3.17C4.688 15.36 2.25 12.174 2.25 8.25 2.25 5.322 4.714 3 7.688 3A5.5 5.5 0 0112 5.052 5.5 5.5 0 0116.313 3c2.973 0 5.437 2.322 5.437 5.25 0 3.925-2.438 7.111-4.739 9.256a25.175 25.175 0 01-4.244 3.17 15.247 15.247 0 01-.383.219l-.022.012-.007.004-.003.001a.752.752 0 01-.704 0l-.003-.001z" />
+                          </svg>
+                          <span class="tabular-nums">{g.likeCount}</span>
+                        </span>
+                        <span class="inline-flex items-center gap-1 whitespace-nowrap" title="照片数">
+                          <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24" aria-hidden="true">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M2.25 15.75l5.159-5.159a2.25 2.25 0 013.182 0l5.159 5.159m-1.5-1.5l1.409-1.409a2.25 2.25 0 013.182 0l2.909 2.909m-18 3.75h16.5a1.5 1.5 0 001.5-1.5V6a1.5 1.5 0 00-1.5-1.5H3.75A1.5 1.5 0 002.25 6v12a1.5 1.5 0 001.5 1.5zm10.5-11.25h.008v.008h-.008V8.25zm.375 0a.375.375 0 11-.75 0 .375.375 0 01.75 0z" />
+                          </svg>
+                          <span class="tabular-nums">{g.photoCount}</span>
+                        </span>
+                        <span class="inline-flex items-center gap-1 whitespace-nowrap" title="评论数">
+                          <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24" aria-hidden="true">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M8.625 12a.375.375 0 11-.75 0 .375.375 0 01.75 0Zm0 0H8.25m4.125 0a.375.375 0 11-.75 0 .375.375 0 01.75 0Zm0 0H12m4.125 0a.375.375 0 11-.75 0 .375.375 0 01.75 0Zm0 0h-.375M21 12c0 4.556-4.03 8.25-9 8.25a9.764 9.764 0 01-2.555-.337A5.972 5.972 0 015.41 20.97a5.969 5.969 0 01-.474-.065 4.48 4.48 0 00.978-2.025c.09-.457-.133-.901-.467-1.226C3.93 16.178 3 14.189 3 12c0-4.556 4.03-8.25 9-8.25s9 3.694 9 8.25Z" />
+                          </svg>
+                          <span class="tabular-nums">{g.commentCount}</span>
+                        </span>
+                      </div>
+                    </div>
+                  </a>
+                ))}
+              </div>
+            </section>
+          )}
+
+          {videoResults.length > 0 && (
+            <section>
+              <div class="flex items-end justify-between mb-5">
+                <h2 class="text-lg font-bold tracking-tight text-[var(--color-text)]">视频 · {videoResults.length}</h2>
+                <a href={`/videos?search=${encodeURIComponent(q)}`} class="text-sm font-medium text-[var(--color-accent)] hover:text-[var(--color-accent-hover)] transition-colors">
+                  在视频页查看全部 →
+                </a>
+              </div>
+              <div class="grid gap-5 sm:grid-cols-3">
+                {videoResults.map((v) => (
+                  <a
+                    href={`/videos/${v.id}`}
+                    class="group block bg-[var(--color-surface)] border border-[var(--color-border)] hover:border-[var(--color-border-hover)] rounded-2xl overflow-hidden transition-all duration-300"
+                  >
+                    <div class="relative h-40 bg-black border-b border-[var(--color-border)] overflow-hidden">
+                      {v.poster ? (
+                        <img src={v.poster} alt={`${v.title} 封面`} class="absolute inset-0 w-full h-full object-cover transition-transform duration-500 group-hover:scale-[1.04]" loading="lazy" />
+                      ) : (
+                        <video class="absolute inset-0 w-full h-full object-cover" src={v.url} preload="metadata" muted playsinline></video>
+                      )}
+                      <span class="absolute inset-0 flex items-center justify-center">
+                        <span class="w-12 h-12 rounded-full bg-black/50 backdrop-blur flex items-center justify-center text-white text-xl group-hover:scale-110 transition-transform" aria-hidden="true">▶</span>
+                      </span>
+                    </div>
+                    <div class="p-4">
+                      <h3 class="text-base font-semibold text-[var(--color-text)] truncate">{v.title}</h3>
+                      <div class="flex flex-wrap items-center gap-x-2.5 gap-y-1 text-xs text-[var(--color-text-subtle)] mt-1.5">
+                        <time class="whitespace-nowrap font-medium tracking-wide uppercase tabular-nums">{formatDateShort(v.createdAt)}</time>
+                        <span class="inline-flex items-center gap-1 whitespace-nowrap" title="点赞数">
+                          <svg class="w-3.5 h-3.5 text-[var(--color-accent)]/60" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                            <path d="M11.645 20.91l-.007-.003-.022-.012a15.247 15.247 0 01-.383-.218 25.18 25.18 0 01-4.244-3.17C4.688 15.36 2.25 12.174 2.25 8.25 2.25 5.322 4.714 3 7.688 3A5.5 5.5 0 0112 5.052 5.5 5.5 0 0116.313 3c2.973 0 5.437 2.322 5.437 5.25 0 3.925-2.438 7.111-4.739 9.256a25.175 25.175 0 01-4.244 3.17 15.247 15.247 0 01-.383.219l-.022.012-.007.004-.003.001a.752.752 0 01-.704 0l-.003-.001z" />
+                          </svg>
+                          <span class="tabular-nums">{v.likeCount}</span>
+                        </span>
+                        <span class="inline-flex items-center gap-1 whitespace-nowrap" title="浏览量">
+                          <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24" aria-hidden="true">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M2.036 12.322a1.012 1.012 0 010-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178Z" />
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0Z" />
+                          </svg>
+                          <span class="tabular-nums">{v.views}</span>
+                        </span>
+                        <span class="inline-flex items-center gap-1 whitespace-nowrap" title="评论数">
+                          <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24" aria-hidden="true">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M8.625 12a.375.375 0 11-.75 0 .375.375 0 01.75 0Zm0 0H8.25m4.125 0a.375.375 0 11-.75 0 .375.375 0 01.75 0Zm0 0H12m4.125 0a.375.375 0 11-.75 0 .375.375 0 01.75 0Zm0 0h-.375M21 12c0 4.556-4.03 8.25-9 8.25a9.764 9.764 0 01-2.555-.337A5.972 5.972 0 015.41 20.97a5.969 5.969 0 01-.474-.065 4.48 4.48 0 00.978-2.025c.09-.457-.133-.901-.467-1.226C3.93 16.178 3 14.189 3 12c0-4.556 4.03-8.25 9-8.25s9 3.694 9 8.25Z" />
+                          </svg>
+                          <span class="tabular-nums">{v.commentCount}</span>
+                        </span>
+                      </div>
+                    </div>
+                  </a>
+                ))}
+              </div>
+            </section>
+          )}
+        </div>
+      )
+    }
+  </div>
+</Layout>

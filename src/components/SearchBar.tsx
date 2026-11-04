@@ -4,9 +4,11 @@ interface SearchBarProps {
   placeholder?: string;
   /** 预填关键词（搜索结果页回显当前搜索词） */
   defaultValue?: string;
+  /** 提交目标路径（参数名统一为 search），默认文章页 */
+  action?: string;
 }
 
-export default function SearchBar({ placeholder = "搜索文章...", defaultValue = "" }: SearchBarProps) {
+export default function SearchBar({ placeholder = "搜索文章...", defaultValue = "", action = "/posts" }: SearchBarProps) {
   const [query, setQuery] = useState(defaultValue);
   const [focused, setFocused] = useState(false);
 
@@ -14,10 +16,10 @@ export default function SearchBar({ placeholder = "搜索文章...", defaultValu
     (e: React.FormEvent) => {
       e.preventDefault();
       if (query.trim()) {
-        window.location.href = `/posts?search=${encodeURIComponent(query.trim())}`;
+        window.location.href = `${action}?search=${encodeURIComponent(query.trim())}`;
       }
     },
-    [query]
+    [action, query]
   );
 
   return (

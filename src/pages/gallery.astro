@@ -6,6 +6,7 @@ import { asc, desc, eq, sql } from "drizzle-orm";
 import { AUTH_COOKIE, isAuthed, nsfwOpen } from "../lib/auth";
 import { parseCategoryPath, categoryLabel } from "../lib/gallery-categories";
 import { formatDateShort } from "../lib/datetime";
+import SearchBar from "../components/SearchBar";
 
 export const prerender = false;
 
@@ -77,6 +78,11 @@ let cards = allRows.map((g) => {
 // 隐私相册：未登录、或登录但 NSFW 开关关闭时，直接从列表剔除
 if (!authed || !nsfwOpen(Astro.cookies)) cards = cards.filter((c) => !c.isPrivate);
 
+// 搜索：相册标题与描述大小写不敏感子串匹配（无正文，不做 FTS）
+const searchQuery = Astro.url.searchParams.get("search") || "";
+const kw = searchQuery.trim().toLowerCase();
+if (kw) cards = cards.filter((c) => c.title.toLowerCase().includes(kw) || c.description.toLowerCase().includes(kw));
+
 // ── 分类过滤（两级）──
 const filtered = cards.filter((c) => (cat1 ? c.cat1 === cat1 : true) && (cat2 ? c.cat2 === cat2 : true));
 
@@ -122,6 +128,7 @@ const baseParams = () => {
   const q = new URLSearchParams();
   if (cat1) q.set("cat1", cat1);
   if (cat2) q.set("cat2", cat2);
+  if (searchQuery) q.set("search", searchQuery);
   if (sortActive) {
     q.set("sort", sort);
     q.set("order", order);
@@ -157,7 +164,7 @@ const viewUrl = (v: string) => {
   const qs = q.toString();
   return qs ? `/gallery?${qs}` : "/gallery";
 };
-const isFiltering = Boolean(cat1 || cat2) || sortActive;
+const isFiltering = Boolean(cat1 || cat2) || sortActive || Boolean(kw);
 
 // ── 标签样式全部前置计算（与文章页 TagFilter 同款胶囊样式）──
 const tabBase = "inline-flex items-center gap-1.5 px-3.5 py-1.5 text-sm font-medium rounded-full border transition-all";
@@ -165,6 +172,10 @@ const tabOn = "bg-[var(--color-accent)] text-white border-[var(--color-accent)]"
 const tabOff = "bg-[var(--color-surface)] text-[var(--color-text-muted)] border-[var(--color-border)] hover:border-[var(--color-accent)] hover:text-[var(--color-accent)]";
 const badgeOn = "bg-white/20 text-white";
 const badgeOff = "bg-[var(--color-accent-muted)] text-[var(--color-accent)]";
+// 排序 chips 与文章页同款软样式（激活浅红 + 箭头），分类 chips 保持实心（与 TagFilter 一致）
+const sortChipBase = "inline-flex items-center gap-1 px-3 py-1 text-xs font-medium rounded-full border transition-all";
+const sortChipOn = "bg-[var(--color-accent-muted)] text-[var(--color-accent)] border-[var(--color-accent)]/40";
+const sortChipOff = "bg-[var(--color-surface)] text-[var(--color-text-muted)] border-[var(--color-border)] hover:border-[var(--color-accent)]/50";
 
 const cat1Tabs = [{ name: "", label: "全部", count: cards.length }, ...l1Facets.map((f) => ({ name: f.name, label: f.name, count: f.count }))].map(
   (t) => {
@@ -199,17 +210,24 @@ const sortTabs = [
     key,
     label: active ? `${label} ${order === "asc" ? "↑" : "↓"}` : label,
     href: sortUrl(key, nextOrder),
-    cls: `${tabBase} ${active ? tabOn : tabOff}`,
+    cls: `${sortChipBase} ${active ? sortChipOn : sortChipOff}`,
   };
 });
 ---
 
 <Layout title="相册" description="按类型存放的相册 —— 点开即可左右切换浏览">
   <article class="py-12 md:py-16">
+    <!-- 搜索（标题与描述，与文章页同款置顶居中样式） -->
+    <div class="flex justify-center mb-10">
+      <SearchBar client:load placeholder="搜索相册..." defaultValue={searchQuery} action="/gallery" />
+    </div>
+
     <!-- Header -->
-    <header class="mb-8">
+    <header class="mb-6">
       <p class="text-xs font-semibold tracking-[0.15em] uppercase text-[var(--color-text-subtle)] mb-2">Gallery</p>
-      <h1 class="text-3xl font-bold tracking-[-0.015em] mb-3">相册</h1>
+      <h1 class="text-3xl font-bold tracking-[-0.015em] mb-3">
+        {searchQuery ? `"${searchQuery}" 的搜索结果` : "相册"}
+      </h1>
       <div class="flex items-center gap-3 flex-wrap text-sm">
         <span class="text-[var(--color-text-muted)]">共 {filtered.length} 个相册</span>
         <a
@@ -220,17 +238,12 @@ const sortTabs = [
           <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 0 1 2.25-2.25h13.5A2.25 2.25 0 0 1 21 7.5v11.25m-18 0A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75m-18 0v-7.5A2.25 2.25 0 0 1 5.25 9h13.5A2.25 2.25 0 0 1 21 11.25v7.5" /></svg>
           {view === "archive" ? "卡片视图" : "归档"}
         </a>
-        {
-          authed && (
-            <a
-              href="/admin?tab=galleries"
-              class="ml-auto inline-flex items-center gap-1 text-sm text-[var(--color-text-muted)] hover:text-[var(--color-accent)] transition-colors"
-            >
-              管理相册
-            </a>
-          )
-        }
       </div>
+      {
+        searchQuery && (
+          <p class="text-[11px] text-[var(--color-text-subtle)] mt-1.5">搜索范围：相册标题与描述</p>
+        )
+      }
     </header>
 
     <!-- 排序（点 inactive 项按倒序生效；再点一次切升降序） -->
@@ -376,7 +389,7 @@ const sortTabs = [
     {
       filtered.length === 0 && (
         <div class="rounded-2xl border border-dashed border-[var(--color-border)] p-8 text-center text-sm text-[var(--color-text-subtle)]">
-          该分类下暂无相册
+          {searchQuery ? `没有找到与 "${searchQuery}" 相关的相册` : "该分类下暂无相册"}
         </div>
       )
     }
