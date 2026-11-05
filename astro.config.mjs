@@ -14,7 +14,26 @@ export default defineConfig({
     enabled: false,
   },
   vite: {
-    plugins: [tailwindcss()],
+    plugins: [
+      tailwindcss(),
+      {
+        // dev 服务器 keep-alive 拉长：Node 默认 5s 空闲即关闭连接，而页面加载时创建的
+        // 连接池在几十秒的大文件上传期间全被关掉——上传完成后的下一个请求（保存/点赞）
+        // 拿到的是已被服务端关闭的 socket，必报「网络错误」，重试也撞同一批死连接。
+        // 120s 覆盖整个上传窗口；headersTimeout 须大于 keepAliveTimeout。
+        name: "dev-keepalive-bump",
+        configureServer(server) {
+          const bump = () => {
+            const http = server.httpServer;
+            if (!http) return;
+            http.keepAliveTimeout = 120000;
+            http.headersTimeout = 125000;
+          };
+          bump();
+          server.httpServer?.once?.("listening", bump);
+        },
+      },
+    ],
   },
   security: {
     // 生产模式的 origin 校验（CSRF 防护）需要知道本站真实的「协议+域名+端口」：

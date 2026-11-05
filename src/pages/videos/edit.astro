@@ -84,7 +84,7 @@ const vid = isEdit ? video!.id : 0;
             <button type="button" id="v-poster-btn" class="px-3 py-1.5 rounded-md text-xs font-semibold border border-[var(--color-border)] text-[var(--color-text-muted)] hover:text-[var(--color-accent)] hover:border-[var(--color-accent)] transition-colors">
               上传封面
             </button>
-            <button type="button" id="v-poster-remove" class="px-3 py-1.5 rounded-md text-xs font-semibold border border-[var(--color-border)] text-[var(--color-text-muted)] hover:text-[var(--color-accent)] transition-colors">
+            <button type="button" id="v-poster-remove" class="px-3 py-1.5 rounded-md text-xs font-semibold border border-[var(--color-border)] text-[var(--color-text-muted)] hover:text-[var(--color-accent)] hover:border-[var(--color-accent)] transition-colors">
               移除封面
             </button>
           </div>
@@ -96,7 +96,7 @@ const vid = isEdit ? video!.id : 0;
       <p id="v-hint" class="hidden text-sm text-[var(--color-text-muted)]"></p>
 
       <div class="flex items-center gap-3 pt-2 border-t border-[var(--color-border)] flex-wrap">
-        <button id="v-save" type="button" class="px-5 py-2.5 text-sm font-semibold rounded-lg bg-[var(--color-accent)] text-white hover:bg-[var(--color-accent-hover)] transition-colors">保存</button>
+        <button id="v-save" type="button" data-edit={isEdit ? "1" : ""} data-vid={vid} class="px-5 py-2.5 text-sm font-semibold rounded-lg bg-[var(--color-accent)] text-white hover:bg-[var(--color-accent-hover)] transition-colors">保存</button>
         {isEdit && (
           <button id="v-del" type="button" class="px-4 py-2.5 text-sm rounded-lg border border-[var(--color-border)] text-red-400 hover:text-red-500 hover:border-red-200 hover:bg-red-50 transition-colors">删除视频</button>
         )}
@@ -112,6 +112,43 @@ const vid = isEdit ? video!.id : 0;
       el.classList.remove("hidden");
     };
 
+    // ── 页面模式：isEdit / vid 必须经 data-* 从服务端传入 —— hoisted script 是独立打包的
+    // 模块，作用域里没有 frontmatter 变量，直接引用会在点击保存/删除时抛 ReferenceError
+    // 且被 catch 误报成「网络错误」 ──
+    const saveBtn = document.getElementById("v-save") as HTMLButtonElement;
+    const isEdit = saveBtn.dataset.edit === "1";
+    const vid = Number(saveBtn.dataset.vid || 0);
+
+    // ── 页面数据请求统一走 XHR ──
+    // 本页的视频上传（XHR）在各类环境（含 ZCode 内嵌浏览器）始终可靠，而页面内的 fetch
+    // 保存请求曾在内嵌浏览器里出现「点击保存后请求静默未发出」的怪象（同页面同身份下、
+    // 主世界注入的完全相同请求毫秒级成功，页面自己的 fetch 却一次都不经过包装器）。
+    // 因此保存/封面/删除统一改走 XHR 通道；每次失败新建 XHR（= 换新连接）重试，
+    // 15s 硬超时保证任何挂起都会进入下一轮重试而不是永远等下去。
+    const xhrSend = (method: string, url: string, body: string | FormData | null, json = false, timeoutMs = 15000) =>
+      new Promise<{ status: number; text: string }>((resolve, reject) => {
+        const x = new XMLHttpRequest();
+        x.open(method, url);
+        x.timeout = timeoutMs;
+        if (json) x.setRequestHeader("Content-Type", "application/json");
+        x.onload = () => resolve({ status: x.status, text: x.responseText });
+        x.onerror = () => reject(new Error("network"));
+        x.ontimeout = () => reject(new Error("timeout"));
+        x.send(body);
+      });
+    const xhrRetry = async (method: string, url: string, body: string | FormData | null, json = false, attempts = 3) => {
+      let lastErr: unknown = null;
+      for (let i = 0; i < attempts; i++) {
+        try {
+          return await xhrSend(method, url, body, json);
+        } catch (e) {
+          lastErr = e;
+          if (i < attempts - 1) await new Promise((r) => setTimeout(r, 500));
+        }
+      }
+      throw lastErr;
+    };
+
     // ── 视频上传（XHR 才有上传进度；fetch 拿不到）──
     const videoUrlInput = document.getElementById("v-url") as HTMLInputElement;
     const wrap = document.getElementById("v-progress-wrap")!;
@@ -121,22 +158,36 @@ const vid = isEdit ? video!.id : 0;
     const fileBtn = document.getElementById("v-file-btn")!;
 
     fileBtn.addEventListener("click", () => fileInput.click());
-    fileInput.addEventListener("change", () => {
-      const file = fileInput.files?.[0];
-      if (!file) return;
-      wrap.classList.remove("hidden");
-      bar.style.width = "0%";
-      progressText.textContent = "0%";
-      hint(`上传中：${file.name}`);
 
+    // 失败分流：上传已到 100% 但响应丢失（dev 服务器偶发连接复位——服务端其实已完整落盘，
+    // data/videos 里的成对孤儿文件就是证据）→ 自动换新连接重试一次，与保存接口的既有补丁同款思路
+    const failOrRetry = (file, isRetry, why, lastPct) => {
+      if (!isRetry && lastPct >= 100) {
+        hint("文件已传完但响应丢失 —— 自动换新连接重试…");
+        // 先发一个丢弃的 GET 把池内坏连接耗掉，再换连接重传
+        try { fetch("/?heal=" + Date.now(), { cache: "no-store" }).catch(() => {}); } catch { /* ignore */ }
+        setTimeout(() => {
+          bar.style.width = "0%";
+          progressText.textContent = "0%";
+          sendUpload(file, true);
+        }, 400);
+      } else {
+        hint(isRetry ? "重试仍失败（" + why + "）" : "上传失败（" + why + "）");
+        wrap.classList.add("hidden");
+      }
+    };
+
+    // 视频上传端点按 Content-Type 识别类型并流式读原始 body —— 必须直传文件本体，
+    // 不能用 FormData（multipart 会被当成未知类型拒掉）
+    const sendUpload = (file, isRetry) => {
       const xhr = new XMLHttpRequest();
-      // 视频上传端点按 Content-Type 识别类型并流式读原始 body —— 必须直传文件本体，
-      // 不能用 FormData（multipart 会被当成未知类型拒掉）
+      let lastPct = 0;
       xhr.open("POST", "/api/videos/upload");
       xhr.setRequestHeader("Content-Type", file.type || "application/octet-stream");
       xhr.upload.addEventListener("progress", (e) => {
         if (e.lengthComputable) {
           const pct = Math.round((e.loaded / e.total) * 100);
+          lastPct = pct;
           bar.style.width = pct + "%";
           progressText.textContent = `${pct}%（${(e.loaded / 1048576).toFixed(1)} / ${(e.total / 1048576).toFixed(1)} MB）`;
         }
@@ -152,15 +203,35 @@ const vid = isEdit ? video!.id : 0;
             wrap.classList.add("hidden");
           }
         } catch {
-          hint("上传失败");
-          wrap.classList.add("hidden");
+          failOrRetry(file, isRetry, "响应解析失败", lastPct);
         }
       });
-      xhr.addEventListener("error", () => {
-        hint("上传失败（网络错误）");
-        wrap.classList.add("hidden");
-      });
+      xhr.addEventListener("error", () => failOrRetry(file, isRetry, "网络错误", lastPct));
       xhr.send(file);
+    };
+
+    fileInput.addEventListener("change", () => {
+      const file = fileInput.files?.[0];
+      if (!file) return;
+      // 客户端预检：与服务端 EXT_BY_MIME 同源的类型白名单 + 500MB 护栏，
+      // 免得超限/异型文件把几分钟的上传带宽白耗完才被服务端 413 拒掉
+      if (!["video/mp4", "video/webm", "video/quicktime"].includes(file.type)) {
+        hint("仅支持 MP4 / WebM / MOV 视频");
+        fileInput.value = "";
+        return;
+      }
+      if (file.size > 500 * 1024 * 1024) {
+        hint("视频不能超过 500MB");
+        fileInput.value = "";
+        return;
+      }
+      wrap.classList.remove("hidden");
+      bar.style.width = "0%";
+      progressText.textContent = "0%";
+      hint(`上传中：${file.name}`);
+      sendUpload(file, false);
+      // 没有手动封面时，自动截取视频首帧当封面（失败静默，手动通道保留）
+      if (!posterInput.value) capturePosterFromVideo(file);
     });
 
     // ── 封面上传（走 /api/upload/photo，10MB）──
@@ -175,14 +246,19 @@ const vid = isEdit ? video!.id : 0;
       const fd = new FormData();
       fd.append("file", file);
       try {
-        const res = await fetch("/api/upload/photo", { method: "POST", body: fd });
-        const j = await res.json();
-        if (res.ok && j.url) {
-          posterInput.value = j.url;
-          posterPreview.innerHTML = `<img src="${j.url}" alt="封面" class="w-full h-full object-cover" />`;
+        const r = await xhrRetry("POST", "/api/upload/photo", fd);
+        let j: Record<string, unknown> = {};
+        try { j = JSON.parse(r.text || "{}"); } catch { /* 非 JSON 响应按失败处理 */ }
+        if (r.status >= 200 && r.status < 300 && j.url) {
+          posterInput.value = j.url as string;
+          const img = document.createElement("img");
+          img.src = j.url as string;
+          img.alt = "封面";
+          img.className = "w-full h-full object-cover";
+          posterPreview.replaceChildren(img);
           hint("封面上传完成，记得点「保存」");
         } else {
-          hint(j.error || "封面上传失败");
+          hint((j.error as string) || "封面上传失败");
         }
       } catch {
         hint("封面上传失败");
@@ -195,8 +271,84 @@ const vid = isEdit ? video!.id : 0;
       posterPreview.textContent = "暂无封面";
     });
 
+    // ── 首帧自动封面：本地解码视频 → 多点采样 → 取最亮帧 → JPEG → 复用 /api/upload/photo ──
+    // 片头常是黑场淡入，固定取 0.5s 会截到暗帧（与资源管理器缩略图不符）；
+    // 候选位置取「开头/10%/25%/40%」四帧，按平均亮度选最亮的一张。
+    // 不依赖 ffmpeg；解码失败静默放弃，手动上传通道保留。触发时与落值前双重检查，
+    // 用户中途手动选了封面则自动帧让位。
+    const capturePosterFromVideo = async (file) => {
+      const objUrl = URL.createObjectURL(file);
+      let bestDataUrl: string | null = null;
+      try {
+        const v = document.createElement("video");
+        v.preload = "auto";
+        v.muted = true;
+        v.src = objUrl;
+        await new Promise((res, rej) => {
+          v.onloadeddata = () => res(null);
+          v.onerror = () => rej(new Error("解码失败"));
+          setTimeout(() => rej(new Error("解码超时")), 8000);
+        });
+        const dur = v.duration || 1;
+        const vw = v.videoWidth || 960;
+        const vh = v.videoHeight || 540;
+        const scale = Math.min(1, 960 / vw);
+        const canvas = document.createElement("canvas");
+        canvas.width = Math.max(1, Math.round(vw * scale));
+        canvas.height = Math.max(1, Math.round(vh * scale));
+        const ctx = canvas.getContext("2d");
+        const candidates = [0.1, Math.min(1.5, dur * 0.1), dur * 0.25, dur * 0.4]
+          .filter((t, i, arr) => t >= 0 && t < dur && arr.indexOf(t) === i);
+        let bestLum = -1;
+        for (const t of candidates) {
+          v.currentTime = t;
+          await new Promise((res) => {
+            v.onseeked = () => res(null);
+            setTimeout(() => res(null), 2500);
+          });
+          try { ctx.drawImage(v, 0, 0, canvas.width, canvas.height); } catch { continue; }
+          let data;
+          try { data = ctx.getImageData(0, 0, canvas.width, canvas.height).data; } catch { continue; }
+          // 平均亮度（采样 ~400 个像素点）
+          const step = 4 * Math.max(1, Math.floor((canvas.width * canvas.height) / 400));
+          let sum = 0, n = 0;
+          for (let i = 0; i + 2 < data.length; i += step) {
+            sum += 0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2];
+            n++;
+          }
+          const lum = n ? sum / n : 0;
+          if (lum > bestLum) {
+            bestLum = lum;
+            bestDataUrl = canvas.toDataURL("image/jpeg", 0.85);
+          }
+        }
+      } catch { return; /* 截帧失败静默，不影响视频上传 */ }
+      finally { URL.revokeObjectURL(objUrl); }
+      // 没截到任何帧，或用户在截帧期间已手动选了封面 → 自动帧让位
+      if (!bestDataUrl || posterInput.value) return;
+      try {
+        const bin = atob(bestDataUrl.split(",")[1]);
+        const bytes = new Uint8Array(bin.length);
+        for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+        const fd = new FormData();
+        fd.append("file", new File([bytes], "poster.jpg", { type: "image/jpeg" }));
+        const r = await xhrRetry("POST", "/api/upload/photo", fd);
+        let j: Record<string, unknown> = {};
+        try { j = JSON.parse(r.text || "{}"); } catch { /* 非 JSON 响应按失败处理 */ }
+        if (r.status >= 200 && r.status < 300 && j.url && !posterInput.value) {
+          // 二次复查：封面上传窗口内用户手动选了封面则放弃写入（已上传的自动帧作孤儿图，可忽略）
+          posterInput.value = j.url as string;
+          const img = document.createElement("img");
+          img.src = j.url as string;
+          img.alt = "封面";
+          img.className = "w-full h-full object-cover";
+          posterPreview.replaceChildren(img);
+          hint("已自动截取视频亮帧作为封面");
+        }
+      } catch { /* 自动封面文件上传失败静默 */ }
+    };
+
     // ── 保存 / 删除 ──
-    const saveBtn = document.getElementById("v-save") as HTMLButtonElement;
     saveBtn.addEventListener("click", async () => {
       const title = (document.getElementById("v-title") as HTMLInputElement).value.trim();
       if (!title) { hint("请先填写视频标题"); return; }
@@ -211,41 +363,37 @@ const vid = isEdit ? video!.id : 0;
         poster: posterInput.value,
         isPrivate: (document.getElementById("v-private") as HTMLInputElement).checked ? 1 : 0,
       };
-      const doSave = () =>
-        fetch("/api/video", {
-          method: isEdit ? "PUT" : "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(isEdit ? { id: vid, ...payload } : payload),
-        }).then(async (res) => {
-          const j = await res.json().catch(() => ({}));
-          return res.ok ? { ok: true } : { ok: false, error: j.error || "保存失败" };
-        });
-
-      // 大文件上传后 Node 默认的 5 秒 keep-alive 超时可能已把连接关闭，
-      // 浏览器在旧连接上发 POST 会报网络错误 —— 自动换新连接重试一次
-      const save = async (attempt: number): Promise<void> => {
-        try {
-          const r = await doSave();
-          if (r.ok) { window.location.href = "/videos"; return; }
-          hint(r.error);
-        } catch {
-          if (attempt === 0) {
-            await new Promise((res) => setTimeout(res, 600));
-            return save(attempt + 1);
-          }
-          hint("保存失败（网络错误），请再试一次");
-        }
-        saveBtn.disabled = false;
+      const doSave = async () => {
+        const r = await xhrRetry(isEdit ? "PUT" : "POST", "/api/video", JSON.stringify(isEdit ? { id: vid, ...payload } : payload), true);
+        let j: Record<string, unknown> = {};
+        try { j = JSON.parse(r.text || "{}"); } catch { /* 非 JSON 响应按通用失败处理 */ }
+        if (r.status >= 200 && r.status < 300) return { ok: true as const };
+        return { ok: false as const, error: (j.error as string) || "保存失败" };
       };
-      await save(0);
+
+      // 连接池自愈交给 fetchWithHeal（含踢坏连接 + 退避重试），这里只做结果呈现
+      try {
+        const r = await doSave();
+        if (r.ok) { window.location.href = "/videos"; return; }
+        hint(r.error);
+      } catch {
+        hint("保存失败（网络错误），请再试一次");
+      }
+      saveBtn.disabled = false;
     });
 
-    const delBtn = document.getElementById("v-del");
+    const delBtn = document.getElementById("v-del") as HTMLButtonElement | null;
     delBtn?.addEventListener("click", async () => {
       if (!confirm("确定删除这个视频？评论与点赞会一并删除，此操作不可恢复。")) return;
-      const res = await fetch(`/api/video?id=${vid}`, { method: "DELETE" });
-      if (res.ok) window.location.href = "/videos";
-      else hint("删除失败，请重试");
+      delBtn.disabled = true;
+      try {
+        const r = await xhrRetry("DELETE", `/api/video?id=${vid}`, null);
+        if (r.status >= 200 && r.status < 300) { window.location.href = "/videos"; return; }
+        hint("删除失败，请重试");
+      } catch {
+        hint("删除失败，请重试");
+      }
+      delBtn.disabled = false;
     });
   </script>
 </Layout>
