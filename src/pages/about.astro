@@ -1,13 +1,20 @@
 ---
 import Layout from "../layouts/Layout.astro";
 import { db } from "../db";
-import { posts, comments, likes } from "../db/schema";
+import { posts, comments, likes, galleries, videos } from "../db/schema";
 import { eq, sql } from "drizzle-orm";
+import { FLASH_GAMES } from "../lib/flash-games";
+import { RPG_GAMES } from "../lib/rpg-games";
 
 // 真实数据小统计：SSR 时直接查库，客户端零请求
 const postCount = db.select({ n: sql<number>`count(*)` }).from(posts).where(eq(posts.published, true)).get()?.n ?? 0;
 const commentCount = db.select({ n: sql<number>`count(*)` }).from(comments).get()?.n ?? 0;
 const likeCount = db.select({ n: sql<number>`coalesce(sum(${likes.count}), 0)` }).from(likes).get()?.n ?? 0;
+// 媒体只计公开内容（隐私项不上榜）；游戏区整区受 NSFW 开关统控、无单款隐私标记，故全量计入
+const publicGalleryCount = db.select({ n: sql<number>`count(*)` }).from(galleries).where(eq(galleries.isPrivate, 0)).get()?.n ?? 0;
+const publicVideoCount = db.select({ n: sql<number>`count(*)` }).from(videos).where(eq(videos.isPrivate, 0)).get()?.n ?? 0;
+const BUILTIN_GAMES = 5; // 与 about-site「游戏板块」档案行同口径（2048/扫雷/吃豆人/贪吃蛇/俄罗斯方块）
+const gameCount = BUILTIN_GAMES + FLASH_GAMES.length + RPG_GAMES.length;
 
 const techStack = [
   { glyph: "◆", label: "框架", title: "Astro 6 SSR", desc: "服务端动态渲染，Node standalone（@astrojs/node 10）部署，首屏直出无需等待。" },
@@ -63,14 +70,26 @@ const fonts = [
           <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M13.5 4.5 21 12l-7.5 7.5M21 12H3" /></svg>
         </a>
         <a href="/archive" class="inline-flex items-center gap-1.5 text-[var(--color-text-muted)] hover:text-[var(--color-accent)] transition-colors">
-          文章归档
+          归档
           <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M13.5 4.5 21 12l-7.5 7.5M21 12H3" /></svg>
         </a>
       </div>
-      <div class="mt-7 flex gap-8">
+      <div class="mt-7 flex flex-wrap gap-x-8 gap-y-4">
         <div>
           <p class="text-2xl font-bold tabular-nums">{postCount}<span class="text-sm font-medium text-[var(--color-text-subtle)] ml-1">篇</span></p>
           <p class="text-xs text-[var(--color-text-subtle)] mt-0.5">已发布文章</p>
+        </div>
+        <div>
+          <p class="text-2xl font-bold tabular-nums">{publicGalleryCount}<span class="text-sm font-medium text-[var(--color-text-subtle)] ml-1">个</span></p>
+          <p class="text-xs text-[var(--color-text-subtle)] mt-0.5">已发布相册</p>
+        </div>
+        <div>
+          <p class="text-2xl font-bold tabular-nums">{publicVideoCount}<span class="text-sm font-medium text-[var(--color-text-subtle)] ml-1">部</span></p>
+          <p class="text-xs text-[var(--color-text-subtle)] mt-0.5">已发布视频</p>
+        </div>
+        <div>
+          <p class="text-2xl font-bold tabular-nums">{gameCount}<span class="text-sm font-medium text-[var(--color-text-subtle)] ml-1">款</span></p>
+          <p class="text-xs text-[var(--color-text-subtle)] mt-0.5">已发布游戏</p>
         </div>
         <div>
           <p class="text-2xl font-bold tabular-nums">{likeCount}<span class="text-sm font-medium text-[var(--color-text-subtle)] ml-1">次</span></p>
