@@ -15,3 +15,20 @@ dist/
 __pycache__/
 .zcodeignore
 .tmp-*.json
+
+# ── 内容与流水线私有产物（只留本地，不进仓库）──
+# 发文流水线台账与文章草稿（书单/旅游/游戏三线）
+scripts/_posted.json
+scripts/_travel-state.json
+scripts/_game-state.json
+scripts/_game/
+scripts/_books/
+# 评论种子（脚本与数据）
+scripts/_demo-comments*.json
+scripts/_seed-comments*.py
+# 一次性工具与迁移脚本
+scripts/_swf-scan.py
+scripts/_extract-seed.ts
+scripts/_seed-raw.ts
+# 旅行城市坐标台账（本地维护；lib 对缺文件回落空池）
+src/data/travel-cities.json
