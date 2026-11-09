@@ -3,13 +3,13 @@ import Layout from "../layouts/Layout.astro";
 import { db } from "../db";
 import { posts, likes, comments, galleries, videos } from "../db/schema";
 import { eq, sql, desc } from "drizzle-orm";
-import citiesJson from "../data/travel-cities.json";
+import { TRAVEL_CITIES } from "../lib/travel-cities";
 import { FLASH_GAMES } from "../lib/flash-games";
 import { RPG_GAMES } from "../lib/rpg-games";
 
 export const prerender = false;
 
-const travelCityCount = Object.keys(citiesJson as Record<string, unknown>).length;
+const travelCityCount = Object.keys(TRAVEL_CITIES).length;
 
 // ── 内容统计 ──
 const all = db
@@ -62,10 +62,13 @@ const fmt = (n: number) => (n >= 10000 ? `${(n / 10000).toFixed(1)} 万` : Strin
 // 媒体与游戏板块规模（仅公开内容；游戏数取注册表实时长度）
 const publicGalleryCount = db.select({ n: sql<number>`count(*)` }).from(galleries).where(eq(galleries.isPrivate, 0)).get()?.n ?? 0;
 const publicVideoCount = db.select({ n: sql<number>`count(*)` }).from(videos).where(eq(videos.isPrivate, 0)).get()?.n ?? 0;
+// 游戏总数 = 内置经典 + Flash/RPG 注册表实时长度（游戏区整区受 NSFW 开关统控，无单款隐私标记，故全量计入）
+const BUILTIN_GAMES = 5;
+const totalGameCount = BUILTIN_GAMES + FLASH_GAMES.length + RPG_GAMES.length;
 
 const cards = [
   { label: "建站天数", value: String(days), sub: `自 ${earliest.slice(0, 4)} 年起步` },
-  { label: "文章总数", value: String(totalPosts), sub: `涵盖 ${tagSet.size} 个分类` },
+  { label: "文章总数", value: String(totalPosts), sub: `涵盖 ${tagSet.size} 个分类 · 另有相册 ${publicGalleryCount} · 视频 ${publicVideoCount} · 游戏 ${totalGameCount}` },
   { label: "总字数", value: fmt(totalWords), sub: "正文累计" },
   { label: "总浏览量", value: fmt(totalViews), sub: "详情页累计" },
 ];
@@ -119,7 +122,7 @@ const cards2 = [
           ["数据层", "SQLite（better-sqlite3 + Drizzle ORM）+ FTS5 全文搜索"],
           ["字体与图片", "自托管字体 · 图片按需转 WebP 与响应式多尺寸"],
           ["媒体库", `相册 ${publicGalleryCount} 个 · 视频 ${publicVideoCount} 部 —— 隐私内容可上锁，上传图片自动转 WebP`],
-          ["游戏板块", `内置经典 ×5 · Flash 怀旧款 ×${FLASH_GAMES.length}（Ruffle 模拟器）· RPG Maker ×${RPG_GAMES.length} —— 登录游玩，存档云端同步`],
+          ["游戏板块", `内置经典 ×${BUILTIN_GAMES} · Flash 怀旧款 ×${FLASH_GAMES.length}（Ruffle 模拟器）· RPG Maker ×${RPG_GAMES.length} —— 登录游玩，存档云端同步`],
           ["站点功能", "侧栏实时天气 · 浏览历史 · TTS 听全文 · 显示设置（深色 / 护眼 / NSFW 开关）"],
         ].map(([k, v]) => (
           <div class="flex items-start gap-4 px-5 py-3.5">
@@ -133,7 +136,7 @@ const cards2 = [
     <p class="text-xs text-[var(--color-text-subtle)] leading-relaxed">
       统计数据每次打开本页实时计算。
       <a href="/about" class="text-[var(--color-accent)] hover:underline">了解我 →</a>
-      <a href="/archive" class="text-[var(--color-accent)] hover:underline ml-3">文章归档 →</a>
+      <a href="/archive" class="text-[var(--color-accent)] hover:underline ml-3">归档 →</a>
     </p>
   </article>
 </Layout>
