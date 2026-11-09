@@ -210,6 +210,33 @@ export const FLASH_GAMES: FlashGame[] = [
     solName: "beauty-vs-alien_none",
     footer: "单文件 12MB · 无存档功能",
   },
+  {
+    id: "miren-mishu",
+    title: "迷人的秘书",
+    orig: "迷人的秘书 · 单文件",
+    desc: "与迷人的秘书展开办公室互动剧情的 Flash 游戏，单文件即点即玩（本作无存档功能）。",
+    tags: ["Flash", "互动", "Ruffle"],
+    solName: "miren-mishu_none",
+    footer: "单文件 5MB · 无存档功能",
+  },
+  {
+    id: "miren-mishu-2",
+    title: "迷人的秘书2",
+    orig: "迷人的秘书2 · 单文件",
+    desc: "迷人的秘书系列续作 —— Flash 互动剧情游戏，单文件即点即玩（本作无存档功能）。",
+    tags: ["Flash", "互动", "Ruffle"],
+    solName: "miren-mishu-2_none",
+    footer: "单文件 8MB · 无存档功能",
+  },
+  {
+    id: "xingqimeng",
+    title: "性启蒙教育",
+    orig: "童年屑游系列 · 单文件",
+    desc: "童年屑游系列的性启蒙教育题材 Flash 互动游戏，单文件即点即玩（本作无存档功能）。",
+    tags: ["Flash", "互动", "Ruffle"],
+    solName: "xingqimeng_none",
+    footer: "单文件 7MB · 无存档功能",
+  },
 ];
 
 export function getFlashGame(id: string | undefined): FlashGame | undefined {
