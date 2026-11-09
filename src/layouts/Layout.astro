@@ -36,7 +36,11 @@ const { title, description, ogImage, ogType = "website" } = Astro.props;
 // OG / canonical 需要绝对地址：以当前请求的协议 + 域名 + 端口为基准
 const siteOrigin = Astro.url.origin.replace(/\/$/, "");
 const canonical = new URL(Astro.url.pathname, siteOrigin).href;
-const ogImageAbs = ogImage ? new URL(ogImage, siteOrigin).href : undefined;
+// 分享卡：调用方传了封面图（如文章 coverImage）优先用之，否则默认走 /api/og 动态出图——
+// 标题版式卡 1200×630，全站无图内容也有像样的社交预览
+const ogImageAbs = ogImage
+  ? new URL(ogImage, siteOrigin).href
+  : `${siteOrigin}/api/og?t=${encodeURIComponent(title.slice(0, 120))}`;
 const desc = description || title;
 
 // 登录态和用户名在服务端就绪，作为 props 下发给岛屿：

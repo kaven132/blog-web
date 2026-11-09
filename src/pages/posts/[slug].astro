@@ -13,6 +13,7 @@ import { renderMarkdown, extractHeadings } from "../../lib/markdown";
 import { formatDateCN, dbDateToISO } from "../../lib/datetime";
 import { AUTH_COOKIE, isAuthed } from "../../lib/auth";
 import { trackBrowse } from "../../lib/history";
+import { shouldCountView } from "../../lib/view-guard";
 import glossaryRaw from "../../data/glossary.json";
 
 // 术语词典（序列化后经 define:vars 注入内联脚本，供正文术语标注与悬停卡片使用）
@@ -28,12 +29,15 @@ if (!post || !post.published) {
   return Astro.redirect("/404");
 }
 
-// 浏览量：本次访问之前的累计值先读出来展示，随后 +1（并发下少许误差对博客无碍）
+// 浏览量：本次访问之前的累计值先读出来展示，随后 +1（并发下少许误差对博客无碍）；
+// 防刷：爬虫/命令行 UA 与 30 分钟内重复访问（cookie 标记）不计数
 const postViews = post.views;
-db.update(posts)
-  .set({ views: sql`${posts.views} + 1` })
-  .where(eq(posts.id, post.id))
-  .run();
+if (shouldCountView(Astro.cookies, Astro.request, "post", post.id)) {
+  db.update(posts)
+    .set({ views: sql`${posts.views} + 1` })
+    .where(eq(posts.id, post.id))
+    .run();
+}
 
 const postLikes = db.select().from(likes).where(eq(likes.postId, post.id)).get();
 const postComments = db
@@ -91,6 +95,18 @@ const viewsDisplay = postViews > 9999 ? `${(postViews / 10000).toFixed(1)} 万` 
   ogImage={post.coverImage?.startsWith("/") ? post.coverImage : undefined}
   ogType="article"
 >
+  <!-- 结构化数据：搜索引擎富摘要（标题/日期/作者/关键词） -->
+  <script type="application/ld+json" set:html={JSON.stringify({
+    "@context": "https://schema.org",
+    "@type": "BlogPosting",
+    headline: post.title,
+    description: post.excerpt,
+    datePublished: `${post.createdAt.replace(" ", "T")}Z`,
+    dateModified: `${post.updatedAt.replace(" ", "T")}Z`,
+    author: { "@type": "Person", name: "kaven" },
+    keywords: tagList.join(","),
+    mainEntityOfPage: `${Astro.url.origin.replace(/\/$/, "")}/posts/${post.slug}`,
+  }).replace(/</g, "\\u003c")} />
   <ReadingProgress client:load />
   {headings.length >= 3 && <TocNav client:load headings={headings} />}
 

@@ -1,6 +1,6 @@
 import type { APIRoute } from "astro";
 import { db } from "../db";
-import { posts } from "../db/schema";
+import { posts, galleries, videos } from "../db/schema";
 import { eq } from "drizzle-orm";
 
 export const prerender = false;
@@ -13,12 +13,22 @@ function toW3C(s: string): string {
 export const GET: APIRoute = async ({ url: site }) => {
   const origin = site.origin.replace(/\/$/, "");
 
-  // 固定页面 + 全部已发布文章（lastmod 取更新时间，帮助爬虫优先抓新内容）
-  const staticPages = ["/", "/posts", "/about", "/games"];
+  // 固定页面 + 已发布文章 + 公开相册/视频（隐私项与 /games 区不进索引——robots.txt 同步挡掉 games）
+  const staticPages = ["/", "/posts", "/archive", "/gallery", "/videos", "/travel", "/about", "/about-site"];
   const postRows = db
     .select({ slug: posts.slug, updatedAt: posts.updatedAt })
     .from(posts)
     .where(eq(posts.published, true))
+    .all();
+  const galleryRows = db
+    .select({ id: galleries.id, createdAt: galleries.createdAt })
+    .from(galleries)
+    .where(eq(galleries.isPrivate, 0))
+    .all();
+  const videoRows = db
+    .select({ id: videos.id, createdAt: videos.createdAt })
+    .from(videos)
+    .where(eq(videos.isPrivate, 0))
     .all();
 
   const items = [
@@ -26,6 +36,14 @@ export const GET: APIRoute = async ({ url: site }) => {
     ...postRows.map((p) => ({
       loc: `${origin}/posts/${encodeURIComponent(p.slug)}`,
       lastmod: toW3C(p.updatedAt),
+    })),
+    ...galleryRows.map((g) => ({
+      loc: `${origin}/gallery/${g.id}`,
+      lastmod: toW3C(g.createdAt),
+    })),
+    ...videoRows.map((v) => ({
+      loc: `${origin}/videos/${v.id}`,
+      lastmod: toW3C(v.createdAt),
     })),
   ];
 
