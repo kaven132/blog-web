@@ -3,8 +3,21 @@ import { db } from "../../db";
 import { comments, posts, galleries, galleryComments, videos, videoComments } from "../../db/schema";
 import { eq } from "drizzle-orm";
 import { AUTH_COOKIE, isAuthed } from "../../lib/auth";
+import { rateLimit } from "../../lib/rate-limit";
 
-export const POST: APIRoute = async ({ request, redirect }) => {
+export const POST: APIRoute = async ({ request, redirect, clientAddress }) => {
+  // 评论是全站唯一免登录写入口：按来源 IP 滑动窗口限流（10 分钟 5 条），防脚本灌水。
+  // 反代部署取 X-Forwarded-For 第一跳（nginx 会覆盖客户端伪造值），直连取 socket 地址。
+  const ip =
+    (request.headers.get("x-forwarded-for") || "").split(",")[0].trim() || clientAddress || "unknown";
+  const rl = rateLimit(`comment:${ip}`, 5, 10 * 60 * 1000);
+  if (!rl.ok) {
+    return new Response(`评论太频繁了，请约 ${Math.max(1, Math.ceil(rl.retryAfterSec / 60))} 分钟后再试`, {
+      status: 429,
+      headers: { "Retry-After": String(rl.retryAfterSec) },
+    });
+  }
+
   try {
     const formData = await request.formData();
 

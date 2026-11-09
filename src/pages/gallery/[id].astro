@@ -7,6 +7,7 @@ import { asc, eq, sql } from "drizzle-orm";
 import { AUTH_COOKIE, isAuthed, nsfwOpen } from "../../lib/auth";
 import { parseCategoryPath, categoryLabel } from "../../lib/gallery-categories";
 import { trackBrowse } from "../../lib/history";
+import { shouldCountView } from "../../lib/view-guard";
 
 export const prerender = false;
 
@@ -24,12 +25,14 @@ if (gallery.isPrivate && !nsfwOpen(Astro.cookies)) {
   return Astro.redirect("/gallery");
 }
 
-// 浏览量：浏览页每次渲染 +1（先取旧值用于展示，再自增）
+// 浏览量：浏览页每次渲染 +1（先取旧值用于展示，再自增）；爬虫/30 分钟内重复访问不计数
 const galleryViews = gallery.views;
-db.update(galleries)
-  .set({ views: sql`${galleries.views} + 1` })
-  .where(eq(galleries.id, gallery.id))
-  .run();
+if (shouldCountView(Astro.cookies, Astro.request, "gallery", gallery.id)) {
+  db.update(galleries)
+    .set({ views: sql`${galleries.views} + 1` })
+    .where(eq(galleries.id, gallery.id))
+    .run();
+}
 const viewsDisplay = galleryViews > 9999 ? `${(galleryViews / 10000).toFixed(1)} 万` : String(galleryViews);
 
 // 浏览历史采集：仅登录用户记录

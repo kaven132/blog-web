@@ -104,6 +104,15 @@ sqlite.exec(`CREATE TABLE IF NOT EXISTS video_comments (
   created_at TEXT NOT NULL DEFAULT (CURRENT_TIMESTAMP)
 )`);
 
+// 评论外键索引：详情页评论查询走 post_id/gallery_id/video_id，盖楼与级联删除走 parent_id，
+// 缺索引这些都是全表扫描（数据量上去后是数量级差距）；幂等，旧库重启即补齐
+sqlite.exec("CREATE INDEX IF NOT EXISTS comments_post_id_idx ON comments(post_id)");
+sqlite.exec("CREATE INDEX IF NOT EXISTS comments_parent_id_idx ON comments(parent_id)");
+sqlite.exec("CREATE INDEX IF NOT EXISTS gallery_comments_gallery_id_idx ON gallery_comments(gallery_id)");
+sqlite.exec("CREATE INDEX IF NOT EXISTS gallery_comments_parent_id_idx ON gallery_comments(parent_id)");
+sqlite.exec("CREATE INDEX IF NOT EXISTS video_comments_video_id_idx ON video_comments(video_id)");
+sqlite.exec("CREATE INDEX IF NOT EXISTS video_comments_parent_id_idx ON video_comments(parent_id)");
+
 // 浏览历史（随账号走）：(user_id, kind, ref_id) 唯一，重复浏览 upsert 置顶
 sqlite.exec(`CREATE TABLE IF NOT EXISTS browse_history (
   id INTEGER PRIMARY KEY AUTOINCREMENT,

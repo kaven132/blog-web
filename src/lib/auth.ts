@@ -29,14 +29,22 @@ export function nsfwOpen(cookies: { get(name: string): { value: string | undefin
 }
 
 /**
- * 账号密码：优先环境变量（ADMIN_ACCOUNT / ADMIN_PASSWORD），未配置时退回本地默认值。
- * 旧实现把明文密码写死且 Cookie 值就是 "true"，任何人 curl 带上 auth=true 即可绕过登录。
+ * 账号密码与签名密钥：ADMIN_PASSWORD / AUTH_SECRET 必须由 .env 或部署环境变量提供，
+ * ADMIN_ACCOUNT 缺省用 "kavenyyds"。旧版在源码里内置默认密码回退——仓库公开，
+ * 等于把备用钥匙贴在大门上；现在缺配置直接拒绝启动（fail-fast）。
  */
 export const ADMIN_ACCOUNT = process.env.ADMIN_ACCOUNT || "kavenyyds";
-export const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || "4399123456";
+const ADMIN_PASSWORD_ENV = process.env.ADMIN_PASSWORD;
+const AUTH_SECRET_ENV = process.env.AUTH_SECRET;
+if (!ADMIN_PASSWORD_ENV || !AUTH_SECRET_ENV) {
+  throw new Error(
+    "[auth] 缺少 ADMIN_PASSWORD / AUTH_SECRET 配置：请在项目根 .env 或部署环境变量中提供后再启动。",
+  );
+}
+export const ADMIN_PASSWORD = ADMIN_PASSWORD_ENV;
 
-/** 签名密钥：默认从密码派生，可用 AUTH_SECRET 独立配置（改密码不再顺带踢掉所有会话） */
-const SECRET = process.env.AUTH_SECRET || `kaven-blog::v1::${ADMIN_PASSWORD}`;
+/** 签名密钥：AUTH_SECRET 必填（独立于密码，改密码不再顺带踢掉所有会话） */
+const SECRET = AUTH_SECRET_ENV;
 
 function authToken(): string {
   return createHmac("sha256", SECRET).update(`auth-v1:${ADMIN_ACCOUNT}`).digest("hex");
