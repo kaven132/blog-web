@@ -10,7 +10,8 @@ import worldTopoRaw from "../data/world-110m.json";
  * 数据由服务端按「标题『：』前缀 = 城市名，查 travel-cities 台账取坐标」聚合传入；
  * 地理数据来自 world-110m 拓扑（随仓库自托管，不依赖 CDN）。
  * 交互：点击图钉选中城市、悬浮放大、筛选行淡出未选分类、滚轮/按钮缩放、拖拽平移。
- * 缩放分级显示：k≥1.6 淡入国境线，k≥2.4 淡入国名（线宽不随缩放变粗）。
+ * 缩放分级显示：k≥1.6 淡入国境线，k≥2.2 淡入国名（线宽不随缩放变粗；
+ * 锚点 = 最大多边形环质心，海外领地/群岛不拉偏，少数国家用 LABEL_ANCHORS 覆盖）。
  */
 
 const worldTopo = worldTopoRaw as any;
@@ -26,6 +27,33 @@ export interface TravelCity {
 
 const W = 1080;
 const H = 480;
+
+// 手工标签锚点（经纬度）：最大环质心仍不理想的国家在此覆盖。
+// 典型成因：群岛国家的最大环未必是视觉主体（Malaysia 最大环在婆罗洲沙捞越）。
+const LABEL_ANCHORS: Record<string, [number, number]> = {
+  Malaysia: [102.0, 4.2], // 锚回马来半岛
+};
+
+// 最大多边形环的质心：整体质心会被海外领地拉偏（如 France 含法属圭亚那 → 标签印到西班牙），
+// 取投影面积最大的那一环求质心可锚回本土。
+function largestRingCentroid(
+  pathGen: ReturnType<typeof geoPath>,
+  f: unknown
+): [number, number] {
+  const geom = (f as { geometry: { type: string; coordinates: unknown } }).geometry;
+  if (geom.type === "Polygon") return pathGen.centroid(f as never) as [number, number];
+  let best: [number, number] = [NaN, NaN];
+  let bestArea = -1;
+  for (const coords of geom.coordinates as Array<Array<[number, number]>>) {
+    const poly = { type: "Feature", geometry: { type: "Polygon", coordinates: coords } };
+    const area = pathGen.area(poly as never);
+    if (area > bestArea) {
+      bestArea = area;
+      best = pathGen.centroid(poly as never) as [number, number];
+    }
+  }
+  return best;
+}
 
 type TypeFilter = "全部" | "国内" | "国际";
 
@@ -48,11 +76,13 @@ export default function TravelMap({ cities }: { cities: TravelCity[] }) {
     const projection = geoNaturalEarth1();
     const pathGen = geoPath(projection);
     const countriesFc = feature(worldTopo, worldTopo.objects.countries) as unknown as {
-      features: Array<{ properties: { name?: string; id?: string }; type: "Feature" }>;
+      features: Array<{ id?: string; properties: { name?: string }; type: "Feature" }>;
     };
+    // 南极洲剔除：world-atlas 的 id 在 Feature 顶层且是 ISO 数字码，"010" = 南极洲
+    // （旧写法 f.properties.id !== "ATA" 永远为真，导致 fitExtent 连南极洲一起适配 + ANTARCTICA 标签出现）
     const visible = {
       type: "FeatureCollection" as const,
-      features: countriesFc.features.filter((f) => f.properties.id !== "ATA"),
+      features: countriesFc.features.filter((f) => f.id !== "010"),
     };
     projection.fitExtent([[6, 6], [W - 6, H - 6]], visible as never);
     return {
@@ -61,11 +91,13 @@ export default function TravelMap({ cities }: { cities: TravelCity[] }) {
       coastPath: pathGen(mesh(worldTopo, worldTopo.objects.countries, (a, b) => a === b)) ?? "",
       bordersPath: pathGen(mesh(worldTopo, worldTopo.objects.countries, (a, b) => a !== b)) ?? "",
       graticulePath: pathGen(geoGraticule10()) ?? "",
-      nameLabels: countriesFc.features
+      nameLabels: visible.features
         .map((f) => {
-          const centroid = pathGen.centroid(f as never);
+          const name = f.properties.name ?? "";
+          const anchor = name ? LABEL_ANCHORS[name] : undefined;
+          const centroid = anchor ? projection(anchor) ?? [NaN, NaN] : largestRingCentroid(pathGen, f);
           const area = pathGen.area(f as never);
-          return { name: f.properties.name ?? "", centroid, area };
+          return { name, centroid, area };
         })
         .filter((l) => Number.isFinite(l.centroid[0]) && l.area > 140 && l.name),
     };
