@@ -3,11 +3,12 @@ import Layout from "../../layouts/Layout.astro";
 import LikeButton from "../../components/LikeButton";
 import { db } from "../../db";
 import { videos, videoLikes, videoComments } from "../../db/schema";
-import { asc, eq, sql } from "drizzle-orm";
+import { and, asc, desc, eq, gt, lt, sql } from "drizzle-orm";
 import { AUTH_COOKIE, isAuthed, nsfwOpen } from "../../lib/auth";
 import { trackBrowse } from "../../lib/history";
 import { shouldCountView } from "../../lib/view-guard";
 import { formatDateShort, dbDateToISO } from "../../lib/datetime";
+import { sizedImgSrc } from "../../lib/imgsrc";
 
 export const prerender = false;
 
@@ -52,9 +53,27 @@ const repliesOf = (cid: number) => videoCommentRows.filter((c) => c.parentId ===
 const authorOf = (cid: number | null) => videoCommentRows.find((c) => c.id === cid)?.author;
 const created = formatDateShort(video.createdAt);
 const createdIso = dbDateToISO(video.createdAt);
+
+// 相邻视频：与列表同序（时间倒序）——上一部 = 更新发布的第一个，下一部 = 更旧的第一个。
+// 匿名或 NSFW 关闭时跳过隐私项（列表里看不到的，导航里也不出现）。
+const hidePrivate = !authed || !nsfwOpen(Astro.cookies);
+const prevVideo = db
+  .select({ id: videos.id, title: videos.title, poster: videos.poster })
+  .from(videos)
+  .where(and(gt(videos.createdAt, video.createdAt), hidePrivate ? eq(videos.isPrivate, 0) : undefined))
+  .orderBy(asc(videos.createdAt))
+  .limit(1)
+  .get();
+const nextVideo = db
+  .select({ id: videos.id, title: videos.title, poster: videos.poster })
+  .from(videos)
+  .where(and(lt(videos.createdAt, video.createdAt), hidePrivate ? eq(videos.isPrivate, 0) : undefined))
+  .orderBy(desc(videos.createdAt))
+  .limit(1)
+  .get();
 ---
 
-<Layout title={`${video.title} · 视频`} description={video.description || `${video.title} —— 在线播放`}>
+<Layout title={`${video.title} · 视频`} description={video.description || `${video.title} —— 在线播放`} ogTag="视频">
   <article class="py-10 md:py-14 max-w-4xl mx-auto">
     <header class="mb-6 animate-[slide-up_0.5s_ease-out_both]">
       <p class="text-xs font-semibold tracking-[0.15em] uppercase text-[var(--color-text-subtle)] mb-3">Video</p>
@@ -69,10 +88,56 @@ const createdIso = dbDateToISO(video.createdAt);
       </div>
     </header>
 
-    <!-- 播放器 -->
-    <div class="rounded-2xl overflow-hidden bg-black border border-[var(--color-border)] mb-10 animate-[slide-up_0.5s_ease-out_both]">
-      <video class="block w-full max-h-[70vh] mx-auto" src={video.url} poster={video.poster || undefined} controls preload="metadata" playsinline></video>
+    <!-- 播放器：原生控制条 + 底部增强条（倍速/循环），单击暂停、双击全屏、播放位置记忆 -->
+    <div id="v-player" class="relative rounded-2xl bg-black border border-[var(--color-border)] mb-10 animate-[slide-up_0.5s_ease-out_both]">
+      <video id="v-video" data-video-id={video.id} class="block w-full max-h-[70vh] mx-auto rounded-t-[15px]" src={video.url} poster={video.poster || undefined} controls preload="metadata" playsinline></video>
+      <div id="v-resume" class="hidden absolute top-3 left-3 rounded-full bg-black/70 text-white text-xs px-3 py-1.5 backdrop-blur z-10"></div>
+      <div class="flex items-center gap-2 px-3 py-2 bg-[var(--color-surface)] relative rounded-b-[15px]">
+        <div class="relative">
+          <button type="button" id="v-rate-btn" title="倍速播放" aria-haspopup="true" class="h-7 px-2.5 rounded-lg text-xs font-mono border border-[var(--color-border)] bg-[var(--color-bg)] text-[var(--color-text-muted)] hover:text-[var(--color-accent)] hover:border-[var(--color-accent)]/50 transition-colors">1.0x</button>
+          <div id="v-rate-menu" class="hidden absolute bottom-full mb-2 left-0 w-20 p-1 rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] shadow-lg z-20">
+            {["0.5", "0.75", "1.0", "1.25", "1.5", "2.0"].map((r) => (
+              <button
+                type="button"
+                data-rate={r}
+                class:list={[
+                  "w-full h-7 rounded-lg text-xs font-mono text-center transition-colors hover:bg-[var(--color-bg)] hover:text-[var(--color-text)]",
+                  r === "1.0" ? "text-[var(--color-accent)] font-bold" : "text-[var(--color-text-muted)]",
+                ]}
+              >
+                {r}x
+              </button>
+            ))}
+          </div>
+        </div>
+        <button type="button" id="v-loop-btn" title="循环播放" aria-pressed="false" class="h-7 px-2.5 rounded-lg text-xs border border-[var(--color-border)] bg-[var(--color-bg)] text-[var(--color-text-muted)] hover:text-[var(--color-accent)] hover:border-[var(--color-accent)]/50 transition-colors">循环 关</button>
+        <span class="ml-auto text-[11px] text-[var(--color-text-subtle)] hidden sm:inline whitespace-nowrap">空格 播放 · ←/→ ±5s · ↑/↓ 音量 · 双击全屏</span>
+      </div>
     </div>
+
+    <!-- 相邻视频导航：上一部 / 下一部（与列表时间倒序一致；隐私项对无权限者不可见） -->
+    {(prevVideo || nextVideo) && (
+      <nav class="grid sm:grid-cols-2 gap-3 mb-10" aria-label="相邻视频">
+        {prevVideo && (
+          <a href={`/videos/${prevVideo.id}`} class="group flex items-center gap-3 bg-[var(--color-surface)] border border-[var(--color-border)] hover:border-[var(--color-border-hover)] rounded-xl p-3 transition-colors min-w-0">
+            {prevVideo.poster && <img src={sizedImgSrc(prevVideo.poster, 320)} alt="" class="w-24 h-14 rounded-lg object-cover flex-shrink-0" loading="lazy" />}
+            <span class="min-w-0">
+              <span class="block text-[11px] text-[var(--color-text-subtle)] mb-0.5">← 上一部</span>
+              <span class="block text-sm font-medium text-[var(--color-text)] truncate group-hover:text-[var(--color-accent)] transition-colors">{prevVideo.title}</span>
+            </span>
+          </a>
+        )}
+        {nextVideo && (
+          <a href={`/videos/${nextVideo.id}`} class="group flex items-center gap-3 sm:flex-row-reverse bg-[var(--color-surface)] border border-[var(--color-border)] hover:border-[var(--color-border-hover)] rounded-xl p-3 transition-colors min-w-0">
+            {nextVideo.poster && <img src={sizedImgSrc(nextVideo.poster, 320)} alt="" class="w-24 h-14 rounded-lg object-cover flex-shrink-0" loading="lazy" />}
+            <span class="min-w-0 text-right">
+              <span class="block text-[11px] text-[var(--color-text-subtle)] mb-0.5">下一部 →</span>
+              <span class="block text-sm font-medium text-[var(--color-text)] truncate group-hover:text-[var(--color-accent)] transition-colors">{nextVideo.title}</span>
+            </span>
+          </a>
+        )}
+      </nav>
+    )}
 
     <!-- 点赞 + 评论区（与相册同构） -->
     <section id="comments" class="mt-12 max-w-2xl mx-auto">
@@ -300,6 +365,150 @@ const createdIso = dbDateToISO(video.createdAt);
               if (e.key === "Escape") closeEmoji();
             });
           }
+        })();
+      </script>
+
+      <script data-astro-rerun>
+        // 播放器增强：倍速菜单 / 循环 / 键盘 / 双击全屏 / 播放位置记忆（纯 JS，见 data-astro-rerun 约定）
+        (() => {
+          const video = document.getElementById("v-video");
+          if (!video) return;
+          const vid = video.dataset.videoId || "0";
+          const rateBtn = document.getElementById("v-rate-btn");
+          const rateMenu = document.getElementById("v-rate-menu");
+          const loopBtn = document.getElementById("v-loop-btn");
+          const resumeToast = document.getElementById("v-resume");
+
+          // ── 倍速：菜单选择 + 恢复上次倍速 + 高亮当前项 ──
+          const setRate = (r) => {
+            if (!Number.isFinite(r) || r <= 0) return;
+            video.playbackRate = r;
+            if (rateBtn) rateBtn.textContent = r + "x";
+            try { localStorage.setItem("video-rate", String(r)); } catch {}
+            if (rateMenu) {
+              rateMenu.classList.add("hidden");
+              for (const b of rateMenu.querySelectorAll("[data-rate]")) {
+                const on = b.getAttribute("data-rate") === String(r);
+                b.classList.toggle("text-[var(--color-accent)]", on);
+                b.classList.toggle("font-bold", on);
+              }
+            }
+          };
+          let savedRate = 1.0;
+          try { savedRate = parseFloat(localStorage.getItem("video-rate") || "1.0") || 1.0; } catch {}
+          setRate(savedRate);
+
+          rateBtn?.addEventListener("click", (e) => {
+            e.stopPropagation();
+            rateMenu?.classList.toggle("hidden");
+          });
+          rateMenu?.addEventListener("click", (e) => {
+            const b = e.target instanceof Element ? e.target.closest("[data-rate]") : null;
+            if (!b) return;
+            setRate(parseFloat(b.getAttribute("data-rate") || "1"));
+          });
+          document.addEventListener("click", (e) => {
+            if (!(e.target instanceof Element)) return;
+            if (rateMenu && !rateMenu.classList.contains("hidden") && !rateMenu.contains(e.target) && !rateBtn?.contains(e.target)) {
+              rateMenu.classList.add("hidden");
+            }
+          });
+
+          // ── 循环开关 ──
+          const syncLoop = () => {
+            if (!loopBtn) return;
+            loopBtn.setAttribute("aria-pressed", video.loop ? "true" : "false");
+            loopBtn.textContent = video.loop ? "循环 开" : "循环 关";
+            loopBtn.classList.toggle("text-[var(--color-accent)]", video.loop);
+            loopBtn.classList.toggle("border-[var(--color-accent)]/50", video.loop);
+          };
+          loopBtn?.addEventListener("click", () => {
+            video.loop = !video.loop;
+            syncLoop();
+          });
+          syncLoop();
+
+          // ── 播放位置记忆：每 3s 落一次 localStorage，看完自动清除；重进页跳回上次位置 ──
+          const posKey = "video-pos:" + vid;
+          let lastSave = 0;
+          video.addEventListener("timeupdate", () => {
+            const now = Date.now();
+            if (now - lastSave > 3000 && video.currentTime > 1) {
+              lastSave = now;
+              try { localStorage.setItem(posKey, String(video.currentTime)); } catch {}
+            }
+          });
+          video.addEventListener("ended", () => {
+            try { localStorage.removeItem(posKey); } catch {}
+          });
+          video.addEventListener("loadedmetadata", () => {
+            let saved = 0;
+            try { saved = parseFloat(localStorage.getItem(posKey) || "0") || 0; } catch {}
+            if (saved > 5 && video.duration && saved < video.duration - 5) {
+              video.currentTime = saved;
+              if (resumeToast) {
+                const m = Math.floor(saved / 60);
+                const s = String(Math.floor(saved % 60)).padStart(2, "0");
+                resumeToast.textContent = "已从 " + m + ":" + s + " 继续播放";
+                resumeToast.classList.remove("hidden");
+                setTimeout(() => resumeToast.classList.add("hidden"), 2500);
+              }
+            }
+          });
+
+          // ── 键盘：空格/←→/↑↓（输入框与原生控制条聚焦时让位，防双触发）──
+          document.addEventListener("keydown", (e) => {
+            if (e.target instanceof Element && /^(INPUT|TEXTAREA|SELECT)$/.test(e.target.tagName)) return;
+            if (e.target === video) return;
+            if (e.key === " ") {
+              e.preventDefault();
+              if (video.paused) video.play(); else video.pause();
+            } else if (e.key === "ArrowLeft") {
+              e.preventDefault();
+              video.currentTime = Math.max(0, video.currentTime - 5);
+            } else if (e.key === "ArrowRight") {
+              e.preventDefault();
+              video.currentTime = Math.min(video.duration || Number.MAX_SAFE_INTEGER, video.currentTime + 5);
+            } else if (e.key === "ArrowUp") {
+              e.preventDefault();
+              video.volume = Math.min(1, video.volume + 0.1);
+            } else if (e.key === "ArrowDown") {
+              e.preventDefault();
+              video.volume = Math.max(0, video.volume - 0.1);
+            }
+          });
+
+          // ── 单击播放/暂停（250ms 延迟区分双击）+ 双击全屏；原生控制条区域让位 ──
+          // （控制条在 shadow DOM 里，点击会冒泡到 <video>，不拦会双触发）
+          const inControlsZone = (e) => {
+            const r = video.getBoundingClientRect();
+            return e.clientY - r.top > r.height - 60;
+          };
+          let clickTimer = null;
+          video.addEventListener("click", (e) => {
+            if (inControlsZone(e)) return;
+            if (clickTimer) {
+              clearTimeout(clickTimer);
+              clickTimer = null;
+              return;
+            }
+            clickTimer = setTimeout(() => {
+              clickTimer = null;
+              if (video.paused) video.play(); else video.pause();
+            }, 250);
+          });
+          video.addEventListener("dblclick", (e) => {
+            if (inControlsZone(e)) return;
+            if (clickTimer) {
+              clearTimeout(clickTimer);
+              clickTimer = null;
+            }
+            if (document.fullscreenElement) {
+              document.exitFullscreen?.();
+            } else {
+              video.requestFullscreen?.();
+            }
+          });
         })();
       </script>
   </article>

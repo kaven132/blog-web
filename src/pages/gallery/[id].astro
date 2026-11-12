@@ -63,7 +63,7 @@ const repliesOf = (cid: number) => galleryCommentRows.filter((c) => c.parentId =
 const authorOf = (cid: number | null) => galleryCommentRows.find((c) => c.id === cid)?.author;
 ---
 
-<Layout title={`${gallery.title} · 相册`} description={gallery.description || `${gallery.title} —— ${photos.length} 张照片`}>
+<Layout title={`${gallery.title} · 相册`} description={gallery.description || `${gallery.title} —— ${photos.length} 张照片`} ogTag="相册">
   <article class="py-10 md:py-14 max-w-5xl mx-auto">
     <!-- Header -->
     <header class="mb-6 animate-[slide-up_0.5s_ease-out_both]">
