@@ -7,6 +7,7 @@ import { AUTH_COOKIE, isAuthed, nsfwOpen } from "../lib/auth";
 import { parseCategoryPath, categoryLabel } from "../lib/gallery-categories";
 import { formatDateShort } from "../lib/datetime";
 import SearchBar from "../components/SearchBar";
+import { sizedImgSrc } from "../lib/imgsrc";
 
 export const prerender = false;
 
@@ -67,6 +68,7 @@ let cards = allRows.map((g) => {
     description: g.description,
     isPrivate: !!g.isPrivate,
     cover: photos[0] ?? "",
+    covers: photos.slice(0, 3),
     count: photos.length,
     views: g.views,
     likeCount: g.likeCount,
@@ -311,8 +313,9 @@ const sortTabs = [
               <div class="relative h-48 bg-[var(--color-bg)] border-b border-[var(--color-border)] overflow-hidden">
                 {g.cover ? (
                   <img
-                    src={g.cover}
+                    src={sizedImgSrc(g.cover, 640)}
                     alt={`${g.title} 封面`}
+                    data-covers={g.covers.length > 1 ? JSON.stringify(g.covers.map((p) => sizedImgSrc(p, 640))) : undefined}
                     class="absolute inset-0 w-full h-full object-cover transition-transform duration-500 group-hover:scale-[1.04]"
                     loading="lazy"
                   />
@@ -403,5 +406,43 @@ const sortTabs = [
         </div>
       )
     }
+
+    <script data-astro-rerun>
+      // 封面 hover 轮播：悬浮卡片时在封面图前 3 张间自动循环，移出复位（仅悬停设备生效）
+      (() => {
+        if (!window.matchMedia("(hover: hover)").matches) return;
+        document.querySelectorAll("[data-covers]").forEach((img) => {
+          let covers = [];
+          try {
+            covers = JSON.parse(img.dataset.covers || "[]");
+          } catch {}
+          if (covers.length < 2) return;
+          let timer = null;
+          let i = 0;
+          let preloaded = false;
+          img.addEventListener("mouseenter", () => {
+            if (!preloaded) {
+              covers.forEach((s) => {
+                const im = new Image();
+                im.src = s;
+              });
+              preloaded = true;
+            }
+            timer = setInterval(() => {
+              i = (i + 1) % covers.length;
+              img.src = covers[i];
+            }, 800);
+          });
+          img.addEventListener("mouseleave", () => {
+            if (timer) {
+              clearInterval(timer);
+              timer = null;
+            }
+            i = 0;
+            img.src = covers[0];
+          });
+        });
+      })();
+    </script>
   </article>
 </Layout>
