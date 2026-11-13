@@ -46,8 +46,16 @@ export const ADMIN_PASSWORD = ADMIN_PASSWORD_ENV;
 /** 签名密钥：AUTH_SECRET 必填（独立于密码，改密码不再顺带踢掉所有会话） */
 const SECRET = AUTH_SECRET_ENV;
 
+/**
+ * 会话版本号：令牌 = HMAC(secret, "auth-v1:<版本>:<账号>")。
+ * 令牌本身是确定性 HMAC、无过期时间——版本号是唯一的吊销手段：
+ * 怀疑 cookie 泄漏或改密码后，把 .env 的 SESSION_VERSION +1 重启，即全体旧会话失效（要重新登录）。
+ * 缺省 "1"，不配置也能正常工作。
+ */
+const SESSION_VERSION = process.env.SESSION_VERSION || "1";
+
 function authToken(): string {
-  return createHmac("sha256", SECRET).update(`auth-v1:${ADMIN_ACCOUNT}`).digest("hex");
+  return createHmac("sha256", SECRET).update(`auth-v1:${SESSION_VERSION}:${ADMIN_ACCOUNT}`).digest("hex");
 }
 
 /** 登录成功后要种下的 Cookie 值（不可伪造的 HMAC token） */
@@ -63,7 +71,7 @@ export function isAuthed(value: string | undefined): boolean {
   return got.length === expected.length && timingSafeEqual(got, expected);
 }
 
-// ── 密码（「账户设置」页可改，改过落库；未改过回退 env / 默认值） ──
+// ── 密码（「账户设置」页可改，改过落库 scrypt 哈希） ──
 
 export function hashPassword(password: string): string {
   const salt = randomBytes(16).toString("hex");
@@ -79,15 +87,20 @@ function verifyHash(password: string, stored: string): boolean {
   return orig.length === test.length && timingSafeEqual(orig, test);
 }
 
-/** 当前生效密码校验：优先读库内凭证，表缺失/未设置时回退 env / 默认密码 */
+/**
+ * 当前生效密码校验：只认库内 scrypt 凭证。
+ * 无凭证行 / 表不可用一律 fail-fast 拒绝——不再回退 .env 明文比较：
+ * 那条老路一方面绕过恒定时间比较，另一方面 DB 恢复到空凭证时，
+ * .env 里早已「死亡」的旧密码会静默复活成有效钥匙。
+ */
 export function verifyPassword(password: string): boolean {
   try {
     const row = db.select().from(credentials).where(eq(credentials.id, 1)).get();
     if (row?.passwordHash) return verifyHash(password, row.passwordHash);
   } catch {
-    // 表暂时不可用等异常 → 回退环境变量比对
+    // 表暂时不可用（迁移中/库损坏）→ 拒绝登录，去修库而不是换一条更弱的验证路
   }
-  return password === ADMIN_PASSWORD;
+  return false;
 }
 
 /** 落库新密码（覆盖单行凭证） */
