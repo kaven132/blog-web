@@ -33,6 +33,7 @@ function fileResponse(full: string, mime: string) {
       "Content-Type": mime,
       "Content-Length": String(size),
       "Cache-Control": "public, max-age=31536000, immutable",
+      "X-Content-Type-Options": "nosniff",
     },
   });
 }
@@ -43,6 +44,7 @@ function bufResponse(buf: Buffer, mime: string, cacheable: boolean) {
       "Content-Type": mime,
       "Content-Length": String(buf.byteLength),
       "Cache-Control": cacheable ? "public, max-age=31536000, immutable" : "no-store",
+      "X-Content-Type-Options": "nosniff",
     },
   });
 }

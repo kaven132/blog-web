@@ -31,6 +31,8 @@ function fileResponse(full: string, mime: string, varyAccept: boolean) {
       "Content-Type": mime,
       "Content-Length": String(size),
       "Cache-Control": "public, max-age=31536000, immutable",
+      // 用户内容端点：显式禁 MIME 嗅探（Content-Type 以魔数嗅探结果为准）
+      "X-Content-Type-Options": "nosniff",
       // 同一 URL 按协商可能返回 WebP 或原图，CDN 必须按 Accept 区分缓存
       ...(varyAccept ? { Vary: "Accept" } : {}),
     },

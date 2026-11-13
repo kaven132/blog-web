@@ -12,5 +12,10 @@ export const onRequest = defineMiddleware(async (context, next) => {
   if (!response.headers.has("Cache-Control")) {
     response.headers.set("Cache-Control", "no-store");
   }
+  // 安全响应头三件套：防 MIME 嗅探 / 防点击劫持 / 收紧 Referrer 泄漏
+  // （middleware 只覆盖 SSR 页面；文件端点的 nosniff 在各自端点内设置）
+  response.headers.set("X-Content-Type-Options", "nosniff");
+  response.headers.set("X-Frame-Options", "DENY");
+  response.headers.set("Referrer-Policy", "strict-origin-when-cross-origin");
   return response;
 });

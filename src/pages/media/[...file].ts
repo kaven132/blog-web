@@ -47,6 +47,7 @@ export const GET: APIRoute = async ({ params, request, cookies }) => {
     "Content-Type": mime,
     "Accept-Ranges": "bytes",
     "Cache-Control": "public, max-age=31536000, immutable",
+    "X-Content-Type-Options": "nosniff",
   };
 
   // Range：只处理 "bytes=start-end" 与 "bytes=start-"（浏览器 video 元素只用这两种形态）
