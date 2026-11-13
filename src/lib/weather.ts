@@ -1,6 +1,8 @@
 /**
  * 天气数据（Open-Meteo，免费无密钥）：城市 → 坐标台账查点，拉当前温度/天气码/当日高低温。
- * 内存缓存 30 分钟；上游失败回退上次缓存，全无则返回 null（调用方整卡隐藏）。
+ * 内存缓存 30 分钟；上游失败回退上次缓存并进入 5 分钟退避窗（负缓存）——窗口内直接秒回旧值/null、
+ * 不再重试上游。否则上游一挂，每个 SSR 页面渲染都要全额等超时（实测全站 +10s/页的教训）。
+ * 全无缓存则返回 null（调用方整卡隐藏）。
  */
 
 export interface WeatherInfo {
@@ -32,7 +34,9 @@ const CITY_COORDS: Record<string, { lat: number; lon: number }> = {
 };
 
 const CACHE_TTL = 30 * 60 * 1000;
-const cache = new Map<string, { data: WeatherInfo; ts: number }>();
+/** 失败退避窗：上游失败后 5 分钟内不重试（负缓存），期间秒回旧值/null */
+const FAIL_TTL = 5 * 60 * 1000;
+const cache = new Map<string, { data: WeatherInfo | null; ts: number; failed?: boolean }>();
 
 export function lookupCity(city: string): { lat: number; lon: number } | null {
   return CITY_COORDS[city?.trim()] ?? null;
@@ -43,11 +47,19 @@ export async function fetchWeather(city: string): Promise<WeatherInfo | null> {
   if (!coord) return null;
 
   const cached = cache.get(city);
-  if (cached && Date.now() - cached.ts < CACHE_TTL) return cached.data;
+  if (cached) {
+    const age = Date.now() - cached.ts;
+    if (cached.failed) {
+      // 失败退避窗内：秒回旧值/null，不碰上游；窗过后放行重试
+      if (age < FAIL_TTL) return cached.data;
+    } else if (age < CACHE_TTL) {
+      return cached.data;
+    }
+  }
 
   try {
     const ctl = new AbortController();
-    const timer = setTimeout(() => ctl.abort(), 10_000);
+    const timer = setTimeout(() => ctl.abort(), 3_000);
     const url =
       `https://api.open-meteo.com/v1/forecast?latitude=${coord.lat}&longitude=${coord.lon}` +
       `&current=temperature_2m,weather_code&daily=temperature_2m_max,temperature_2m_min` +
@@ -71,7 +83,8 @@ export async function fetchWeather(city: string): Promise<WeatherInfo | null> {
     cache.set(city, { data, ts: Date.now() });
     return data;
   } catch {
-    // 上游失败回退上次缓存（过期也比没有强）；从未成功过则放弃
+    // 上游失败：记负缓存（退避窗起点），数据回退上次成功值（过期也比没有强）
+    cache.set(city, { data: cached?.data ?? null, ts: Date.now(), failed: true });
     return cached?.data ?? null;
   }
 }
